@@ -43,7 +43,7 @@ router.get('/', optionalAuth, async (req, res) => {
 // GET /api/games/:id
 router.get('/:id', optionalAuth, async (req, res) => {
   const game = await db.query.games.findFirst({
-    where: eq(schema.games.id, req.params['id']!),
+    where: eq(schema.games.id, req.params['id'] as string),
   });
 
   if (!game) { res.status(404).json({ error: 'Game not found' }); return; }

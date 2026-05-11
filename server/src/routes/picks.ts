@@ -90,7 +90,7 @@ router.post('/', requireAuth, async (req, res) => {
 
 // DELETE /api/picks/:id — remove a pick before lock
 router.delete('/:id', requireAuth, async (req, res) => {
-  const pick = await db.query.picks.findFirst({ where: eq(schema.picks.id, req.params['id']!) });
+  const pick = await db.query.picks.findFirst({ where: eq(schema.picks.id, req.params['id'] as string) });
 
   if (!pick) { res.status(404).json({ error: 'Pick not found' }); return; }
   if (pick.userId !== req.currentUser!.id) { res.status(403).json({ error: 'Not your pick' }); return; }

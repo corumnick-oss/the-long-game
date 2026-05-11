@@ -52,7 +52,7 @@ router.post('/', requireAuth, async (req, res) => {
 
 // GET /api/users/:id — other user profile (limited info + H2H vs viewer)
 router.get('/:id', optionalAuth, async (req, res) => {
-  const targetUser = await db.query.users.findFirst({ where: eq(schema.users.id, req.params['id']!) });
+  const targetUser = await db.query.users.findFirst({ where: eq(schema.users.id, req.params['id'] as string) });
   if (!targetUser) { res.status(404).json({ error: 'User not found' }); return; }
 
   const season = getCurrentNFLSeason();

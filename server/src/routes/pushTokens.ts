@@ -30,7 +30,7 @@ router.post('/', requireAuth, async (req, res) => {
 // DELETE /api/push-tokens/:token
 router.delete('/:token', requireAuth, async (req, res) => {
   await db.delete(schema.pushTokens).where(
-    and(eq(schema.pushTokens.token, req.params['token']!), eq(schema.pushTokens.userId, req.currentUser!.id))
+    and(eq(schema.pushTokens.token, req.params['token'] as string), eq(schema.pushTokens.userId, req.currentUser!.id))
   );
   res.status(204).send();
 });

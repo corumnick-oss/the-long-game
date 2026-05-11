@@ -12,7 +12,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 **App Name:** The Long Game
 **Type:** iOS and Android mobile app (React Native / Expo)
 **Purpose:** NFL picks app where users predict winners of each week's games and compete on leaderboards
-**Current Status:** Setup complete. Next step: Create Railway PostgreSQL database.
+**Current Status:** Setup complete. Deployed to Railway. Need to test variables and endpoints.
 **Target Launch:** Before NFL Season 2026 (starts September 4, 2026)
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone user
 
@@ -397,13 +397,14 @@ Permission flow: in-app prompt 10 seconds after first login, then system dialog.
 
 ## Complete Build Plan
 
-### Phase 1 — Backend Migration (CURRENT)
-- [ ] Create Railway PostgreSQL database (NEXT STEP)
-- [ ] Write Drizzle schema (src/db/schema.ts)
-- [ ] Run migrations
-- [ ] Write 2025 data migration script
-- [ ] Build all Express routes
-- [ ] Deploy to Railway
+### Phase 1 — Backend Migration (CURRENT - The X marks complete)
+- [X] Create Railway PostgreSQL database (NEXT STEP)
+- [X] Write Drizzle schema (src/db/schema.ts)
+- [X] Run migrations
+- [X] Write 2025 data migration script
+- [X] Build all Express routes
+- [X] Deploy to Railway
+  NOTE: We need to test this was deployed successfully. Check that variables are correct.
 - [ ] Test all endpoints
 
 ### Phase 2 — Expo Foundation
