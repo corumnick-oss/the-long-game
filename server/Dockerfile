@@ -4,15 +4,11 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Install all deps including devDependencies (tsc needs them at build time)
-RUN npm ci --include=dev
+RUN npm ci
 
 COPY . .
 
 RUN npm run build
-
-# Remove devDependencies from the final image
-RUN npm prune --production
 
 EXPOSE 3000
 
