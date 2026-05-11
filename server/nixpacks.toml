@@ -1,3 +1,6 @@
+[variables]
+NODE_ENV = "production"
+
 [phases.install]
 cmds = ["npm install"]
 
