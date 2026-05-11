@@ -52,8 +52,8 @@ const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} (${process.env['NODE_ENV'] ?? 'development'})`);
 
-  // Start scheduler only in production to avoid cron noise during local dev
-  if (process.env['NODE_ENV'] === 'production') {
+  // Start scheduler unless explicitly running in local dev
+  if (process.env['NODE_ENV'] !== 'development') {
     import('./services/scheduler').catch(console.error);
   }
 });
