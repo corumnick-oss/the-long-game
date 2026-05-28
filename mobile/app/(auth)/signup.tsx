@@ -12,6 +12,8 @@ import {
 import { Link } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 
+const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
+
 export default function SignupScreen() {
   const { signUpWithEmail } = useAuth();
   const [email, setEmail] = useState('');
@@ -44,11 +46,17 @@ export default function SignupScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-6 py-12"
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+          paddingVertical: 48,
+        }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View className="items-center mb-10">
           <Text className="text-5xl mb-3">🏈</Text>
@@ -57,8 +65,9 @@ export default function SignupScreen() {
         </View>
 
         <TextInput
-          className="bg-surface border border-border rounded-xl px-4 py-3.5 text-white text-base mb-3"
-          placeholder="Team name (displayed on leaderboard)"
+          className="bg-surface border border-border rounded-xl text-white text-base mb-3"
+          style={inputStyle}
+          placeholder="Team name (shown on leaderboard)"
           placeholderTextColor="#6b7280"
           value={teamName}
           onChangeText={setTeamName}
@@ -66,7 +75,8 @@ export default function SignupScreen() {
           autoComplete="name"
         />
         <TextInput
-          className="bg-surface border border-border rounded-xl px-4 py-3.5 text-white text-base mb-3"
+          className="bg-surface border border-border rounded-xl text-white text-base mb-3"
+          style={inputStyle}
           placeholder="Email"
           placeholderTextColor="#6b7280"
           value={email}
@@ -76,7 +86,8 @@ export default function SignupScreen() {
           autoComplete="email"
         />
         <TextInput
-          className="bg-surface border border-border rounded-xl px-4 py-3.5 text-white text-base mb-4"
+          className="bg-surface border border-border rounded-xl text-white text-base mb-4"
+          style={inputStyle}
           placeholder="Password (min. 6 characters)"
           placeholderTextColor="#6b7280"
           value={password}
@@ -90,7 +101,8 @@ export default function SignupScreen() {
         ) : null}
 
         <TouchableOpacity
-          className="bg-primary rounded-xl py-3.5 items-center"
+          className="bg-primary rounded-xl items-center justify-center"
+          style={{ height: 50 }}
           onPress={handleSignUp}
           disabled={isSubmitting}
         >

@@ -16,10 +16,12 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '@/context/AuthContext';
 
 // To enable Google Sign-In:
-// 1. Go to Firebase Console > Authentication > Sign-in method > Google
-// 2. Copy the Web client ID and paste as EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in mobile/.env
-// 3. Add iOS/Android client IDs if needed for native flows
+// 1. Firebase Console > Authentication > Sign-in method > Google > copy Web client ID
+// 2. Add to mobile/.env:  EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+
+// Shared style for all text inputs — explicit height prevents iOS text clipping
+const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
 
 export default function LoginScreen() {
   const { signInWithEmail, signInWithGoogleCredential, signInWithApple } = useAuth();
@@ -28,7 +30,7 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const [request, response, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+  const [_request, response, promptGoogleAsync] = Google.useIdTokenAuthRequest({
     clientId: GOOGLE_WEB_CLIENT_ID || 'not-configured',
   });
 
@@ -37,7 +39,7 @@ export default function LoginScreen() {
       const { id_token } = response.params;
       setIsSubmitting(true);
       signInWithGoogleCredential(id_token)
-        .catch((err) => setError(err.message))
+        .catch((err: Error) => setError(err.message))
         .finally(() => setIsSubmitting(false));
     } else if (response?.type === 'error') {
       setError(response.error?.message ?? 'Google sign-in failed');
@@ -64,8 +66,8 @@ export default function LoginScreen() {
   const handleGoogleSignIn = () => {
     if (!GOOGLE_WEB_CLIENT_ID) {
       Alert.alert(
-        'Google Sign-In',
-        'Google Sign-In is not yet configured. Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in mobile/.env',
+        'Google Sign-In Not Configured',
+        'Add your Google Web Client ID to mobile/.env:\n\nEXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_ID.apps.googleusercontent.com\n\nFind it in Firebase Console → Authentication → Sign-in method → Google.',
       );
       return;
     }
@@ -79,9 +81,19 @@ export default function LoginScreen() {
     try {
       await signInWithApple();
     } catch (err: unknown) {
-      if ((err as { code?: string }).code === 'ERR_REQUEST_CANCELED') return;
+      if ((err as { code?: string }).code === 'ERR_REQUEST_CANCELED') {
+        setIsSubmitting(false);
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Apple sign-in failed';
-      setError(msg);
+      if (msg.includes('identity provider') || msg.includes('operation-not-allowed')) {
+        Alert.alert(
+          'Apple Sign-In Not Configured',
+          'Enable Apple in Firebase Console:\n\nAuthentication → Sign-in method → Apple → Enable\n\nYou’ll need a Service ID from your Apple Developer account.',
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -90,11 +102,17 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerClassName="flex-grow justify-center px-6 py-12"
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+          paddingVertical: 48,
+        }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Logo / Title */}
         <View className="items-center mb-12">
@@ -105,11 +123,12 @@ export default function LoginScreen() {
 
         {/* OAuth buttons */}
         <TouchableOpacity
-          className="flex-row items-center justify-center bg-white rounded-xl py-3.5 mb-3"
+          className="flex-row items-center justify-center bg-white rounded-xl mb-3"
+          style={{ height: 50 }}
           onPress={handleGoogleSignIn}
           disabled={isSubmitting}
         >
-          <Text className="text-[#333] font-semibold text-base">G&nbsp;&nbsp;Sign in with Google</Text>
+          <Text className="text-[#333] font-semibold text-base">Sign in with Google</Text>
         </TouchableOpacity>
 
         <AppleAuthentication.AppleAuthenticationButton
@@ -129,7 +148,8 @@ export default function LoginScreen() {
 
         {/* Email / Password */}
         <TextInput
-          className="bg-surface border border-border rounded-xl px-4 py-3.5 text-white text-base mb-3"
+          className="bg-surface border border-border rounded-xl text-white text-base mb-3"
+          style={inputStyle}
           placeholder="Email"
           placeholderTextColor="#6b7280"
           value={email}
@@ -139,7 +159,8 @@ export default function LoginScreen() {
           autoComplete="email"
         />
         <TextInput
-          className="bg-surface border border-border rounded-xl px-4 py-3.5 text-white text-base mb-4"
+          className="bg-surface border border-border rounded-xl text-white text-base mb-4"
+          style={inputStyle}
           placeholder="Password"
           placeholderTextColor="#6b7280"
           value={password}
@@ -153,7 +174,8 @@ export default function LoginScreen() {
         ) : null}
 
         <TouchableOpacity
-          className="bg-primary rounded-xl py-3.5 items-center"
+          className="bg-primary rounded-xl items-center justify-center"
+          style={{ height: 50 }}
           onPress={handleEmailSignIn}
           disabled={isSubmitting}
         >
@@ -165,7 +187,7 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <View className="flex-row justify-center mt-6">
-          <Text className="text-muted text-sm">Don&apos;t have an account? </Text>
+          <Text className="text-muted text-sm">Don't have an account? </Text>
           <Link href="/(auth)/signup">
             <Text className="text-primary text-sm font-semibold">Create one</Text>
           </Link>
