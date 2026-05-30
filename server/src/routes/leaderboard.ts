@@ -17,13 +17,14 @@ router.get('/', optionalAuth, async (req, res) => {
   const isWeekly = type === 'weekly' && week != null;
   const longiesOnly = filter === 'longies';
 
-  // Build game filter subquery
   const gameFilter = isWeekly
     ? sql`g.season = ${season} AND g.week = ${week} AND g.sport = 'nfl'`
     : sql`g.season = ${season} AND g.sport = 'nfl'`;
 
   const userFilter = longiesOnly ? sql`u.is_longie = true` : sql`u.nfl_access = true`;
 
+  // Join order: users → games (filtered) → picks
+  // This ensures is_correct counts only apply to the filtered game set
   const result = await db.execute(sql`
     SELECT
       u.id                  AS user_id,
@@ -39,8 +40,8 @@ router.get('/', optionalAuth, async (req, res) => {
         WHERE t.user_id = u.id AND t.season = ${season} AND t.sport = 'nfl'
       ) AS INTEGER), 0) AS trophy_count
     FROM users u
-    LEFT JOIN picks p ON p.user_id = u.id
-    LEFT JOIN games g ON g.id = p.game_id AND ${gameFilter}
+    LEFT JOIN games g ON ${gameFilter}
+    LEFT JOIN picks p ON p.user_id = u.id AND p.game_id = g.id
     WHERE ${userFilter}
     GROUP BY u.id, u.team_name, u.profile_image_url, u.is_longie, u.is_premium, u.is_admin
     ORDER BY wins DESC, losses ASC

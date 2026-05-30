@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +25,7 @@ const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
 
 export default function LoginScreen() {
   const { signInWithEmail, signInWithGoogleCredential, signInWithApple } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,14 +87,7 @@ export default function LoginScreen() {
         return;
       }
       const msg = err instanceof Error ? err.message : 'Apple sign-in failed';
-      if (msg.includes('identity provider') || msg.includes('operation-not-allowed')) {
-        Alert.alert(
-          'Apple Sign-In Not Configured',
-          'Enable Apple in Firebase Console:\n\nAuthentication → Sign-in method → Apple → Enable\n\nYou’ll need a Service ID from your Apple Developer account.',
-        );
-      } else {
-        setError(msg);
-      }
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -168,6 +162,10 @@ export default function LoginScreen() {
           secureTextEntry
           autoComplete="current-password"
         />
+
+        <TouchableOpacity className="items-end mb-4 -mt-1" onPress={() => router.push('/forgot-password' as never)}>
+          <Text className="text-primary text-sm">Forgot password?</Text>
+        </TouchableOpacity>
 
         {error ? (
           <Text className="text-danger text-sm mb-3 text-center">{error}</Text>

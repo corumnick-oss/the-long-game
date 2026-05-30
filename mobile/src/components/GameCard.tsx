@@ -1,0 +1,242 @@
+import { View, Text, TouchableOpacity, Image } from 'react-native';
+import type { Game } from '../hooks/usePicksData';
+
+type Props = {
+  game: Game;
+  isLocked: boolean;
+  onPick: (pick: 'home' | 'away') => void;
+};
+
+function formatGameTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
+function TeamRow({
+  team,
+  logo,
+  record,
+  score,
+  ppg,
+  ppgAllowed,
+  isPicked,
+  isWinner,
+  isFinal,
+  isLive,
+  pickPct,
+  showPct,
+  pickOutcome,
+  onPress,
+  disabled,
+}: {
+  team: string;
+  logo: string | null;
+  record: string | null;
+  score: number | null;
+  ppg: string | null;
+  ppgAllowed: string | null;
+  isPicked: boolean;
+  isWinner: boolean;
+  isFinal: boolean;
+  isLive: boolean;
+  pickPct: number;
+  showPct: boolean;
+  pickOutcome: 'correct' | 'wrong' | 'pending' | null;
+  onPress: () => void;
+  disabled: boolean;
+}) {
+  const showScore = isFinal || isLive;
+  const winnerBg = isFinal && isWinner;
+
+  const badgeStyle = pickOutcome === 'correct'
+    ? 'bg-success'
+    : pickOutcome === 'wrong'
+    ? 'bg-danger'
+    : 'bg-primary';
+
+  const badgeLabel = pickOutcome === 'correct'
+    ? '✓ CORRECT'
+    : pickOutcome === 'wrong'
+    ? '✗ WRONG'
+    : 'MY PICK';
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+      className={`flex-row items-center px-4 py-3 ${winnerBg ? 'bg-green-900/40' : ''}`}
+    >
+      {/* Logo */}
+      <View className="w-10 h-10 mr-3 items-center justify-center">
+        {logo ? (
+          <Image source={{ uri: logo }} style={{ width: 40, height: 40 }} resizeMode="contain" />
+        ) : (
+          <View className="w-10 h-10 rounded-full bg-surface items-center justify-center">
+            <Text className="text-white text-xs font-bold">{team.slice(0, 2).toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Team info */}
+      <View className="flex-1">
+        <View className="flex-row items-center">
+          <Text className={`font-semibold text-base ${winnerBg ? 'text-green-400' : 'text-white'}`} numberOfLines={1}>
+            {team}
+          </Text>
+          {isPicked && (
+            <View className={`ml-2 rounded px-1.5 py-0.5 ${badgeStyle}`}>
+              <Text className="text-white text-xs font-bold">{badgeLabel}</Text>
+            </View>
+          )}
+        </View>
+        {record && !showScore && (
+          <Text className="text-muted text-xs mt-0.5">{record}</Text>
+        )}
+        {!showScore && ppg && (
+          <Text className="text-muted text-xs">{ppg} PPG · {ppgAllowed} allowed</Text>
+        )}
+        {/* Pick % bar */}
+        {showPct && (
+          <View className="mt-1.5 h-1.5 bg-surface rounded-full overflow-hidden" style={{ width: '100%' }}>
+            <View className="h-full bg-primary rounded-full" style={{ width: `${pickPct}%` }} />
+          </View>
+        )}
+        {showPct && (
+          <Text className="text-muted text-xs mt-0.5">{pickPct}% picked</Text>
+        )}
+      </View>
+
+      {/* Score or win prob */}
+      {showScore ? (
+        <Text className={`text-2xl font-bold ml-2 ${winnerBg ? 'text-green-400' : 'text-white'}`}>
+          {score ?? 0}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
+export function GameCard({ game, isLocked, onPick }: Props) {
+  const isFinal = game.status === 'post';
+  const isLive = game.status === 'in';
+  const isPre = game.status === 'pre';
+
+  // Determine winner for final games
+  const homeWins = isFinal && game.homeScore !== null && game.awayScore !== null && game.homeScore > game.awayScore;
+  const awayWins = isFinal && game.homeScore !== null && game.awayScore !== null && game.awayScore > game.homeScore;
+
+  const homePicked = game.myPick === 'home';
+  const awayPicked = game.myPick === 'away';
+
+  // Pick outcome for badge + border color
+  const homePickOutcome: 'correct' | 'wrong' | 'pending' | null = homePicked
+    ? isFinal ? (homeWins ? 'correct' : 'wrong') : 'pending'
+    : null;
+  const awayPickOutcome: 'correct' | 'wrong' | 'pending' | null = awayPicked
+    ? isFinal ? (awayWins ? 'correct' : 'wrong') : 'pending'
+    : null;
+
+  const showPct = isLocked;
+  const homePct = game.homePickPct ?? 50;
+  const awayPct = game.awayPickPct ?? 50;
+
+  const canPick = !isLocked && (isPre || isLive);
+
+  const hasPick = game.myPick !== null;
+  const pickedOutcome = homePickOutcome ?? awayPickOutcome;
+  const borderColor = !hasPick
+    ? '#2a2a2a'
+    : pickedOutcome === 'correct'
+    ? '#22c55e'
+    : pickedOutcome === 'wrong'
+    ? '#ef4444'
+    : '#3b82f6';
+
+  return (
+    <View
+      className="bg-surface rounded-2xl mx-4 mb-4 overflow-hidden"
+      style={{ borderWidth: 2, borderColor }}
+    >
+      {/* Live / Final badge */}
+      {(isLive || isFinal) && (
+        <View className={`px-3 py-1 ${isLive ? 'bg-red-600' : 'bg-zinc-700'}`}>
+          <Text className="text-white text-xs font-bold text-center">
+            {isLive ? `${game.displayClock ?? ''} · Q${game.period ?? ''}` : 'FINAL'}
+          </Text>
+        </View>
+      )}
+
+      {/* Away team (top) */}
+      <TeamRow
+        team={game.awayTeam}
+        logo={game.awayTeamLogo}
+        record={game.awayTeamRecord}
+        score={game.awayScore}
+        ppg={game.awayTeamPPG}
+        ppgAllowed={game.awayTeamPPGAllowed}
+        isPicked={awayPicked}
+        isWinner={awayWins}
+        isFinal={isFinal}
+        isLive={isLive}
+        pickPct={awayPct}
+        showPct={showPct}
+        pickOutcome={awayPickOutcome}
+        onPress={() => onPick('away')}
+        disabled={!canPick}
+      />
+
+      {/* Divider with game info */}
+      <View className="flex-row items-center px-4 py-1.5 border-t border-b border-border">
+        <View className="flex-1">
+          {isPre && game.spread && (
+            <Text className="text-muted text-xs">Spread: {game.spread}</Text>
+          )}
+        </View>
+        <Text className="text-muted text-xs text-center flex-1">
+          {isPre ? formatGameTime(game.gameTime) : isLive ? 'LIVE' : 'Final'}
+        </Text>
+        <View className="flex-1 items-end">
+          {isPre && game.winningTeamWinProb && (
+            <Text className="text-muted text-xs">
+              {game.favoriteTeam ? `${Math.round(parseFloat(game.winningTeamWinProb) * 100)}% fav` : ''}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Home team (bottom) */}
+      <TeamRow
+        team={game.homeTeam}
+        logo={game.homeTeamLogo}
+        record={game.homeTeamRecord}
+        score={game.homeScore}
+        ppg={game.homeTeamPPG}
+        ppgAllowed={game.homeTeamPPGAllowed}
+        isPicked={homePicked}
+        isWinner={homeWins}
+        isFinal={isFinal}
+        isLive={isLive}
+        pickPct={homePct}
+        showPct={showPct}
+        pickOutcome={homePickOutcome}
+        onPress={() => onPick('home')}
+        disabled={!canPick}
+      />
+
+      {/* Locked message if no pick yet */}
+      {isLocked && !hasPick && isPre && (
+        <View className="px-4 py-2 bg-zinc-800/60">
+          <Text className="text-muted text-xs text-center">Picks locked — you didn't submit</Text>
+        </View>
+      )}
+    </View>
+  );
+}

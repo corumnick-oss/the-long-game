@@ -5,12 +5,14 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithCredential,
   OAuthProvider,
   updateProfile,
 } from 'firebase/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { auth } from '../lib/firebase';
 import { API_BASE } from '../lib/queryClient';
@@ -25,6 +27,7 @@ type AuthContextType = {
   signInWithGoogleCredential: (idToken: string) => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -57,6 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setIsLoading(false);
+      // Sync on session restore so the DB record always exists
+      if (firebaseUser) syncUserToBackend(firebaseUser);
     });
     return unsubscribe;
   }, []);
@@ -80,16 +85,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithApple = async () => {
+    // Firebase requires a nonce to prevent replay attacks
+    const rawNonce = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const hashedNonce = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      rawNonce,
+    );
+
     const credential = await AppleAuthentication.signInAsync({
       requestedScopes: [
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
+      nonce: hashedNonce,
     });
+
     const { identityToken, fullName } = credential;
     if (!identityToken) throw new Error('No identity token from Apple');
+
     const provider = new OAuthProvider('apple.com');
-    const oauthCredential = provider.credential({ idToken: identityToken });
+    const oauthCredential = provider.credential({ idToken: identityToken, rawNonce });
     const result = await signInWithCredential(auth, oauthCredential);
     const teamName = fullName?.givenName
       ? `${fullName.givenName}${fullName.familyName ? ' ' + fullName.familyName : ''}`
@@ -99,6 +114,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+  };
+
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
   };
 
   return (
@@ -111,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogleCredential,
         signInWithApple,
         signOut,
+        resetPassword,
       }}
     >
       {children}

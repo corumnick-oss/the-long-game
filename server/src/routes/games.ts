@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import * as schema from '../db/schema';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { isWeekLocked } from '../utils/lockTime';
 import { getCurrentNFLSeason } from '../utils/season';
@@ -34,9 +34,36 @@ router.get('/', optionalAuth, async (req, res) => {
     myPicksMap = Object.fromEntries(allMyPicks.filter(p => gameList.some(g => g.id === p.gameId)).map(p => [p.gameId, p.pick]));
   }
 
+  // Compute pick % after lock
+  let pickPctMap: Record<string, { homePickPct: number | null; awayPickPct: number | null }> = {};
+  if (week && gameList.length > 0) {
+    const locked = await isWeekLocked(week, season);
+    if (locked) {
+      const gameIds = gameList.map(g => g.id);
+      const allPicks = await db.query.picks.findMany({
+        where: inArray(schema.picks.gameId, gameIds),
+      });
+      for (const game of gameList) {
+        const gamePicks = allPicks.filter(p => p.gameId === game.id);
+        const total = gamePicks.length;
+        if (total === 0) {
+          pickPctMap[game.id] = { homePickPct: null, awayPickPct: null };
+        } else {
+          const homeCount = gamePicks.filter(p => p.pick === 'home').length;
+          pickPctMap[game.id] = {
+            homePickPct: Math.round((homeCount / total) * 100),
+            awayPickPct: Math.round(((total - homeCount) / total) * 100),
+          };
+        }
+      }
+    }
+  }
+
   res.json(gameList.map(game => ({
     ...game,
     myPick: myPicksMap[game.id] ?? null,
+    homePickPct: pickPctMap[game.id]?.homePickPct ?? null,
+    awayPickPct: pickPctMap[game.id]?.awayPickPct ?? null,
   })));
 });
 
