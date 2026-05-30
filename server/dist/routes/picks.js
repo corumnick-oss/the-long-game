@@ -67,22 +67,53 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
         return;
     }
     const locked = await (0, lockTime_1.isWeekLocked)(week, season);
-    if (!locked) {
-        res.json({ locked: false, picks: [] });
-        return;
-    }
     const weekGames = await db_1.db.query.games.findMany({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+        orderBy: [(0, drizzle_orm_1.asc)(schema.games.gameTime)],
     });
-    const gameIds = weekGames.map(g => g.id);
-    if (!gameIds.length) {
-        res.json({ locked: true, picks: [] });
+    if (!locked) {
+        res.json({ locked: false, week, season, games: weekGames.map(g => ({
+                id: g.id, homeTeam: g.homeTeam, awayTeam: g.awayTeam,
+                homeTeamLogo: g.homeTeamLogo, awayTeamLogo: g.awayTeamLogo,
+                homeScore: g.homeScore, awayScore: g.awayScore, status: g.status,
+            })), users: [], picksByUser: {} });
         return;
     }
-    const allPicks = await db_1.db.query.picks.findMany({
-        where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds),
+    const gameIds = weekGames.map(g => g.id);
+    const [longies, allPicks] = await Promise.all([
+        db_1.db.query.users.findMany({ where: (0, drizzle_orm_1.eq)(schema.users.isLongie, true) }),
+        gameIds.length
+            ? db_1.db.query.picks.findMany({ where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds) })
+            : Promise.resolve([]),
+    ]);
+    // picksByUser[userId][gameId] = { pick, isCorrect }
+    const picksByUser = {};
+    for (const p of allPicks) {
+        if (!picksByUser[p.userId])
+            picksByUser[p.userId] = {};
+        picksByUser[p.userId][p.gameId] = { pick: p.pick, isCorrect: p.isCorrect ?? null };
+    }
+    res.json({
+        locked: true,
+        week,
+        season,
+        games: weekGames.map(g => ({
+            id: g.id,
+            homeTeam: g.homeTeam,
+            awayTeam: g.awayTeam,
+            homeTeamLogo: g.homeTeamLogo,
+            awayTeamLogo: g.awayTeamLogo,
+            homeScore: g.homeScore,
+            awayScore: g.awayScore,
+            status: g.status,
+        })),
+        users: longies.map(u => ({
+            id: u.id,
+            teamName: u.teamName,
+            profileImageUrl: u.profileImageUrl,
+        })),
+        picksByUser,
     });
-    res.json({ locked: true, picks: allPicks });
 });
 // POST /api/picks  — submit or update a pick (before lock)
 router.post('/', auth_1.requireAuth, async (req, res) => {

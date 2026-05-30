@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import * as schema from '../db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, asc } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
 import { isWeekLocked } from '../utils/lockTime';
 import { getCurrentNFLSeason } from '../utils/season';
@@ -36,22 +36,58 @@ router.get('/week', requireAuth, async (req, res) => {
   if (!week) { res.status(400).json({ error: 'week is required' }); return; }
 
   const locked = await isWeekLocked(week, season);
-  if (!locked) {
-    res.json({ locked: false, picks: [] });
-    return;
-  }
 
   const weekGames = await db.query.games.findMany({
     where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl')),
+    orderBy: [asc(schema.games.gameTime)],
   });
+
+  if (!locked) {
+    res.json({ locked: false, week, season, games: weekGames.map(g => ({
+      id: g.id, homeTeam: g.homeTeam, awayTeam: g.awayTeam,
+      homeTeamLogo: g.homeTeamLogo, awayTeamLogo: g.awayTeamLogo,
+      homeScore: g.homeScore, awayScore: g.awayScore, status: g.status,
+    })), users: [], picksByUser: {} });
+    return;
+  }
+
   const gameIds = weekGames.map(g => g.id);
-  if (!gameIds.length) { res.json({ locked: true, picks: [] }); return; }
 
-  const allPicks = await db.query.picks.findMany({
-    where: inArray(schema.picks.gameId, gameIds),
+  const [longies, allPicks] = await Promise.all([
+    db.query.users.findMany({ where: eq(schema.users.isLongie, true) }),
+    gameIds.length
+      ? db.query.picks.findMany({ where: inArray(schema.picks.gameId, gameIds) })
+      : Promise.resolve([]),
+  ]);
+
+  // picksByUser[userId][gameId] = { pick, isCorrect }
+  const picksByUser: Record<string, Record<string, { pick: string; isCorrect: boolean | null }>> = {};
+  for (const p of allPicks) {
+    if (!picksByUser[p.userId]) picksByUser[p.userId] = {};
+    picksByUser[p.userId][p.gameId] = { pick: p.pick, isCorrect: p.isCorrect ?? null };
+  }
+
+  res.json({
+    locked: true,
+    week,
+    season,
+    games: weekGames.map(g => ({
+      id: g.id,
+      homeTeam: g.homeTeam,
+      awayTeam: g.awayTeam,
+      homeTeamLogo: g.homeTeamLogo,
+      awayTeamLogo: g.awayTeamLogo,
+      homeScore: g.homeScore,
+      awayScore: g.awayScore,
+      status: g.status,
+    })),
+    users: longies.map(u => ({
+      id: u.id,
+      teamName: u.teamName,
+      profileImageUrl: u.profileImageUrl,
+    })),
+    picksByUser,
   });
-
-  res.json({ locked: true, picks: allPicks });
 });
 
 // POST /api/picks  — submit or update a pick (before lock)
