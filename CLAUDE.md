@@ -43,18 +43,31 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 - **Game Detail Screen** ✅ — compact header, prev/next, team stats (PPG/OppPPG), pick list after lock, tappable from Picks + Week Picks
 - **Public Profile Screen** ✅ — other user profiles, season stats, weekly history, H2H vs viewer, pick comparison (Nick's fav feature)
 - **Auth timing fixed** ✅ — user.uid in query key, token from React state (not auth.currentUser)
-- **seed:nick script** ✅ — `npm run seed:nick` in server/ seeds nickcorum@gmail.com with Nicholas's 2025 picks
+- **seed:nick script** ✅ — `npm run seed:nick` in server/ seeds nickcorum@gmail.com with Nicholas's 2025 picks + trophies
+- **Game Detail improvements** ✅ — winner highlighted green, loser dimmed, MY PICK badge (green ✓ or red ✗), outcome banner
+- **Profile insights** ✅ — shows W-L record alongside accuracy % for best/worst team
+- **H2H rows tappable** ✅ — navigate to opponent's public profile
+- **Public profiles tappable from leaderboard** ✅
+- **Week Picks bounce scroll fixed** ✅ — header row is scrollable and syncs with game rows
 
 ### Known TODOs (Before Launch)
-- **GameCard correct/incorrect UI polish** — green/red design is functional but needs visual redesign
-- **Remove debug console.logs** — `[apiFetch]` and `[useGames]` logs left in from auth debugging (queryClient.ts + usePicksData.ts)
-- **Player names tappable in Week Picks** — user requested; tapping a user row name should navigate to their public profile
-- **Splash/onboarding screen** — logo + tagline screen, not yet built
+- **Remove debug console.logs** — `[apiFetch]` and `[useGames]` logs in queryClient.ts + usePicksData.ts
+- **Player names tappable in Week Picks** — tapping a user's name should navigate to their public profile
+- **GameCard correct/incorrect UI polish** — green/red design works but needs visual redesign
+- **Splash/onboarding screen** — logo + tagline screen not yet built
 - **Trophy case UI redesign** — current design uses placeholder emojis; needs:
-  - Custom trophy artwork/images per trophy type (most_wins, loser, upset_pick, lone_wolf, contrarian)
-  - Better layout in the profile trophy case grid
-  - The contrarian trophy image was never created (placeholder only)
-  - Consider full-screen trophy detail view on tap (name, description, week earned, game context)
+  - Custom trophy artwork/images per type (most_wins, loser, upset_pick, lone_wolf, contrarian)
+  - Better grid layout in profile
+  - Contrarian trophy image was never created (placeholder only)
+  - Consider full-screen trophy detail on tap (description, week earned, game context)
+
+### seed:nick — Re-run After Any Cleanup
+`npm run seed:nick` (from server/) must be re-run any time Nick's test data is wiped. It:
+- Looks up nickcorum@gmail.com UID via Firebase Admin
+- Sets isAdmin=true, isLongie=true, teamName=Nicholas
+- Copies all 179 2025 picks from CSV → DB (mapped via espnId)
+- Copies all Nicholas trophies from CSV → DB
+Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env
 
 ### Showing 2025 Season — CORRECT BEHAVIOR
 getCurrentNFLSeason() correctly returns 2025 in May 2026 because the 2026 NFL season starts September 4, 2026. It will flip automatically on that date. No fix needed.
