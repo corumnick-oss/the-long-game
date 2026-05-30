@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Image } from 'react-native';
 import type { Game } from '../hooks/usePicksData';
 
 type Props = {
@@ -162,7 +162,8 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
     : '#3b82f6';
 
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       className="bg-surface rounded-2xl mx-4 mb-4 overflow-hidden"
       style={{ borderWidth: 2, borderColor }}
     >
@@ -194,13 +195,8 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
         disabled={!canPick}
       />
 
-      {/* Divider with game info — tappable to open game detail */}
-      <TouchableOpacity
-        onPress={onPress}
-        disabled={!onPress}
-        activeOpacity={onPress ? 0.6 : 1}
-        className="flex-row items-center px-4 py-1.5 border-t border-b border-border"
-      >
+      {/* Divider with game info */}
+      <View className="flex-row items-center px-4 py-1.5 border-t border-b border-border">
         <View className="flex-1">
           {isPre && game.spread && (
             <Text className="text-muted text-xs">Spread: {game.spread}</Text>
@@ -217,7 +213,7 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
           )}
           {onPress && <Text className="text-muted text-xs">›</Text>}
         </View>
-      </TouchableOpacity>
+      </View>
 
       {/* Home team (bottom) */}
       <TeamRow
@@ -244,6 +240,6 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
           <Text className="text-muted text-xs text-center">Picks locked — you didn't submit</Text>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }

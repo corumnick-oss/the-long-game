@@ -60,9 +60,11 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
-function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
+function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: () => void }) {
   return (
-    <View
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
       className={`flex-row items-center px-4 py-3 border-b border-border ${entry.isCurrentUser ? 'bg-primary/10' : ''}`}
     >
       <View className="w-8 items-center mr-1">
@@ -84,7 +86,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
       <Text className="text-white text-sm font-bold w-14 text-right">
         {entry.accuracy}%
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -126,8 +128,10 @@ function ListHeader({ filter, setFilter, type, setType }: {
 }
 
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 
 export default function LeaderboardScreen() {
+  const router = useRouter();
   const [filter, setFilter] = useState<Filter>('longies');
   const [type, setType] = useState<ViewType>('season');
 
@@ -162,7 +166,18 @@ export default function LeaderboardScreen() {
       <FlatList
         data={data?.entries ?? []}
         keyExtractor={item => item.userId}
-        renderItem={({ item }) => <LeaderboardRow entry={item} />}
+        renderItem={({ item }) => (
+          <LeaderboardRow
+            entry={item}
+            onPress={() => {
+              if (item.isCurrentUser) {
+                router.push('/(tabs)/profile');
+              } else {
+                router.push({ pathname: '/user/[id]' as any, params: { id: item.userId } });
+              }
+            }}
+          />
+        )}
         ListHeaderComponent={
           <ListHeader
             filter={filter}
