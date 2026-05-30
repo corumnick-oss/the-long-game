@@ -1,7 +1,7 @@
 import '../src/global.css';
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -42,7 +42,7 @@ function AuthGate() {
 
   return (
     <>
-      <Slot />
+      <Stack screenOptions={{ headerShown: false }} />
       <NotificationPrompt
         visible={showPrompt}
         onAllow={handleAllow}

@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, Image, TouchableOpacity,
   ActivityIndicator, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useWeekPicks, type WeekPicksGame, type WeekPicksUser } from '@/hooks/useWeekPicks';
 import { WeekSelector } from '@/components/WeekSelector';
@@ -13,10 +14,10 @@ const NAME_W = 88; // px for the fixed name column
 
 // ── Game column header ─────────────────────────────────────────────────────
 
-function GameHeader({ game }: { game: WeekPicksGame }) {
+function GameHeader({ game, onPress }: { game: WeekPicksGame; onPress: () => void }) {
   const isFinal = game.status === 'post';
   return (
-    <View style={{ width: CELL }} className="items-center py-1 px-1">
+    <TouchableOpacity style={{ width: CELL }} className="items-center py-1 px-1" onPress={onPress} activeOpacity={0.7}>
       {/* Away logo */}
       <View className="w-9 h-9 items-center justify-center">
         {game.awayTeamLogo ? (
@@ -40,7 +41,7 @@ function GameHeader({ game }: { game: WeekPicksGame }) {
           <Text className="text-muted text-xs">{game.homeTeam.slice(0, 3)}</Text>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -94,6 +95,7 @@ function PickCell({
 // ── Main screen ────────────────────────────────────────────────────────────
 
 export default function WeekPicksScreen() {
+  const router = useRouter();
   const currentWeek = getCurrentNFLWeek();
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
   const { data, isLoading, isError, refetch } = useWeekPicks(selectedWeek, SEASON);
@@ -179,7 +181,14 @@ export default function WeekPicksScreen() {
               showsHorizontalScrollIndicator={false}
             >
               {games.map(game => (
-                <GameHeader key={game.id} game={game} />
+                <GameHeader
+                  key={game.id}
+                  game={game}
+                  onPress={() => router.push({
+                    pathname: '/game/[id]' as any,
+                    params: { id: game.id, week: String(selectedWeek), season: String(SEASON) },
+                  })}
+                />
               ))}
             </ScrollView>
           </View>
