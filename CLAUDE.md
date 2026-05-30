@@ -790,6 +790,9 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 
 ## Future Features — Not Building Now
 
+### Team History Screen
+Tapping a team logo (anywhere in the app) opens that team's past game history — schedule, scores, results. Would use ESPN API's `/teams/{teamId}/schedule` endpoint. Useful context for making picks.
+
 ### Advanced Game Stats (Pre-Game + Post-Game)
 Discussed and scoped — deferring to let the 2026 season generate real data.
 

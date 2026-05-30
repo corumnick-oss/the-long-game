@@ -165,13 +165,52 @@ async function main() {
     if (unmatched > 0) {
         console.warn(`Warning: ${unmatched} picks skipped — game not found in DB`);
     }
-    // 10. Insert in batches
+    // 10. Insert picks in batches
     const BATCH = 50;
     for (let i = 0; i < rows.length; i += BATCH) {
         await db.insert(schema.picks).values(rows.slice(i, i + BATCH));
     }
-    console.log(`\nInserted ${matched} picks for ${TARGET_EMAIL}`);
-    console.log('Done! Pull-to-refresh in the app to see your 2025 picks.\n');
+    console.log(`Inserted ${matched} picks for ${TARGET_EMAIL}`);
+    // 11. Copy trophies from CSV
+    const nicholasTrophies = readCsv('trophies.csv').filter(t => t['user_id'] === NICHOLAS_OLD_UID);
+    console.log(`${nicholasTrophies.length} trophies found for Nicholas in CSV`);
+    await db.delete(schema.trophies).where((0, drizzle_orm_1.eq)(schema.trophies.userId, firebaseUid));
+    let trophiesInserted = 0;
+    let trophiesSkipped = 0;
+    const trophyRows = [];
+    for (const t of nicholasTrophies) {
+        // Map gameId if present
+        let dbGameId = null;
+        if (t['game_id']) {
+            const espnId = csvToEspn.get(t['game_id']);
+            dbGameId = espnId ? espnToDb.get(espnId) ?? null : null;
+            if (!dbGameId) {
+                trophiesSkipped++;
+                continue;
+            }
+        }
+        trophyRows.push({
+            id: (0, crypto_1.randomUUID)(),
+            userId: firebaseUid,
+            type: t['type'],
+            name: t['name'],
+            description: t['description'],
+            week: parseInt(t['week'], 10),
+            season: parseInt(t['season'], 10),
+            sport: t['sport'] || 'nfl',
+            gameId: dbGameId,
+            earnedAt: parseDate(t['earned_at']) ?? new Date(),
+        });
+        trophiesInserted++;
+    }
+    for (let i = 0; i < trophyRows.length; i += BATCH) {
+        await db.insert(schema.trophies).values(trophyRows.slice(i, i + BATCH));
+    }
+    if (trophiesSkipped > 0) {
+        console.warn(`Warning: ${trophiesSkipped} trophies skipped (game ID not found)`);
+    }
+    console.log(`Inserted ${trophiesInserted} trophies for ${TARGET_EMAIL}`);
+    console.log('\nDone! Pull-to-refresh in the app to see your 2025 picks and trophies.\n');
     await pool.end();
     process.exit(0);
 }

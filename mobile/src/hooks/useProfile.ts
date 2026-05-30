@@ -33,8 +33,8 @@ export type MyProfile = {
   weeklyHistory: WeekRecord[];
   h2h: H2HEntry[];
   insights: {
-    bestTeam: { team: string; accuracy: number } | null;
-    worstTeam: { team: string; accuracy: number } | null;
+    bestTeam: { team: string; wins: number; losses: number; accuracy: number } | null;
+    worstTeam: { team: string; wins: number; losses: number; accuracy: number } | null;
   };
 };
 

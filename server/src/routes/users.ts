@@ -199,8 +199,15 @@ async function getInsights(userId: string, season: number) {
     ORDER BY (SUM(CASE WHEN p.is_correct = true THEN 1 ELSE 0 END)::float / COUNT(*)) DESC
   `);
   const teams = ((teamStatsResult as any).rows ?? teamStatsResult) as any[];
-  const bestTeam = teams[0] ? { team: teams[0].team, accuracy: Math.round((Number(teams[0].correct) / Number(teams[0].total)) * 100) } : null;
-  const worstTeam = teams[teams.length - 1] ? { team: teams[teams.length - 1].team, accuracy: Math.round((Number(teams[teams.length - 1].correct) / Number(teams[teams.length - 1].total)) * 100) } : null;
+  const makeTeamStat = (row: any) => row ? {
+    team: row.team as string,
+    wins: Number(row.correct),
+    losses: Number(row.total) - Number(row.correct),
+    accuracy: Math.round((Number(row.correct) / Number(row.total)) * 100),
+  } : null;
+
+  const bestTeam = makeTeamStat(teams[0]);
+  const worstTeam = makeTeamStat(teams[teams.length - 1]);
 
   return { bestTeam, worstTeam };
 }

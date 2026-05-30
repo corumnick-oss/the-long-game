@@ -1,4 +1,5 @@
 import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useMyProfile, useMyTrophies, type H2HEntry, type WeekRecord, type Trophy } from '@/hooks/useProfile';
 
@@ -94,14 +95,20 @@ function WeeklyHistory({ history }: { history: WeekRecord[] }) {
 // ── H2H row ───────────────────────────────────────────────────────────────────
 
 function H2HRow({ entry }: { entry: H2HEntry }) {
+  const router = useRouter();
   const total = entry.wins + entry.losses + entry.ties;
   const initials = entry.teamName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   return (
-    <View className="flex-row items-center py-2.5 border-b border-border">
+    <TouchableOpacity
+      onPress={() => router.push({ pathname: '/user/[id]' as any, params: { id: entry.opponentId } })}
+      activeOpacity={0.7}
+      className="flex-row items-center py-2.5 border-b border-border"
+    >
       <View className="w-8 h-8 rounded-full bg-surface-2 items-center justify-center mr-3">
         <Text className="text-white text-xs font-bold">{initials}</Text>
       </View>
       <Text className="flex-1 text-white text-sm font-medium">{entry.teamName}</Text>
+      <Text className="text-primary text-xs mr-3">›</Text>
       {total === 0 ? (
         <Text className="text-muted text-sm">No games</Text>
       ) : (
@@ -120,7 +127,7 @@ function H2HRow({ entry }: { entry: H2HEntry }) {
           </View>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -240,9 +247,14 @@ export default function ProfileScreen() {
                 <Text className="text-success text-base mr-2">↑</Text>
                 <View className="flex-1">
                   <Text className="text-white text-sm font-medium">{profile.insights.bestTeam.team}</Text>
-                  <Text className="text-muted text-xs">Best team</Text>
+                  <Text className="text-muted text-xs">Best team to pick</Text>
                 </View>
-                <Text className="text-success font-bold">{profile.insights.bestTeam.accuracy}%</Text>
+                <View className="items-end">
+                  <Text className="text-success font-bold">{profile.insights.bestTeam.accuracy}%</Text>
+                  <Text className="text-muted text-xs">
+                    {profile.insights.bestTeam.wins}-{profile.insights.bestTeam.losses}
+                  </Text>
+                </View>
               </View>
             )}
             {profile.insights.worstTeam && (
@@ -250,9 +262,14 @@ export default function ProfileScreen() {
                 <Text className="text-danger text-base mr-2">↓</Text>
                 <View className="flex-1">
                   <Text className="text-white text-sm font-medium">{profile.insights.worstTeam.team}</Text>
-                  <Text className="text-muted text-xs">Worst team</Text>
+                  <Text className="text-muted text-xs">Worst team to pick</Text>
                 </View>
-                <Text className="text-danger font-bold">{profile.insights.worstTeam.accuracy}%</Text>
+                <View className="items-end">
+                  <Text className="text-danger font-bold">{profile.insights.worstTeam.accuracy}%</Text>
+                  <Text className="text-muted text-xs">
+                    {profile.insights.worstTeam.wins}-{profile.insights.worstTeam.losses}
+                  </Text>
+                </View>
               </View>
             )}
           </View>
