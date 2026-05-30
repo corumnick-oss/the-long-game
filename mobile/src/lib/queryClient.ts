@@ -13,6 +13,10 @@ export const queryClient = new QueryClient({
 });
 
 export async function apiFetch<T = unknown>(path: string, options?: RequestInit): Promise<T> {
+  // Wait for Firebase to finish restoring the persisted session before reading currentUser.
+  // Without this, currentUser is null on app open even for logged-in users, so no Bearer
+  // token is sent and the backend can't return user-specific data (myPick, etc.).
+  await auth.authStateReady();
   const token = await auth.currentUser?.getIdToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

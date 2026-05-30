@@ -114,20 +114,28 @@ async function main() {
         });
     }
     console.log('User: isAdmin=true, isLongie=true, teamName=Nicholas');
-    // 3. Build espnId → DB game UUID
+    // 3. Remove the old migration Nicholas record if it exists (avoids duplicate on leaderboard)
+    const oldNicholasExists = await db.query.users.findFirst({ where: (0, drizzle_orm_1.eq)(schema.users.id, NICHOLAS_OLD_UID) });
+    if (oldNicholasExists) {
+        await db.delete(schema.picks).where((0, drizzle_orm_1.eq)(schema.picks.userId, NICHOLAS_OLD_UID));
+        await db.delete(schema.trophies).where((0, drizzle_orm_1.eq)(schema.trophies.userId, NICHOLAS_OLD_UID));
+        await db.delete(schema.users).where((0, drizzle_orm_1.eq)(schema.users.id, NICHOLAS_OLD_UID));
+        console.log('Removed old migration Nicholas record (picks + trophies + user)');
+    }
+    // 5. Build espnId → DB game UUID
     const dbGames = await db.query.games.findMany({ where: (0, drizzle_orm_1.eq)(schema.games.season, 2025) });
     const espnToDb = new Map(dbGames.map(g => [g.espnId, g.id]));
     console.log(`${dbGames.length} games found in DB for 2025 season`);
-    // 4. Build CSV game UUID → espnId
+    // 6. Build CSV game UUID → espnId
     const csvGames = readCsv('games.csv').filter(g => g['season'] === '2025');
     const csvToEspn = new Map(csvGames.map(g => [g['id'], g['espn_id']]));
-    // 5. Get Nicholas's picks from CSV
+    // 7. Get Nicholas's picks from CSV
     const nicholasPicks = readCsv('picks.csv').filter(p => p['user_id'] === NICHOLAS_OLD_UID);
     console.log(`${nicholasPicks.length} picks found for Nicholas in CSV`);
-    // 6. Clear any existing picks (makes script safe to re-run)
+    // 8. Clear any existing picks (makes script safe to re-run)
     await db.delete(schema.picks).where((0, drizzle_orm_1.eq)(schema.picks.userId, firebaseUid));
     console.log('Cleared existing picks');
-    // 7. Map CSV game UUIDs → live DB game UUIDs
+    // 9. Map CSV game UUIDs → live DB game UUIDs
     let matched = 0;
     let unmatched = 0;
     const rows = [];
@@ -153,7 +161,7 @@ async function main() {
     if (unmatched > 0) {
         console.warn(`Warning: ${unmatched} picks skipped — game not found in DB`);
     }
-    // 8. Insert in batches
+    // 10. Insert in batches
     const BATCH = 50;
     for (let i = 0; i < rows.length; i += BATCH) {
         await db.insert(schema.picks).values(rows.slice(i, i + BATCH));
