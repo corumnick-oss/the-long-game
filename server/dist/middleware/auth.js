@@ -44,9 +44,11 @@ async function optionalAuth(req, res, next) {
         const user = await db_1.db.query.users.findFirst({ where: (0, drizzle_orm_1.eq)(schema_1.users.id, decoded.uid) });
         if (user)
             req.currentUser = user;
+        else
+            console.warn('[optionalAuth] token verified but no DB user for uid:', decoded.uid);
     }
-    catch {
-        // ignore bad token for optional auth
+    catch (err) {
+        console.error('[optionalAuth] token verification failed:', err?.message ?? err);
     }
     next();
 }

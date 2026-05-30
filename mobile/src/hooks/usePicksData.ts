@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/queryClient';
 
 export type Game = {
@@ -38,28 +39,40 @@ export type TiebreakerData = {
 } | null;
 
 export function useGames(week: number, season: number) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['games', week, season],
-    queryFn: () => apiFetch<Game[]>(`/api/games?week=${week}&season=${season}`),
+    // user.uid in the key means the query re-runs with auth as soon as the
+    // user is confirmed — no stale unauthenticated result ever shows picks
+    queryKey: ['games', week, season, user?.uid ?? null],
+    queryFn: async () => {
+      const result = await apiFetch<Game[]>(`/api/games?week=${week}&season=${season}`, undefined, user);
+      if (__DEV__) {
+        const picked = result.filter(g => g.myPick !== null).length;
+        console.log(`[useGames] w${week} returned ${result.length} games, ${picked} with myPick`);
+      }
+      return result;
+    },
     staleTime: 30_000,
   });
 }
 
 export function useTiebreaker(week: number, season: number) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['tiebreaker', week, season],
-    queryFn: () => apiFetch<TiebreakerData>(`/api/tiebreaker?week=${week}&season=${season}`),
+    queryKey: ['tiebreaker', week, season, user?.uid ?? null],
+    queryFn: () => apiFetch<TiebreakerData>(`/api/tiebreaker?week=${week}&season=${season}`, undefined, user),
     staleTime: 60_000,
   });
 }
 
 export function useSubmitPick() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ gameId, pick }: { gameId: string; pick: 'home' | 'away'; week: number; season: number }) =>
-      apiFetch('/api/picks', { method: 'POST', body: JSON.stringify({ gameId, pick }) }),
+      apiFetch('/api/picks', { method: 'POST', body: JSON.stringify({ gameId, pick }) }, user),
     onMutate: async ({ gameId, pick, week, season }) => {
-      const key = ['games', week, season];
+      const key = ['games', week, season, user?.uid ?? null];
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Game[]>(key);
       qc.setQueryData<Game[]>(key, old =>
@@ -68,21 +81,22 @@ export function useSubmitPick() {
       return { prev };
     },
     onError: (_err, { week, season }, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['games', week, season], ctx.prev);
+      if (ctx?.prev) qc.setQueryData(['games', week, season, user?.uid ?? null], ctx.prev);
     },
     onSettled: (_data, _err, { week, season }) => {
-      qc.invalidateQueries({ queryKey: ['games', week, season] });
+      qc.invalidateQueries({ queryKey: ['games', week, season, user?.uid ?? null] });
     },
   });
 }
 
 export function useSubmitTiebreaker() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ tiebreakerGameId, predictedTotal }: { tiebreakerGameId: string; predictedTotal: number; week: number; season: number }) =>
-      apiFetch('/api/tiebreaker', { method: 'POST', body: JSON.stringify({ tiebreakerGameId, predictedTotal }) }),
+      apiFetch('/api/tiebreaker', { method: 'POST', body: JSON.stringify({ tiebreakerGameId, predictedTotal }) }, user),
     onSettled: (_data, _err, { week, season }) => {
-      qc.invalidateQueries({ queryKey: ['tiebreaker', week, season] });
+      qc.invalidateQueries({ queryKey: ['tiebreaker', week, season, user?.uid ?? null] });
     },
   });
 }

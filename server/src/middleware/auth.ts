@@ -37,8 +37,9 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     req.uid = decoded.uid;
     const user = await db.query.users.findFirst({ where: eq(users.id, decoded.uid) });
     if (user) req.currentUser = user;
-  } catch {
-    // ignore bad token for optional auth
+    else console.warn('[optionalAuth] token verified but no DB user for uid:', decoded.uid);
+  } catch (err: any) {
+    console.error('[optionalAuth] token verification failed:', err?.message ?? err);
   }
   next();
 }

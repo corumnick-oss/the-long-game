@@ -117,10 +117,14 @@ async function main() {
     // 3. Remove the old migration Nicholas record if it exists (avoids duplicate on leaderboard)
     const oldNicholasExists = await db.query.users.findFirst({ where: (0, drizzle_orm_1.eq)(schema.users.id, NICHOLAS_OLD_UID) });
     if (oldNicholasExists) {
+        // Delete all FK-referencing rows before deleting the user
         await db.delete(schema.picks).where((0, drizzle_orm_1.eq)(schema.picks.userId, NICHOLAS_OLD_UID));
         await db.delete(schema.trophies).where((0, drizzle_orm_1.eq)(schema.trophies.userId, NICHOLAS_OLD_UID));
+        await db.delete(schema.tiebreakerPicks).where((0, drizzle_orm_1.eq)(schema.tiebreakerPicks.userId, NICHOLAS_OLD_UID));
+        await db.delete(schema.pushTokens).where((0, drizzle_orm_1.eq)(schema.pushTokens.userId, NICHOLAS_OLD_UID));
+        await db.delete(schema.activityLog).where((0, drizzle_orm_1.eq)(schema.activityLog.targetUserId, NICHOLAS_OLD_UID));
         await db.delete(schema.users).where((0, drizzle_orm_1.eq)(schema.users.id, NICHOLAS_OLD_UID));
-        console.log('Removed old migration Nicholas record (picks + trophies + user)');
+        console.log('Removed old migration Nicholas record (all related rows + user)');
     }
     // 5. Build espnId → DB game UUID
     const dbGames = await db.query.games.findMany({ where: (0, drizzle_orm_1.eq)(schema.games.season, 2025) });
