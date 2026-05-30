@@ -105,6 +105,15 @@ export default function GameDetailScreen() {
 
   const isFinal = game.status === 'post';
   const isLive = game.status === 'in';
+
+  const homeWins = isFinal && (game.homeScore ?? 0) > (game.awayScore ?? 0);
+  const awayWins = isFinal && (game.awayScore ?? 0) > (game.homeScore ?? 0);
+  const myPickedHome = game.myPick === 'home';
+  const myPickedAway = game.myPick === 'away';
+  const hasPick = game.myPick !== null;
+  const iWon = (myPickedHome && homeWins) || (myPickedAway && awayWins);
+  const iLost = hasPick && isFinal && !iWon;
+
   const homePicks = game.pickBreakdown?.picks.filter(p => p.pick === 'home') ?? [];
   const awayPicks = game.pickBreakdown?.picks.filter(p => p.pick === 'away') ?? [];
 
@@ -142,49 +151,100 @@ export default function GameDetailScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ── Score or team info ── */}
-        <View className="flex-row items-center px-6 py-6">
+        {/* ── Outcome banner (final games with a pick) ── */}
+        {isFinal && hasPick && (
+          <View
+            className={`mx-4 mt-4 rounded-xl py-3 px-4 flex-row items-center justify-center gap-2 ${iWon ? 'bg-success/20' : 'bg-danger/20'}`}
+          >
+            <Text className={`text-xl font-bold ${iWon ? 'text-success' : 'text-danger'}`}>
+              {iWon ? '✓' : '✗'}
+            </Text>
+            <Text className={`font-bold text-base ${iWon ? 'text-success' : 'text-danger'}`}>
+              {iWon ? 'Correct pick!' : 'Wrong pick'}
+            </Text>
+          </View>
+        )}
+
+        {/* ── Score / team info ── */}
+        <View className="flex-row items-center px-4 py-6">
           {/* Away */}
-          <View className="flex-1 items-center">
+          <View className={`flex-1 items-center rounded-xl py-3 px-2 ${awayWins ? 'bg-success/10' : ''}`}>
             {game.awayTeamLogo ? (
-              <Image source={{ uri: game.awayTeamLogo }} style={{ width: 64, height: 64 }} resizeMode="contain" />
+              <Image
+                source={{ uri: game.awayTeamLogo }}
+                style={{ width: 64, height: 64, opacity: isFinal && !awayWins ? 0.5 : 1 }}
+                resizeMode="contain"
+              />
             ) : null}
-            <Text className="text-white font-semibold text-sm mt-2 text-center" numberOfLines={2}>
+            <Text
+              className={`font-semibold text-sm mt-2 text-center ${awayWins ? 'text-success' : 'text-white'}`}
+              numberOfLines={2}
+            >
               {game.awayTeam}
             </Text>
-            {game.awayTeamRecord && (
+            {game.awayTeamRecord && !isFinal && (
               <Text className="text-muted text-xs">{game.awayTeamRecord}</Text>
+            )}
+            {myPickedAway && (
+              <View className={`mt-1.5 rounded px-2 py-0.5 ${isFinal ? (awayWins ? 'bg-success' : 'bg-danger') : 'bg-primary'}`}>
+                <Text className="text-white text-xs font-bold">
+                  {isFinal ? (awayWins ? '✓ MY PICK' : '✗ MY PICK') : 'MY PICK'}
+                </Text>
+              </View>
             )}
           </View>
 
           {/* Score or vs */}
-          <View className="items-center px-4">
+          <View className="items-center px-3">
             {(isFinal || isLive) ? (
-              <View className="flex-row items-center gap-3">
-                <Text className="text-white text-3xl font-bold">{game.awayScore ?? 0}</Text>
-                <Text className="text-muted text-lg">–</Text>
-                <Text className="text-white text-3xl font-bold">{game.homeScore ?? 0}</Text>
+              <View className="items-center">
+                <View className="flex-row items-center gap-2">
+                  <Text className={`text-3xl font-bold ${awayWins ? 'text-success' : isFinal ? 'text-muted' : 'text-white'}`}>
+                    {game.awayScore ?? 0}
+                  </Text>
+                  <Text className="text-muted text-lg">–</Text>
+                  <Text className={`text-3xl font-bold ${homeWins ? 'text-success' : isFinal ? 'text-muted' : 'text-white'}`}>
+                    {game.homeScore ?? 0}
+                  </Text>
+                </View>
+                {isLive && (
+                  <Text className="text-danger text-xs font-bold mt-1">LIVE</Text>
+                )}
               </View>
             ) : (
               <>
-                <Text className="text-muted text-lg font-bold">vs</Text>
+                <Text className="text-muted text-base font-bold">vs</Text>
                 {game.spread && (
-                  <Text className="text-muted text-xs mt-1">Spread: {game.spread}</Text>
+                  <Text className="text-muted text-xs mt-1">{game.spread}</Text>
                 )}
               </>
             )}
           </View>
 
           {/* Home */}
-          <View className="flex-1 items-center">
+          <View className={`flex-1 items-center rounded-xl py-3 px-2 ${homeWins ? 'bg-success/10' : ''}`}>
             {game.homeTeamLogo ? (
-              <Image source={{ uri: game.homeTeamLogo }} style={{ width: 64, height: 64 }} resizeMode="contain" />
+              <Image
+                source={{ uri: game.homeTeamLogo }}
+                style={{ width: 64, height: 64, opacity: isFinal && !homeWins ? 0.5 : 1 }}
+                resizeMode="contain"
+              />
             ) : null}
-            <Text className="text-white font-semibold text-sm mt-2 text-center" numberOfLines={2}>
+            <Text
+              className={`font-semibold text-sm mt-2 text-center ${homeWins ? 'text-success' : 'text-white'}`}
+              numberOfLines={2}
+            >
               {game.homeTeam}
             </Text>
-            {game.homeTeamRecord && (
+            {game.homeTeamRecord && !isFinal && (
               <Text className="text-muted text-xs">{game.homeTeamRecord}</Text>
+            )}
+            {myPickedHome && (
+              <View className={`mt-1.5 rounded px-2 py-0.5 ${isFinal ? (homeWins ? 'bg-success' : 'bg-danger') : 'bg-primary'}`}>
+                <Text className="text-white text-xs font-bold">
+                  {isFinal ? (homeWins ? '✓ MY PICK' : '✗ MY PICK') : 'MY PICK'}
+                </Text>
+              </View>
             )}
           </View>
         </View>
