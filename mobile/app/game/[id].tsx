@@ -189,38 +189,56 @@ export default function GameDetailScreen() {
           </View>
         </View>
 
-        {/* ── Pre-game stats ── */}
-        {!isFinal && !isLive && (
+        {/* ── Team stats ── */}
+        {(game.awayTeamPPG || game.homeTeamPPG || game.winningTeamWinProb) && (
           <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
             <View className="flex-row justify-between mb-3">
               <Text className="text-muted text-xs font-semibold uppercase">Stat</Text>
-              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 60 }}>
+              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>
                 {game.awayTeam.split(' ').pop()}
               </Text>
-              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 60 }}>
+              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>
                 {game.homeTeam.split(' ').pop()}
               </Text>
             </View>
             {game.awayTeamPPG && game.homeTeamPPG && (
-              <View className="flex-row justify-between py-1.5 border-b border-border">
+              <View className="flex-row justify-between py-2 border-b border-border">
                 <Text className="text-muted text-sm flex-1">PPG</Text>
-                <Text className="text-white text-sm text-right" style={{ width: 60 }}>{parseFloat(game.awayTeamPPG).toFixed(1)}</Text>
-                <Text className="text-white text-sm text-right" style={{ width: 60 }}>{parseFloat(game.homeTeamPPG).toFixed(1)}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
+                  {parseFloat(game.awayTeamPPG).toFixed(1)}
+                </Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
+                  {parseFloat(game.homeTeamPPG).toFixed(1)}
+                </Text>
               </View>
             )}
             {game.awayTeamPPGAllowed && game.homeTeamPPGAllowed && (
-              <View className="flex-row justify-between py-1.5">
+              <View className="flex-row justify-between py-2 border-b border-border">
                 <Text className="text-muted text-sm flex-1">Opp PPG</Text>
-                <Text className="text-white text-sm text-right" style={{ width: 60 }}>{parseFloat(game.awayTeamPPGAllowed).toFixed(1)}</Text>
-                <Text className="text-white text-sm text-right" style={{ width: 60 }}>{parseFloat(game.homeTeamPPGAllowed).toFixed(1)}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
+                  {parseFloat(game.awayTeamPPGAllowed).toFixed(1)}
+                </Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
+                  {parseFloat(game.homeTeamPPGAllowed).toFixed(1)}
+                </Text>
               </View>
             )}
-            <WinProbBar
-              favoriteTeam={game.favoriteTeam}
-              prob={game.winningTeamWinProb}
-              homeTeam={game.homeTeam}
-              awayTeam={game.awayTeam}
-            />
+            {!isFinal && !isLive && game.spread && (
+              <View className="flex-row justify-between py-2 border-b border-border">
+                <Text className="text-muted text-sm flex-1">Spread</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 128 }}>
+                  {game.spread}
+                </Text>
+              </View>
+            )}
+            {!isFinal && !isLive && (
+              <WinProbBar
+                favoriteTeam={game.favoriteTeam}
+                prob={game.winningTeamWinProb}
+                homeTeam={game.homeTeam}
+                awayTeam={game.awayTeam}
+              />
+            )}
           </View>
         )}
 

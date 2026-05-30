@@ -104,15 +104,19 @@ export default function WeekPicksScreen() {
   const headerScrollRef = useRef<ScrollView>(null);
   const rowScrollRefs = useRef<(ScrollView | null)[]>([]);
 
-  const syncScroll = (x: number, sourceIdx: number) => {
-    headerScrollRef.current?.scrollTo({ x, animated: false });
+  const syncScroll = (x: number, skipHeader: boolean, skipRowIdx: number | null) => {
+    if (!skipHeader) headerScrollRef.current?.scrollTo({ x, animated: false });
     rowScrollRefs.current.forEach((ref, i) => {
-      if (i !== sourceIdx) ref?.scrollTo({ x, animated: false });
+      if (i !== skipRowIdx) ref?.scrollTo({ x, animated: false });
     });
   };
 
+  const onHeaderScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    syncScroll(e.nativeEvent.contentOffset.x, true, null);
+  };
+
   const onRowScroll = (e: NativeSyntheticEvent<NativeScrollEvent>, rowIdx: number) => {
-    syncScroll(e.nativeEvent.contentOffset.x, rowIdx);
+    syncScroll(e.nativeEvent.contentOffset.x, false, rowIdx);
   };
 
   if (isLoading) {
@@ -177,8 +181,10 @@ export default function WeekPicksScreen() {
             <ScrollView
               ref={headerScrollRef}
               horizontal
-              scrollEnabled={false}
+              onScroll={onHeaderScroll}
+              scrollEventThrottle={16}
               bounces={false}
+              overScrollMode="never"
               showsHorizontalScrollIndicator={false}
             >
               {games.map(game => (
