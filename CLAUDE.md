@@ -50,6 +50,11 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 - **Remove debug console.logs** — `[apiFetch]` and `[useGames]` logs left in from auth debugging (queryClient.ts + usePicksData.ts)
 - **Player names tappable in Week Picks** — user requested; tapping a user row name should navigate to their public profile
 - **Splash/onboarding screen** — logo + tagline screen, not yet built
+- **Trophy case UI redesign** — current design uses placeholder emojis; needs:
+  - Custom trophy artwork/images per trophy type (most_wins, loser, upset_pick, lone_wolf, contrarian)
+  - Better layout in the profile trophy case grid
+  - The contrarian trophy image was never created (placeholder only)
+  - Consider full-screen trophy detail view on tap (name, description, week earned, game context)
 
 ### Showing 2025 Season — CORRECT BEHAVIOR
 getCurrentNFLSeason() correctly returns 2025 in May 2026 because the 2026 NFL season starts September 4, 2026. It will flip automatically on that date. No fix needed.
