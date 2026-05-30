@@ -12,7 +12,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 **App Name:** The Long Game
 **Type:** iOS and Android mobile app (React Native / Expo)
 **Purpose:** NFL picks app where users predict winners of each week's games and compete on leaderboards
-**Current Status:** Phase 2 + Phase 3 COMPLETE. Picks Tab + Leaderboard Tab (Phase 4) COMPLETE. Ready to build Week Picks, Profile tabs.
+**Current Status:** Phase 4 COMPLETE (all core screens built). Phase 5 partially done. Cleanup + polish + advanced features remain before launch.
 **Railway URL:** https://thelonggame-production.up.railway.app
 **Target Launch:** Before NFL Season 2026 (starts September 4, 2026)
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone user — Admin team name: Nicholas
@@ -33,29 +33,34 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 - NativeWind dark theme configured ✅
 - TanStack Query connected to Railway backend ✅
 - 4-tab navigation with bell icon header ✅
-- Login screen ✅
-- Signup screen ✅
-- Forgot password screen ✅
+- Login / Signup / Forgot Password screens ✅
 - Notification permission flow (10 sec delay, "Maybe Later" after 7 days) ✅
 - Push token registration to backend ✅
-- **Picks Tab COMPLETE** ✅ — GameCard (3 states: pre/live/final), WeekSelector, TiebreakerCard, all hooks, lock logic
-- **Pick % bars fixed** ✅ — backend computes homePickPct/awayPickPct from picks table after lock
-- **Leaderboard Tab COMPLETE** ✅ — Longies/Global toggle, Season/Weekly toggle, rank badges, W-L, accuracy
-- **Leaderboard weekly query fixed** ✅ — JOIN order corrected so week filter applies to picks correctly
-- **Auth timing fixed** ✅ — useGames/useTiebreaker include user.uid in query key; token passed directly from React state
+- **Picks Tab** ✅ — GameCard (3 states), WeekSelector, TiebreakerCard, pick % bars, lock logic, game card taps → Game Detail
+- **Leaderboard Tab** ✅ — Longies/Global + Season/Weekly toggles, rank badges, W-L, accuracy, rows tap → profiles
+- **Week Picks Tab** ✅ — compact grid, synchronized horizontal scroll, pick outcome tinting, week selector, bounce-scroll fixed, header scrollable
+- **Profile Tab (own)** ✅ — avatar, season stats, weekly history color blocks, insights, H2H vs Longies, trophy case
+- **Game Detail Screen** ✅ — compact header, prev/next, team stats (PPG/OppPPG), pick list after lock, tappable from Picks + Week Picks
+- **Public Profile Screen** ✅ — other user profiles, season stats, weekly history, H2H vs viewer, pick comparison (Nick's fav feature)
+- **Auth timing fixed** ✅ — user.uid in query key, token from React state (not auth.currentUser)
 - **seed:nick script** ✅ — `npm run seed:nick` in server/ seeds nickcorum@gmail.com with Nicholas's 2025 picks
 
-### Known Issue — GameCard correct/incorrect pick UI needs polish
-The current correct/incorrect pick display (green border + "✓ CORRECT" / red border + "✗ WRONG" badge) is functional but Nick doesn't like the visual design. Needs a UI redesign pass before launch. The logic is correct — just the look needs work.
+### Known TODOs (Before Launch)
+- **GameCard correct/incorrect UI polish** — green/red design is functional but needs visual redesign
+- **Remove debug console.logs** — `[apiFetch]` and `[useGames]` logs left in from auth debugging (queryClient.ts + usePicksData.ts)
+- **Player names tappable in Week Picks** — user requested; tapping a user row name should navigate to their public profile
+- **Splash/onboarding screen** — logo + tagline screen, not yet built
 
 ### Showing 2025 Season — CORRECT BEHAVIOR
 getCurrentNFLSeason() correctly returns 2025 in May 2026 because the 2026 NFL season starts September 4, 2026. It will flip automatically on that date. No fix needed.
 
-### What's Next — Phase 4 Remaining
-1. Week Picks Tab (lock behavior, compact grid)
-2. Profile Tab (stats, insights, H2H, trophy case)
-3. Game Detail Screen (compact header, prev/next, pick list after lock)
-4. Run 2025 data migration (CSV → Railway database) when Longies are ready to sign up
+### What's Next
+1. **Cleanup** — remove debug logs, make Week Picks player names tappable
+2. **Activity bell panel** — Global Feed + Your Activity (Phase 5)
+3. **Admin dashboard** — Users, NFL Tools, Data tabs (Phase 5)
+4. **Push notifications** — all 5 triggers wired up (Phase 5)
+5. **Run 2025 data migration** — when Longies are ready to sign up and create accounts
+6. **EAS dev build** — needed to test Google/Apple sign-in before launch
 
 ### Important: Railway Environment Variables (Learned the Hard Way)
 - `FIREBASE_PROJECT_ID` had trailing whitespace which caused all token verification to silently fail
@@ -715,20 +720,21 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 - [x] Sign up (email, password, team name)
 - [x] Forgot password
 
-### Phase 4 — Core Screens (IN PROGRESS)
-- [x] Picks Tab (game cards 3 states, week selector, submit, tiebreaker)
-- [x] Fix pick % bars — backend returns homePickPct/awayPickPct per game after lock
-- [x] Leaderboard Tab (Longies/Global, Season/Weekly toggles, row design)
-- [ ] **GameCard correct/incorrect UI polish** — current green/red design works but needs visual redesign ← TODO
-- [ ] Week Picks Tab (lock behavior, compact grid) ← NEXT
-- [ ] Profile Tab (stats, insights, H2H, trophy case)
-- [ ] Game Detail Screen (compact header, prev/next, pick list after lock)
+### Phase 4 — Core Screens ✅ COMPLETE
+- [x] Picks Tab (game cards 3 states, week selector, submit, tiebreaker, pick %)
+- [x] Leaderboard Tab (Longies/Global, Season/Weekly toggles, tappable rows)
+- [x] Week Picks Tab (compact synchronized grid, all outcomes color-coded)
+- [x] Profile Tab (own profile: stats, weekly history, insights, H2H, trophies)
+- [x] Game Detail Screen (header, prev/next, stats, pick list after lock)
+- [x] Public profile screen (other users: stats, H2H, pick comparison)
+- [ ] **GameCard correct/incorrect UI polish** — logic correct, design needs work ← TODO
+- [ ] **Remove debug console.logs** from queryClient.ts and usePicksData.ts ← TODO
+- [ ] **Week Picks: player names tappable** → public profile ← TODO
 
-### Phase 5 — Advanced Features
+### Phase 5 — Advanced Features (NEXT)
 - [ ] Activity bell panel (Global + Your Activity)
-- [ ] Other user profiles + H2H pick comparison
 - [ ] Push notifications (all 5 triggers)
-- [ ] Admin dashboard (3 tabs)
+- [ ] Admin dashboard (3 tabs: Users, NFL Tools, Data)
 - [ ] AdminUserPicksPage (read-only + confirm-to-edit)
 
 ### Phase 6 — Preseason Testing
@@ -783,6 +789,31 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 ---
 
 ## Future Features — Not Building Now
+
+### Advanced Game Stats (Pre-Game + Post-Game)
+Discussed and scoped — deferring to let the 2026 season generate real data.
+
+**Pre-game card stats** (ESPN `/summary?event={id}` predictor section):
+- Team season stats: YPG, OppYPG, rush/pass yards, 3rd-down %, red zone %, sack rate, home/away record
+- Top QB/WR/RB season averages: yards/game, TDs/game, carries/completions/receptions per game
+- Win probability bar (already shown)
+- Week 1 2026 edge case: if no current-season stats exist, fall back to 2025 stats
+
+**Post-game box score** (ESPN `/summary?event={id}` boxscore section):
+- Team: total yards, pass yards, rush yards, pass TDs, rush TDs, turnovers, 3rd-down efficiency, red zone
+- Top QB: completions/attempts, passing yards, TDs, INTs
+- Top RB: carries, rush yards, TDs
+- Top WR: receptions/targets, receiving yards, TDs
+
+**Implementation when ready:**
+1. `espnService.ts`: add `syncBoxScore(game)` → stores in `team_game_stats` + `player_stats`
+2. `espnService.ts`: update `syncWinProbabilities` to also store predictor team stats
+3. Add `npm run sync:stats` script to backfill 2025 completed games
+4. `GET /api/games` list: include pregame season stats per game
+5. `GET /api/games/:id`: include post-game box score
+6. GameCard: show team stats + player season averages for pre games
+7. Game Detail: show box score section for final games
+- DB tables (`team_game_stats`, `player_stats`) are already in schema — just needs population
 
 ### Premium ("Long Game Pro") ~$4.99/month or $29.99/season
 - Stripe web-only (no in-app purchase — avoids Apple's 30% cut)
