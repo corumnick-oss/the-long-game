@@ -5,6 +5,7 @@ type Props = {
   game: Game;
   isLocked: boolean;
   onPick: (pick: 'home' | 'away') => void;
+  onPress?: () => void;
 };
 
 function formatGameTime(iso: string): string {
@@ -124,7 +125,7 @@ function TeamRow({
   );
 }
 
-export function GameCard({ game, isLocked, onPick }: Props) {
+export function GameCard({ game, isLocked, onPick, onPress }: Props) {
   const isFinal = game.status === 'post';
   const isLive = game.status === 'in';
   const isPre = game.status === 'pre';
@@ -193,8 +194,13 @@ export function GameCard({ game, isLocked, onPick }: Props) {
         disabled={!canPick}
       />
 
-      {/* Divider with game info */}
-      <View className="flex-row items-center px-4 py-1.5 border-t border-b border-border">
+      {/* Divider with game info — tappable to open game detail */}
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={!onPress}
+        activeOpacity={onPress ? 0.6 : 1}
+        className="flex-row items-center px-4 py-1.5 border-t border-b border-border"
+      >
         <View className="flex-1">
           {isPre && game.spread && (
             <Text className="text-muted text-xs">Spread: {game.spread}</Text>
@@ -203,14 +209,15 @@ export function GameCard({ game, isLocked, onPick }: Props) {
         <Text className="text-muted text-xs text-center flex-1">
           {isPre ? formatGameTime(game.gameTime) : isLive ? 'LIVE' : 'Final'}
         </Text>
-        <View className="flex-1 items-end">
+        <View className="flex-1 items-end flex-row justify-end gap-2">
           {isPre && game.winningTeamWinProb && (
             <Text className="text-muted text-xs">
               {game.favoriteTeam ? `${Math.round(parseFloat(game.winningTeamWinProb) * 100)}% fav` : ''}
             </Text>
           )}
+          {onPress && <Text className="text-muted text-xs">›</Text>}
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Home team (bottom) */}
       <TeamRow

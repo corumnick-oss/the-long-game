@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker } from '@/hooks/usePicksData';
 import { WeekSelector } from '@/components/WeekSelector';
@@ -11,6 +12,7 @@ import type { Game } from '@/hooks/usePicksData';
 const SEASON = getCurrentNFLSeason();
 
 export default function PicksScreen() {
+  const router = useRouter();
   const currentWeek = getCurrentNFLWeek();
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
 
@@ -81,6 +83,10 @@ export default function PicksScreen() {
               game={item}
               isLocked={isLocked}
               onPick={pick => handlePick(item, pick)}
+              onPress={() => router.push({
+                pathname: '/game/[id]' as any,
+                params: { id: item.id, week: String(selectedWeek), season: String(SEASON) },
+              })}
             />
           )}
           ListHeaderComponent={<View className="h-2" />}

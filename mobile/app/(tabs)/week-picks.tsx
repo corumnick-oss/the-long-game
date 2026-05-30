@@ -178,6 +178,7 @@ export default function WeekPicksScreen() {
               ref={headerScrollRef}
               horizontal
               scrollEnabled={false}
+              bounces={false}
               showsHorizontalScrollIndicator={false}
             >
               {games.map(game => (
@@ -225,6 +226,8 @@ export default function WeekPicksScreen() {
                   horizontal
                   onScroll={e => onRowScroll(e, rowIdx)}
                   scrollEventThrottle={16}
+                  bounces={false}
+                  overScrollMode="never"
                   showsHorizontalScrollIndicator={false}
                 >
                   {games.map(game => (
