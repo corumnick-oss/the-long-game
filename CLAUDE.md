@@ -12,9 +12,9 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 **App Name:** The Long Game
 **Type:** iOS and Android mobile app (React Native / Expo)
 **Purpose:** NFL picks app where users predict winners of each week's games and compete on leaderboards
-**Current Status:** Phase 4 COMPLETE. Phase 5 mostly done (Activity panel + Admin dashboard built). Push notifications + EAS build + Google/Apple Sign-In remain before launch.
+**Current Status:** Phase 5 nearly complete. First EAS iOS dev build submitted (queued). Notification testing added. Google/Apple Sign-In, push cron triggers, preseason handling, past seasons, and team stats remain before launch.
 **Railway URL:** https://thelonggame-production.up.railway.app
-**Target Launch:** Before NFL Season 2026 (starts September 4, 2026)
+**Target Launch:** App Store submission late July 2026. Regular season starts September 4, 2026.
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone user — Admin team name: Nicholas
 **Local Code Path:** C:\Dev\TheLongGame
 
@@ -25,7 +25,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### The Plan
 - **Do NOT wait for preseason to submit to the App Store**
 - Submit to Apple and Google in **late July** — well before preseason starts August 7
-- Use **preseason (Aug 7-28) to polish** with OTA updates while app is already live
+- Use **preseason (Aug 7-28) as live testing** with OTA updates while app is already in the App Store
 - Regular season starts **September 4, 2026** — hard deadline
 
 ### Why This Works — 3 Ways to Push Updates
@@ -34,35 +34,53 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 3. **App Store Update** — Only needed for new native packages, permission changes, or major version bumps. Takes 1-3 days review. Rarely needed for bug fixes.
 
 ### Timeline
-- **Now (June)** — EAS dev build, get Google/Apple Sign-In working, finish Phase 5
-- **Early July** — TestFlight with Longies, fix issues, run 2025 data migration
+- **Now (June)** — EAS dev build installed, Google/Apple Sign-In working, push notifications tested
+- **Early July** — TestFlight preview build for Longies, fix issues, run 2025 data migration
 - **Late July** — Submit to App Store and Google Play
-- **August 7-28** — Preseason: polish with OTA updates, app already live
-- **September 4** — Regular season opens 🏈
+- **August 7-28** — Preseason live: real picks on preseason games, live score updates, polish via OTA
+- **September 4** — Regular season opens, app transitions automatically
+
+### Three Build Types
+| Build | Command | Purpose | Who |
+|---|---|---|---|
+| `development` | `eas build --profile development` | Dev testing, connects to Metro | Just Nick |
+| `preview` | `eas build --profile preview` | TestFlight beta | Longies |
+| `production` | `eas build --profile production` | App Store submission | Everyone |
 
 ### What Actually Blocks App Store Submission
 Must have before submitting:
 - Google/Apple Sign-In working (needs EAS dev build first)
-- Push notifications working
-- Admin dashboard (to manage Longies)
-- Activity panel
-- No crashes on core flows
+- Push notifications working and cron-triggered
+- Preseason handling (season flip, functional picks)
+- Past seasons accessible (leaderboard + profile)
+- Pre-game team stats on GameCard
+- Post-game box scores on Game Detail
 - Splash/onboarding screen
+- No crashes on core flows
 
 Can fix post-launch with OTA updates:
 - UI polish, minor bugs, text changes
+- Achievement case artwork
 - Non-native feature additions
 - Any JavaScript/React Native changes
 
-### EAS Dev Build — Do This Immediately
+### EAS Dev Build
 An EAS dev build is a real version of YOUR app (bundle ID `com.thelonggame.picks`) installed on Nick's iPhone. It's NOT Expo Go. It unlocks Google Sign-In, Apple Sign-In, and push notifications which all fail in Expo Go because Expo Go runs under `host.exp.exponent` not our bundle ID.
 
-To create one:
+To create one (already done — see EAS section below):
 ```bash
 cd mobile
 eas build --platform ios --profile development
 ```
-EAS builds in the cloud (no Mac needed), ~15-30 minutes. Install via TestFlight link.
+
+### EAS CLI Windows Bug — IMPORTANT
+EAS CLI v20 has a Windows bug: `EPERM: operation not permitted, rmdir` during project upload. It uses non-recursive `rmdir` to clean up a temp shallow clone, which fails on Windows.
+
+**Fix applied to:** `C:\nvm4w\nodejs\node_modules\eas-cli\build\build\utils\repository.js`
+Wrap the `finally` block's `remove` call in a try/catch that swallows EPERM errors.
+
+**⚠️ This patch is lost if `eas-cli` is updated.** Re-apply after any `npm install -g eas-cli`.
+See memory file for exact patch: `eas-cli-windows-fix.md`
 
 ---
 
@@ -100,22 +118,36 @@ EAS builds in the cloud (no Mac needed), ~15-30 minutes. Install via TestFlight 
 - **GameCard polish** ✅ — wrong-pick row gets red tint, pending-pick gets blue tint (matching border colors)
 - **Activity bell panel** ✅ — slide-in drawer, Global Feed + Your Activity tabs, paginated 20 per load
 - **Admin dashboard** ✅ — Users tab (Longie toggle + inline teamName edit), NFL Tools tab (Sync Games, Sync Scores Only, Sync Win Probs, Award Achievements, Unlock Week, inline score correction editor), Data tab (season + weekly picks export). Season selector in header for viewing past seasons. Gear icon on profile for admins.
-- **Achievements terminology** ✅ — weekly awards (most_wins, upset_pick, lone_wolf, contrarian, loser) renamed to "Achievements" throughout all UI. DB table still called `trophies` (rename when building new Trophy/podium system).
-- **Dynamic season labels** ✅ — "2025 Season" now uses `getCurrentNFLSeason()` everywhere in mobile UI
-- **ESPN score-only sync** ✅ — `syncWeekScores()` in espnService.ts updates scores/status without touching game metadata; `POST /api/admin/games/sync-scores` route added
+- **Achievements terminology** ✅ — weekly awards renamed to "Achievements" throughout UI. DB table still called `trophies`.
+- **Dynamic season labels** ✅ — uses `getCurrentNFLSeason()` everywhere in mobile UI
+- **ESPN score-only sync** ✅ — `syncWeekScores()` updates scores/status without touching game metadata
+- **EAS project initialized** ✅ — `eas.json` created, project linked to @nickcorum/the-long-game, Apple push key registered
+- **expo-dev-client installed** ✅ — required for EAS development builds
+- **EAS CLI Windows bug patched** ✅ — `repository.js` finally block patched to not throw on temp dir cleanup EPERM
+- **Notification testing in Admin Dashboard** ✅ — NFL Tools tab: "Send Test Notification Now" (immediate) + "Schedule Deadline Reminder Test" (1/5/10/30m presets that fire real "1 hour left for picks" message)
+- **notificationService.ts** ✅ — all 5 push triggers built: week unlocked, deadline, picks locked, trophy earned, game final. NOT YET wired to cron jobs.
+- **First EAS iOS dev build submitted** ⏳ — build queued on Expo's servers (submitted May 31 2026)
 
 ### Known TODOs (Before Launch)
-- **Week 18 2025 tiebreaker is wrong** — needs to be investigated and corrected. Check the `tiebreaker_games` and `tiebreaker_picks` tables for week 18, season 2025. The designated game or actual total may be incorrect. Use the Admin → NFL Tools → score correction or fix directly in the DB.
-- **EAS dev build** — needed immediately to test Google/Apple sign-in ← DO THIS FIRST
-- **Google/Apple Sign-In** — must work before launch, currently blocked by Expo Go limitation
-- **Splash/onboarding screen** — logo + tagline screen not yet built
-- **Achievement case UI redesign** — current design uses placeholder emojis; needs:
-  - Custom artwork/images per type (most_wins, loser, upset_pick, lone_wolf, contrarian)
-  - Better grid layout in profile
-  - Contrarian artwork was never created (placeholder only)
-  - Consider full-screen detail on tap (description, week earned, game context)
-- **Trophies (podium) system** — NEW concept: season-end 1st/2nd/3rd/last place awards. Not yet built. Design and award logic TBD with Nick. Last-place prize keeps eliminated players engaged.
-- **Admin: email editing** — backend needs Firebase Admin SDK email update; deferred (simpler fix is new account + UID reassignment)
+- **Install EAS dev build** — build currently queued. Once installed on Nick's iPhone, open app to register push token, then test notifications from Admin Dashboard.
+- **Google/Apple Sign-In** — must work before launch. Currently blocked by Expo Go limitation. Needs native `@react-native-google-signin` package + second EAS build. Apple Sign-In config is already complete.
+- **Wire push notification cron triggers** — all 5 notification functions exist in notificationService.ts but are not called by the scheduler. Need to connect to scheduler.ts cron jobs.
+- **Preseason handling** — 2026 NFL preseason starts Aug 7. App needs to:
+  - Show preseason games starting Aug 7 (season flips to 2026 for preseason)
+  - Picks, leaderboard, live scores all work during preseason
+  - Preseason results tracked separately from regular season (via seasonType)
+  - Seamlessly transition to regular season games on Sept 4
+  - Design decision needed: how does `getCurrentNFLSeason()` handle the Aug 7 flip?
+- **Past seasons feature** — once 2026 season starts, users need to see 2025 historical data:
+  - Leaderboard: add season selector (like admin has) for all users
+  - Profile: add "Past Seasons" row showing W-L per season
+- **Pre-game team stats on GameCard** — BEFORE LAUNCH. Show PPG, OppPPG, total yards, pass yards/TDs, rush yards/TDs, defensive yards allowed, offensive/defensive rankings for both teams. ESPN `/summary?event={id}` predictor section. DB tables already exist (`team_game_stats`, `player_stats`).
+- **Post-game box scores on Game Detail** — BEFORE LAUNCH. Store team totals + top QB/RB/WR stats permanently after each game. Builds our own proprietary database. Same ESPN endpoint, boxscore section.
+- **Splash/onboarding screen** — logo + tagline screen not yet built. Required for App Store review.
+- **Week 18 2025 tiebreaker is wrong** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025. Fix via Admin → NFL Tools → score correction or directly in DB.
+- **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image was never created. Consider full-screen detail on tap.
+- **Trophies (podium) system** — season-end 1st/2nd/3rd/last place awards. NOT YET BUILT. Design with Nick before implementing.
+- **Admin: email editing** — deferred. Workaround: new account + UID reassignment.
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) must be re-run any time Nick's test data is wiped. It:
@@ -125,17 +157,23 @@ EAS builds in the cloud (no Mac needed), ~15-30 minutes. Install via TestFlight 
 - Copies all Nicholas trophies from CSV → DB
 Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env
 
-### Showing 2025 Season — CORRECT BEHAVIOR
-getCurrentNFLSeason() correctly returns 2025 in May 2026 because the 2026 NFL season starts September 4, 2026. It will flip automatically on that date. No fix needed.
+### Season Detection — ALWAYS USE THIS
+`getCurrentNFLSeason()` correctly returns 2025 until the 2026 season begins. It will need updating to handle the preseason start date (Aug 7) — see Known TODOs above.
 
 ### What's Next — Priority Order
-1. **EAS dev build** — run `eas build --platform ios --profile development` in mobile/ ← DO THIS FIRST
-2. **Google/Apple Sign-In** — fix once EAS dev build is available (critical for launch)
-3. **Push notifications** — all 5 triggers wired up (Phase 5)
-4. **Splash/onboarding screen**
-5. **Submit to App Store and Google Play** — target late July
-6. **Run 2025 data migration** — when Longies are ready to sign up
-7. **Trophies (podium) system** — season-end 1st/2nd/3rd/last place (design with Nick first)
+1. **Install EAS dev build** — when build completes, install on iPhone, open app, register push token
+2. **Test push notifications** — Admin Dashboard → NFL Tools → "Send Test Notification Now"
+3. **Google/Apple Sign-In** — install native Google Sign-In SDK, requires second EAS build
+4. **Wire push notification cron triggers** — connect 5 notification functions to scheduler.ts
+5. **Preseason handling** — season flip logic for Aug 7, functional preseason picks/leaderboard
+6. **Past seasons** — leaderboard season selector + profile past seasons row
+7. **Pre-game team stats** — ESPN sync → GameCard display (PPG, yards, rankings)
+8. **Post-game box scores** — ESPN sync after finals → Game Detail display + permanent DB storage
+9. **Splash/onboarding screen**
+10. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
+11. **2025 data migration** — when Longies sign up with Google/Apple
+12. **App Store + Google Play submission** — target late July
+13. **Trophies (podium) system** — design with Nick first
 
 ### Important: Railway Environment Variables (Learned the Hard Way)
 - `FIREBASE_PROJECT_ID` had trailing whitespace which caused all token verification to silently fail
@@ -144,8 +182,8 @@ getCurrentNFLSeason() correctly returns 2025 in May 2026 because the 2026 NFL se
 
 ### Apple + Google Sign-In — DEFERRED TO EAS DEV BUILD
 - **Why deferred:** Both require a real build with bundle ID `com.thelonggame.picks`. Expo Go runs under `host.exp.exponent` so Apple identity tokens fail Firebase validation and Google OAuth is blocked. This is NOT a configuration bug — it is a fundamental Expo Go limitation.
-- **Apple:** Apple Developer Portal App ID + Service ID (`com.thelonggame.picks.siwa`) configured. Firebase has Team ID `NMR4HYNN3K`, Key ID, and private key entered. Nonce fix in code with expo-crypto. Ready to test once we have an EAS dev build.
-- **Google:** Web Client ID in `mobile/.env`. Gets "OAuth 2.0 policy" error in Expo Go. Will fix with native Google Sign-In SDK during EAS dev build phase.
+- **Apple:** Apple Developer Portal App ID + Service ID (`com.thelonggame.picks.siwa`) configured. Firebase has Team ID `NMR4HYNN3K`, Key ID, and private key entered. Nonce fix in code with expo-crypto. Ready to test once EAS dev build is installed.
+- **Google:** Web Client ID in `mobile/.env`. Gets "OAuth 2.0 policy" error in Expo Go. Will fix with native `@react-native-google-signin` SDK during EAS dev build phase.
 - **These are CRITICAL for launch** — must be tested and working before App Store submission.
 
 ### Important Deployment Notes (Learned the Hard Way)
@@ -170,7 +208,7 @@ This is NOT just a friend group app. Nick has a large vision:
 
 - Publicly available iOS + Android app with hundreds of thousands of users
 - Multi-sport platform — NFL first, then March Madness brackets, FIFA World Cup brackets, NCAA Top 25 matchups. Curated high-stakes events only — NOT every sport every day. The concept is scarcity: fewer games = more emotional investment per pick.
-- Premium analytics tier ("Long Game Pro") — paying users get deep stats to help make better picks
+- Premium analytics tier ("Long Game Pro") — paying users get deep stats powered by OUR OWN proprietary database built from seasons of stored game/pick/outcome data
 - Private pools (like fantasy football leagues) — friends/coworkers compete in their own group with commissioner and optional buy-in
 - Multiple game modes — Standard (current), Probability Mode, Upset Hunter, Lock of the Week
 - No ads ever — firm, permanent decision
@@ -199,11 +237,13 @@ The premium analytics features do NOT require a paid API. They come from data we
 - `pickWinProbability` stored at pick submission time
 - All pick outcomes for every user every week
 - Team stats snapshots in `team_game_stats`
+- Post-game box scores in `team_game_stats` + `player_stats`
 
 After one full 2026 season we have proprietary data no API can sell us:
 - Win probability vs actual outcome (for Probability Mode calibration)
 - User pick accuracy patterns (best team, worst team, home/away, day of week)
 - Matchup intelligence built from our own historical data
+- Every QB/RB/WR performance linked to team win/loss outcomes
 
 This data gets more valuable every season. It IS the premium product. ESPN just feeds us raw game data to populate it.
 
@@ -220,6 +260,7 @@ This data gets more valuable every season. It IS the premium product. ESPN just 
 - Expo Notifications + Expo Push API (push notifications)
 - EAS Build + EAS Submit (cloud builds, no Mac needed)
 - Expo Updates (OTA updates without App Store re-review)
+- expo-dev-client (required for development builds)
 
 ### Backend
 - Express.js with TypeScript
@@ -241,6 +282,7 @@ This data gets more valuable every season. It IS the premium product. ESPN just 
 - GitHub: corumnick-oss/the-long-game (lowercase, with hyphen)
 - Railway: connected to GitHub, auto-deploys on push to main ✅
 - Apple Developer: approved (Individual account) ✅
+- EAS Project: @nickcorum/the-long-game (projectId: cb389856-b1ab-42c9-a22b-803f25093e22) ✅
 - Google Play: NOT set up yet (not urgent, needed before Android launch)
 - Firebase Project: the-long-game-prod-bef05 ✅
 - Bundle ID: com.thelonggame.picks (both iOS and Android)
@@ -252,15 +294,18 @@ This data gets more valuable every season. It IS the premium product. ESPN just 
 ```
 TheLongGame/
 ├── CLAUDE.md                        ← this file
+├── .gitignore                       ← root gitignore (.claude/, Needed info/)
+├── .easignore                       ← EAS upload exclusions (.claude/, data/, server/, etc.)
 ├── data/                            ← 2025 CSV files for migration
 │   ├── picks.csv                    (1,903 picks)
 │   ├── games.csv                    (272 games, 2025 season)
 │   ├── trophies.csv                 (109 trophies)
 │   ├── users.csv                    (9 users, only migrate 7)
 │   └── week18_tiebreakers.csv       (7 entries)
-├── mobile/                          ← Expo React Native app (BUILT, running in Expo Go)
+├── mobile/                          ← Expo React Native app
 │   ├── app/
 │   │   ├── _layout.tsx              ← root layout (QueryClientProvider + AuthProvider + AuthGate)
+│   │   ├── admin.tsx                ← Admin Dashboard (3 tabs: Users, NFL Tools, Data)
 │   │   ├── (auth)/
 │   │   │   ├── _layout.tsx
 │   │   │   ├── login.tsx            ← login screen (email working; Apple/Google need EAS build)
@@ -268,7 +313,7 @@ TheLongGame/
 │   │   │   └── forgot-password.tsx  ← forgot password screen
 │   │   └── (tabs)/
 │   │       ├── _layout.tsx          ← 4 bottom tabs + bell icon header
-│   │       ├── picks.tsx            ← Picks tab (COMPLETE — game cards, week selector, tiebreaker)
+│   │       ├── picks.tsx            ← Picks tab (COMPLETE)
 │   │       ├── leaderboard.tsx      ← Leaderboard tab (COMPLETE)
 │   │       ├── week-picks.tsx       ← Week Picks tab (COMPLETE)
 │   │       └── profile.tsx          ← Profile tab (COMPLETE)
@@ -282,31 +327,33 @@ TheLongGame/
 │   │   ├── context/
 │   │   │   └── AuthContext.tsx      ← Firebase auth context (email + Google + Apple)
 │   │   ├── hooks/
-│   │   │   ├── usePicksData.ts      ← TanStack Query hooks: useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker
-│   │   │   └── useNotificationPermission.ts ← notification permission + push token registration
+│   │   │   ├── usePicksData.ts      ← TanStack Query hooks for picks/games
+│   │   │   ├── useAdminData.ts      ← Admin hooks including notification testing
+│   │   │   └── useNotificationPermission.ts ← permission + push token registration
 │   │   └── lib/
 │   │       ├── firebase.ts          ← Firebase init with AsyncStorage persistence
 │   │       ├── queryClient.ts       ← TanStack Query + apiFetch() with Bearer token
 │   │       ├── nflSeason.ts         ← getCurrentNFLSeason(), getCurrentNFLWeek()
 │   │       └── lockTime.ts          ← isWeekCurrentlyLocked() (client-side best-effort)
-│   ├── app.json                     ← bundle ID com.thelonggame.picks, scheme thelonggame
-│   ├── babel.config.js              ← jsxImportSource nativewind, react-native-worklets/plugin
-│   ├── metro.config.js              ← withNativeWind wrapper
-│   ├── tailwind.config.js           ← custom dark color palette
-│   ├── tsconfig.json                ← strict, @/* → ./src/*
-│   ├── nativewind-env.d.ts          ← NativeWind types + Firebase module augmentation
+│   ├── app.json                     ← bundle ID, EAS projectId, expo-dev-client plugin
+│   ├── eas.json                     ← development/preview/production build profiles
+│   ├── babel.config.js
+│   ├── metro.config.js
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── nativewind-env.d.ts
 │   ├── .env                         ← EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
 │   └── package.json
 └── server/                          ← Express.js backend (BUILT AND DEPLOYED)
     ├── src/
-    │   ├── index.ts                 ← main server entry
+    │   ├── index.ts
     │   ├── types.ts
     │   ├── db/
-    │   │   ├── index.ts             ← database connection
+    │   │   ├── index.ts
     │   │   └── schema.ts            ← complete Drizzle schema
     │   ├── routes/
     │   │   ├── activity.ts
-    │   │   ├── admin.ts
+    │   │   ├── admin.ts             ← includes notification test endpoints
     │   │   ├── games.ts
     │   │   ├── leaderboard.ts
     │   │   ├── picks.ts
@@ -315,9 +362,9 @@ TheLongGame/
     │   │   ├── trophies.ts
     │   │   └── users.ts
     │   ├── services/
-    │   │   ├── espnService.ts       ← ESPN API isolated here — easy to swap to Sportradar/SportsData later
-    │   │   ├── notificationService.ts
-    │   │   ├── scheduler.ts
+    │   │   ├── espnService.ts       ← ESPN API isolated here
+    │   │   ├── notificationService.ts ← all 5 push triggers built, not yet cron-wired
+    │   │   ├── scheduler.ts         ← cron jobs (push triggers NOT yet connected)
     │   │   └── trophyService.ts     ← bug-fixed version
     │   ├── utils/
     │   │   ├── lockTime.ts
@@ -327,8 +374,7 @@ TheLongGame/
     │   └── scripts/
     │       └── migrate-2025.ts      ← imports CSV data into database
     ├── dist/                        ← compiled JS (committed to git, used by Railway)
-    ├── Dockerfile                   ← copies pre-compiled dist, no TypeScript build
-    ├── railway.toml                 ← sets builder to DOCKERFILE
+    ├── Dockerfile
     ├── .env                         ← never commit this
     ├── .gitignore
     ├── package.json
@@ -501,7 +547,7 @@ Skip migrating: activity_log, pick_audit_log, unlocked_weeks, sessions (regenera
 - sackRate, thirdDownConversion, redZoneEfficiency (decimal, nullable)
 - homeRecord, awayRecord (text, nullable)
 - last3Games (text, nullable)
-- additionalStats (jsonb, nullable)
+- additionalStats (jsonb, nullable) — post-game box score stored here
 - createdAt (timestamp)
 
 ### player_stats
@@ -516,7 +562,7 @@ Skip migrating: activity_log, pick_audit_log, unlocked_weeks, sessions (regenera
 - stat2 (decimal) — touchdowns
 - stat3 (decimal) — additional stat
 - stat4 (decimal) — additional stat
-- additionalStats (jsonb, nullable)
+- additionalStats (jsonb, nullable) — full box score details
 - createdAt (timestamp)
 
 ### activity_log
@@ -535,85 +581,27 @@ Skip migrating: activity_log, pick_audit_log, unlocked_weeks, sessions (regenera
 - platform (text) — 'ios', 'android'
 - createdAt, updatedAt (timestamps)
 
-### tiebreaker_games
-- id (uuid PK)
-- season (integer)
-- week (integer)
-- gameId (uuid, FK → games.id)
-- description (text)
-- actualTotal (integer, nullable)
-- designatedAt (timestamp)
-
-### tiebreaker_picks
-- id (uuid PK)
-- userId (text, FK → users.id)
-- tiebreakerGameId (uuid, FK → tiebreaker_games.id)
-- season (integer)
-- predictedTotal (integer)
-- createdAt, updatedAt (timestamps)
-
-### week_settings
-- id (uuid PK)
-- week (integer)
-- season (integer)
-- lockTime (timestamp, nullable) — overrides default Wednesday 9PM PST
-- notes (text, nullable)
-
-### app_settings
-- id (uuid PK)
-- key (text, unique)
-- value (text)
-- updatedAt (timestamp)
-Keys: 'seasonStartDate', 'currentSeason', 'preseasonMode'
-
-### pick_audit_log
-- id (uuid PK)
-- userId, gameId, action
-- previousPick, newPick (text, nullable)
-- adminId (text, nullable)
-- createdAt (timestamp)
-
-### unlocked_weeks
-- id (uuid PK)
-- week, season (integer)
-- unlockedAt (timestamp)
-- unlockedBy (text)
+### tiebreaker_games / tiebreaker_picks / week_settings / app_settings / pick_audit_log / unlocked_weeks
+(unchanged — see prior schema documentation)
 
 ---
 
 ## Achievement & Trophy System
 
 ### Terminology (IMPORTANT)
-- **Achievements** = Weekly awards earned throughout the season. These are stored in the `trophies` DB table (rename pending). Displayed as "Achievements" everywhere in the UI.
-- **Trophies** = Season-end podium placements (1st, 2nd, 3rd, last place). **NOT YET BUILT.** The last-place "trophy" comes with a prize — keeps players engaged even after falling out of contention. Design with Nick before implementing.
+- **Achievements** = Weekly awards earned throughout the season. Stored in `trophies` DB table. Displayed as "Achievements" everywhere in UI.
+- **Trophies** = Season-end podium placements (1st, 2nd, 3rd, last place). **NOT YET BUILT.** Design with Nick before implementing.
 
-### Achievement System — Complete
-
-### Currently Active (bugs already fixed in trophyService.ts)
-
-**most_wins** — Most correct picks that week. Ties = multiple winners.
-
-**loser** — Most incorrect picks that week. Ties = multiple losers. Sad football image. Stings a little — makes winning meaningful.
-
-**upset_pick** — Correctly picked lowest win probability winner. Uses winningTeamWinProb NOT FPI. Floating point epsilon 0.01.
-
-**lone_wolf** — ONLY player to correctly pick winner. Requires winningPicks.length === 1 AND losingPicks.length >= 1. Will become very rare as user base grows.
-
-**contrarian** — NEW. Correctly picked winner when 20% or fewer of players chose that team. Requires >1 winner pick (not Lone Wolf territory). Multiple per week possible. More attainable than Lone Wolf.
-
-### Bug Fixes Applied (trophyService.ts)
-1. Lone Wolf: added `losingPicks.length >= 1`
-2. Upset Pick: uses `winningTeamWinProb` not FPI
-3. Floating point: `Math.abs(a - b) < 0.01`
+### Achievement Types (all bugs fixed in trophyService.ts)
+- **most_wins** — Most correct picks that week. Ties = multiple winners.
+- **loser** — Most incorrect picks that week. Stings a little.
+- **upset_pick** — Correctly picked lowest win probability winner. Uses winningTeamWinProb.
+- **lone_wolf** — ONLY player to correctly pick a winner. Rare and valuable.
+- **contrarian** — Correctly picked winner when ≤20% of players chose that team. Multiple per week possible.
 
 ### Trophy Images
 - most_wins, loser, upset_pick, lone_wolf: existing images ✓
 - contrarian: NEEDS NEW IMAGE — placeholder for now
-
-### Future Trophies — Discuss With Nick Before Implementing
-Weekly: `perfect_week`
-Season-end: `sharpshooter`, `most_improved`, `the_goat`, `consistency_king`, `chaos_agent`, `oracle`
-Milestone: `century_club` (100 correct), `hot_hand` (10 in a row), `faithful` (every week submitted)
 
 ---
 
@@ -626,10 +614,10 @@ Milestone: `century_club` (100 correct), `hot_hand` (10 in a row), `faithful` (e
 | Tuesday 9PM PST | Win probability refresh |
 | Wednesday 6AM PST | Win probability refresh |
 | Wednesday 5PM PST | Win probability refresh (added — ESPN sometimes slow) |
-| Wednesday 8PM PST | Push: "1 hour left for Week X picks!" |
-| Wednesday 9PM PST | Picks lock + push notification |
+| Wednesday 8PM PST | Push: "1 hour left for Week X picks!" ← NOT YET WIRED |
+| Wednesday 9PM PST | Picks lock + push notification ← NOT YET WIRED |
 
-REMOVED: Monday 12PM CBB sync.
+Push notification cron triggers (all 5) need to be wired to scheduler.ts — functions exist in notificationService.ts.
 
 ### Season Detection — ALWAYS USE THIS
 ```typescript
@@ -642,16 +630,23 @@ export function getCurrentNFLSeason(): number {
 ```
 NEVER hardcode 2025 or any year. Lives in server/src/utils/season.ts.
 
+**TODO:** This function needs updating to handle the preseason start (Aug 7). When preseason starts, the season should flip to 2026 even though it's August. Options: check app_settings for preseasonStartDate, or change cutoff to month >= 8.
+
 ### Lock Times
 - Default: Wednesday 9PM PST
 - Admin-configurable per week via week_settings table
 - Season start date: admin-configurable, stored in app_settings
 
-### Preseason Mode
-- 'preseasonMode' boolean in app_settings
-- Completely isolated from regular season
-- Admin toggle as safeguard
-- Data never deleted, excluded from queries
+### Preseason — FUNCTIONAL, NOT ISOLATED
+The 2026 preseason (Aug 7–Sept 3) is a REAL picks period, not a sandboxed test mode:
+- Picks work on preseason games
+- Live score updates during preseason games
+- Leaderboard tracks preseason results separately from regular season (filtered by seasonType)
+- Regular season (Sept 4) resets to Week 1 regular season games — preseason data preserved
+- Preseason leaderboard accessible via past seasons / seasonType filter
+- The `preseasonMode` app_settings toggle remains as an admin safeguard but preseason IS functional by default
+
+**Rule 11 updated:** Preseason stats and leaderboard are kept SEPARATE from regular season via `seasonType` field, but preseason is fully functional — picks, live scores, and leaderboards all work.
 
 ---
 
@@ -660,17 +655,16 @@ NEVER hardcode 2025 or any year. Lives in server/src/utils/season.ts.
 ### Bottom Tabs (4)
 1. Picks 🏈
 2. Leaderboard 🏆
-3. Week Picks 👥 (renamed from All Picks)
+3. Week Picks 👥
 4. Profile 👤
 
 ### Bell Icon 🔔 (header top-right)
-- Activity slide-in panel
-- Two tabs: Global Feed | Your Activity
-- NOT a bottom tab
+- Activity slide-in panel — Global Feed | Your Activity tabs, paginated 20 per load
 
 ### Admin
-- Profile → Settings ⚙️ → Admin Dashboard
-- Only visible when isAdmin: true
+- Profile → Settings ⚙️ → Admin Dashboard (admins only)
+- 3 tabs: Users | NFL Tools | Data
+- NFL Tools includes: Sync Games, Sync Scores, Sync Win Probs, Award Achievements, Unlock Week, Score Correction, **Send Test Notification Now**, **Schedule Deadline Reminder Test**
 
 ---
 
@@ -697,118 +691,119 @@ After lock:
 - Full team names — NEVER abbreviations
 - Blue outer border = your pick
 - Green background = winning team
-- 6px thick pick percentage bars
-- Pick % bars only visible AFTER Wednesday lock
+- 6px thick pick percentage bars (visible after lock only)
 - 3 states: upcoming (pre-game stats), live (score+clock), final (score+result)
 
-### Upcoming Card State
-Shows: team logos (larger), full names, records, PPG, defensive rank, game time, spread, win probability bar, head-to-head top performers (QB/RB/WR side by side with season stats).
+### Pre-Game Card Stats (TO BUILD)
+Both teams side by side:
+- PPG / Opp PPG
+- Total yards per game / yards allowed per game
+- Pass yards + TDs, Rush yards + TDs
+- Defensive ranking
+- Win probability bar (already shown)
+- Top QB/RB/WR season averages
+
+Week 1 2026 edge case: if no current-season stats exist yet, fall back to prior season stats.
 
 ### Leaderboard
 - Longies users: Longies/Season default
 - Global users: Global/Season default
 - Toggles: Longies/Global (top) + Season/Weekly (below)
+- **Season selector for all users (TO BUILD)** — same +/− control admin has, lets users view 2025 final standings
 - Row: trophy/rank | avatar | team name | "X picks different" | W-L | accuracy%
-- "X picks different" = games picked differently than YOU this week
-- HIDE "picks different" entirely on your own row (not "0" — just hide it)
-- Blue highlight own row
-- 🏆🥈🥉 top 3, numbers rest
-- Tappable rows → profiles
-- Longies appear on Global leaderboard too
-- Tiebreaker column on season leaderboard
+- Blue highlight own row, tappable rows → profiles
 
 ### Week Picks Tab
 Before lock: message + past weeks viewable
-After lock: compact horizontal grid
-- Fixed left column (truncated names, ellipsis)
-- ~44px logo badges
-- Tap → Game Detail
+After lock: compact horizontal grid with synchronized scroll
 
 ### Game Detail
 - Compact header: "CAR @ TB" + date/time
 - Prev/Next + swipe gesture
 - Before lock: pre-game stats only, NO picks visible
-- After lock: player pick list with avatars, tappable to profiles
+- After lock: player pick list with avatars
+- **Post-game box score section (TO BUILD)** — team totals, top QB/RB/WR (final games only)
 
 ### Profile (own)
-- Header: avatar, name, member since, Longie badge, ⚙️ gear (admins only → Admin Dashboard), Sign Out
+- Header: avatar, name, member since, Longie badge, ⚙️ gear (admins only), Sign Out
 - 2×2 stats: Record | Accuracy | Best Week | Achievements
-- This Week record
-- Week-by-week color-coded history (green = above .500, red = below)
-- Auto insights: best team, worst team, underdog record, home/away, upset rank, best day
-- NO current streak (games change too fast on Sundays)
-- H2H vs every Longie (W-L-T, ties counted as T)
-- Achievement Case: type summary chips + 2-col grid (most recent 12), tap for detail (future)
+- Week-by-week color-coded history
+- Auto insights: best team, worst team, underdog record, etc.
+- H2H vs every Longie
+- Achievement Case
+- **Past Seasons row (TO BUILD)** — W-L per season for historical context
 
 ### Other User Profiles
-Tappable from: Leaderboard rows, Week Picks names, Game Detail pick list
-
 - H2H vs YOU specifically
-- H2H Pick Comparison (Nick's favorite feature):
-  - ONLY after Wednesday lock
-  - ONLY current week
-  - Shows side by side your pick vs their pick for each game
-  - Highlights games where you differ
-  - Explains the "X picks different" number on leaderboard
+- H2H Pick Comparison: current week only, after lock only
 - No email, no full pick history
 
-### Activity Panel
-Global Feed: week unlock/lock, trophy awards (bulk), new user joined, score corrections. Paginated 20.
-Your Activity: picks submitted, trophy earned (individual), weekly result, milestones. Paginated 20.
-
-Activity visibility rules:
-- global: week_unlock, week_lock, trophy_award, user_join, score_correction
-- personal: pick_submit, trophy_earn, weekly_result, milestone
-- admin only: stats_update, account_delete, admin_action
-
 ### Admin (3 tabs) — BUILT ✅
-Accessible from Profile → ⚙️ gear icon (admins only). Season selector in header lets Nick view any past season.
-
-**Users:** User cards with inline teamName edit (pencil icon), Longie toggle (Switch), Admin/Longie badges.
-
-**NFL Tools:** Week picker (+/−), then:
-- Sync Games from ESPN (full upsert — teams, logos, spread, scores)
-- Sync Scores Only (scores/status/clock only — faster, use when games are stuck)
-- Sync Win Probabilities
-- Award Achievements (confirmation alert)
-- Unlock Week (confirmation alert)
-- Inline score correction — tap any game in the list to edit away score, home score, and status (Pre-game / Live / Final)
-
-**Data:** Export Season Data (verifies record counts from Railway), Export Week X Picks (by week picker).
+**Users:** Inline teamName edit, Longie toggle, Admin/Longie badges.
+**NFL Tools:** Week picker, Sync buttons, Award Achievements, Unlock Week, Score Correction, **Notification Testing** (Send Test Now + Schedule with 1/5/10/30m presets).
+**Data:** Export Season Data, Export Week Picks.
 
 ---
 
-## Pre-Game Stats on Game Cards
+## Pre-Game Stats & Post-Game Box Scores (TO BUILD — Before Launch)
 
-Head-to-head top performers comparison (season stats):
-```
-PASSING          Mahomes    Allen
-Yards            2,847      2,631
-TDs              22         19
-INTs             4          6
+This is a priority feature before launch. The DB tables (`team_game_stats`, `player_stats`) are already in the schema — just needs population and display.
 
-RUSHING          Pacheco    Cook
-Yards            487        412
-TDs              5          3
+### Pre-Game (ESPN `/summary?event={id}` predictor section)
+Sync on: Tuesday 6AM + Wednesday syncs (before lock)
+Store in: `team_game_stats` (season stats) + `player_stats` (top performers)
+Display on: GameCard pre-game state, Game Detail before lock
 
-RECEIVING        Rice       Diggs
-Yards            634        589
-TDs              6          4
-```
-Plus offensive/defensive ranking, yards per game, win probability bar.
-From ESPN public API, stored in player_stats table, refreshed Tuesday 6AM.
+Stats to show per team:
+- PPG + Opp PPG
+- Total YPG + yards allowed
+- Pass yards/game + pass TDs/game
+- Rush yards/game + rush TDs/game
+- Offensive rank + Defensive rank
+- Top QB, RB, WR season averages (yards, TDs)
+
+### Post-Game Box Score (ESPN `/summary?event={id}` boxscore section)
+Sync on: when game status flips to 'post'
+Store in: `team_game_stats.additionalStats` (jsonb) + `player_stats`
+Display on: Game Detail final state
+
+Stats to show:
+- Team: total yards, pass yards, rush yards, TDs, turnovers, 3rd-down %, red zone
+- Top QB: comp/att, pass yards, TDs, INTs
+- Top RB: carries, rush yards, TDs
+- Top WR: rec/targets, yards, TDs
+
+### Implementation Plan
+1. `espnService.ts`: add `syncTeamStats(game)` — pre-game stats from predictor section
+2. `espnService.ts`: add `syncBoxScore(game)` — post-game stats from boxscore section
+3. Wire `syncTeamStats` to Tuesday 6AM + Wednesday sync crons
+4. Wire `syncBoxScore` to live score update loop (trigger when game goes 'post')
+5. `GET /api/games` list: include pre-game team stats per game
+6. `GET /api/games/:id`: include post-game box score
+7. GameCard: show team stats in pre-game state
+8. Game Detail: show box score section for final games
+9. Add `npm run sync:stats` script to backfill 2025 box scores
 
 ---
 
 ## Push Notifications
 
-| Trigger | Message | When |
-|---|---|---|
-| Week unlocked | "Week X picks are now open! 🏈" | Tue 6AM |
-| Deadline | "1 hour left for Week X picks!" | Wed 8PM |
-| Locked | "Picks locked. Good luck! 🏈" | Wed 9PM |
-| Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring |
-| Final | "Final: [score]. Your pick: ✓/✗" | As games end |
+| Trigger | Message | When | Status |
+|---|---|---|---|
+| Week unlocked | "Week X picks are now open! 🏈" | Tue 6AM | function built, NOT wired |
+| Deadline | "1 hour left for Week X picks!" | Wed 8PM | function built, NOT wired |
+| Locked | "Picks locked. Good luck! 🏈" | Wed 9PM | function built, NOT wired |
+| Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring | function built, NOT wired |
+| Final | "Final: [score]. Your pick: ✓/✗" | As games end | function built, NOT wired |
+
+All functions live in `server/src/services/notificationService.ts`. Need to be called from `scheduler.ts`.
+
+### Testing Push Notifications
+Admin Dashboard → NFL Tools:
+- **Send Test Notification Now** — fires immediately to the admin's device
+- **Schedule Deadline Reminder Test** — fires "1 hour left for picks" message after 1/5/10/30 min delay
+
+Requires: EAS dev build installed + app opened at least once to register push token.
 
 Permission: in-app prompt 10 seconds after first login → system dialog. Maybe Later re-asks after 7 days.
 
@@ -817,155 +812,102 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 ## Complete Build Plan
 
 ### Phase 1 — Backend ✅ COMPLETE
-- [x] Create Railway PostgreSQL database
-- [x] Write Drizzle schema
-- [x] Run migrations
-- [x] Write 2025 data migration script
-- [x] Build all Express routes
-- [x] Deploy to Railway — WORKING ✅
-- [x] Test endpoints — games API confirmed returning 2025 data ✅
-- [ ] Run migration script to import 2025 CSV data (pending — run when ready)
-- [ ] Verify leaderboard matches known 2025 results (pending)
-
 ### Phase 2 — Expo Foundation ✅ COMPLETE
-- [x] Expo Router navigation (4 bottom tabs + bell icon)
-- [x] Firebase Auth (email working; Google + Apple deferred to EAS dev build)
-- [x] TanStack Query connected to Railway backend
-- [x] NativeWind + dark theme
-- [x] Notification permission flow (10 sec delay, "Maybe Later" after 7 days)
-- [x] Push token registration to backend
-
-### Phase 3 — Auth Screens ✅ MOSTLY COMPLETE
-- [ ] Splash/onboarding (logo, tagline) ← TODO
-- [x] Login (Google, Apple, Email buttons) — email works; OAuth needs EAS dev build
-- [x] Sign up (email, password, team name)
-- [x] Forgot password
+### Phase 3 — Auth Screens (mostly complete)
+- [ ] Splash/onboarding (logo, tagline)
+- [x] Login, Sign up, Forgot password
 
 ### Phase 4 — Core Screens ✅ COMPLETE
-- [x] Picks Tab (game cards 3 states, week selector, submit, tiebreaker, pick %)
-- [x] Leaderboard Tab (Longies/Global, Season/Weekly toggles, tappable rows)
-- [x] Week Picks Tab (compact synchronized grid, all outcomes color-coded)
-- [x] Profile Tab (own profile: stats, weekly history, insights, H2H, trophies)
-- [x] Game Detail Screen (header, prev/next, stats, pick list after lock)
-- [x] Public profile screen (other users: stats, H2H, pick comparison)
-- [x] **GameCard correct/incorrect UI polish** ✅ — wrong-pick red tint, pending blue tint
-- [x] **Remove debug console.logs** ✅ — removed from queryClient.ts and usePicksData.ts
-- [x] **Week Picks: player names tappable** ✅ — navigates to public profile
 
-### Phase 5 — Advanced Features (NEXT PRIORITY)
-- [ ] **EAS dev build** — do this first, unlocks Google/Apple sign-in testing ← DO FIRST
-- [ ] **Google/Apple Sign-In** — fix once EAS build available, CRITICAL for launch
-- [x] Activity bell panel (Global + Your Activity) ✅
-- [ ] Push notifications (all 5 triggers wired to cron jobs)
-- [x] Admin dashboard ✅ — Users (teamName edit, Longie toggle), NFL Tools (sync games, sync scores, sync probs, award achievements, unlock week, inline score editor), Data (season + weekly export), season selector
-- [ ] AdminUserPicksPage (read-only + confirm-to-edit) — deferred to future
+### Phase 5 — Advanced Features (IN PROGRESS)
+- [x] EAS project initialized, eas.json created, expo-dev-client installed ✅
+- [x] First iOS dev build submitted (⏳ queued as of May 31 2026)
+- [ ] Install EAS dev build on iPhone, register push token
+- [ ] Google/Apple Sign-In (needs second EAS build after native SDK installed)
+- [x] Activity bell panel ✅
+- [x] notificationService.ts — all 5 triggers built ✅
+- [x] Notification testing in Admin Dashboard ✅ (Send Test Now + Schedule)
+- [ ] Wire push notification cron triggers to scheduler.ts
+- [x] Admin dashboard ✅
 
-### Phase 6 — Preseason Testing
-- [ ] Preseason mode working end-to-end
-- [ ] All screens tested
-- [ ] Safeguard toggle working
-- [ ] Confirmed no contamination of regular season
+### Phase 6 — Season & History
+- [ ] Preseason handling — season flip Aug 7, functional picks/leaderboard for preseason
+- [ ] Past seasons feature — leaderboard season selector + profile past seasons row
+- [ ] `getCurrentNFLSeason()` updated to handle preseason start date
 
-### Phase 7 — 2025 Data Migration
-- [ ] 7 Longies sign up with Google/Apple
+### Phase 7 — Team Stats & Box Scores (Before Launch)
+- [ ] `syncTeamStats()` in espnService.ts — pre-game stats from ESPN predictor
+- [ ] `syncBoxScore()` in espnService.ts — post-game box scores stored permanently
+- [ ] Wire to cron schedule (pre-game: Tuesday + Wednesday; post-game: live loop)
+- [ ] API returns stats with game data
+- [ ] GameCard pre-game state shows team stats
+- [ ] Game Detail final state shows box score
+- [ ] Backfill 2025 box scores with sync:stats script
+
+### Phase 8 — TestFlight & Migration (Early July)
+- [ ] `eas build --platform ios --profile preview` + `eas submit --platform ios`
+- [ ] Add Longies as TestFlight testers by email
+- [ ] 7 Longies sign up with Google/Apple Sign-In
 - [ ] Run UID reassignment script
 - [ ] Verify 2025 stats correct for all users
+- [ ] Fix issues via OTA updates
 
-### Phase 8 — Polish
+### Phase 9 — Polish
 - [ ] Loading/error/empty states everywhere
-- [ ] Animations and transitions
-- [ ] Android testing
-- [ ] Edge cases
-- [ ] Achievement case UI redesign with custom images (see Known TODOs)
-- [ ] UI + icon polish pass across all tabs (see Future Features — UI Polish)
+- [ ] Android testing (emulator or Nick's dad's phone)
+- [ ] Achievement case UI redesign with custom images
+- [ ] UI + icon polish pass
+- [ ] Haptic feedback via expo-haptics (OTA-safe)
 
-### Phase 9 — App Store Submission (Target: Late July)
+### Phase 10 — App Store Submission (Target: Late July)
 
 #### Before Either Store
-- [ ] Privacy policy live on web
-- [ ] Terms of service live on web
+- [ ] Privacy policy live at a URL (GitHub Pages is fine)
+- [ ] Terms of service live at a URL
 - [ ] Support email working
-- [ ] TestFlight tested on real iPhone
-- [ ] Tested on real Android
-- [ ] Push notifications working
+- [ ] Zero crashes on core flows
+- [ ] Push notifications tested and working
 - [ ] Google/Apple sign-in working
-- [ ] Zero crashes
 
 #### Apple App Store
 - [ ] App icon (1024×1024px)
-- [ ] Screenshots: 6.5" iPhone + 12.9" iPad
-- [ ] App name: "The Long Game"
-- [ ] Subtitle: "NFL Picks & Leaderboards"
-- [ ] Description, keywords, category (Sports), age rating (4+)
-- [ ] Privacy Policy URL
+- [ ] Screenshots: 6.5" iPhone required
+- [ ] App name: "The Long Game" / Subtitle: "NFL Picks & Leaderboards"
+- [ ] Category: Sports, Age rating: 4+
 - [ ] `eas build --platform ios --profile production`
 - [ ] `eas submit --platform ios` — review 1-7 days
 
 #### Google Play Store
 - [ ] Set up Google Play Developer account ($25) — NOT DONE YET
-- [ ] App icon (512×512px), feature graphic (1024×500px)
-- [ ] Description, content rating
-- [ ] Privacy Policy URL
 - [ ] `eas build --platform android --profile production`
 - [ ] `eas submit --platform android` — review 1-3 days
 
 ---
 
-## Future Features — Not Building Now
+## Future Features — Post-Launch
 
 ### Team History Screen
-Tapping a team logo (anywhere in the app) opens that team's past game history — schedule, scores, results. Would use ESPN API's `/teams/{teamId}/schedule` endpoint. Useful context for making picks.
-
-### Advanced Game Stats (Pre-Game + Post-Game)
-Discussed and scoped — deferring to let the 2026 season generate real data.
-
-**Pre-game card stats** (ESPN `/summary?event={id}` predictor section):
-- Team season stats: YPG, OppYPG, rush/pass yards, 3rd-down %, red zone %, sack rate, home/away record
-- Top QB/WR/RB season averages: yards/game, TDs/game, carries/completions/receptions per game
-- Win probability bar (already shown)
-- Week 1 2026 edge case: if no current-season stats exist, fall back to 2025 stats
-
-**Post-game box score** (ESPN `/summary?event={id}` boxscore section):
-- Team: total yards, pass yards, rush yards, pass TDs, rush TDs, turnovers, 3rd-down efficiency, red zone
-- Top QB: completions/attempts, passing yards, TDs, INTs
-- Top RB: carries, rush yards, TDs
-- Top WR: receptions/targets, receiving yards, TDs
-
-**Implementation when ready:**
-1. `espnService.ts`: add `syncBoxScore(game)` → stores in `team_game_stats` + `player_stats`
-2. `espnService.ts`: update `syncWinProbabilities` to also store predictor team stats
-3. Add `npm run sync:stats` script to backfill 2025 completed games
-4. `GET /api/games` list: include pregame season stats per game
-5. `GET /api/games/:id`: include post-game box score
-6. GameCard: show team stats + player season averages for pre games
-7. Game Detail: show box score section for final games
-- DB tables (`team_game_stats`, `player_stats`) are already in schema — just needs population
+Tapping a team logo opens that team's past game history. ESPN `/teams/{teamId}/schedule` endpoint.
 
 ### Premium ("Long Game Pro") ~$4.99/month or $29.99/season
 - Stripe web-only (no in-app purchase — avoids Apple's 30% cut)
-- Powered by OUR OWN database — not a third-party API (see ESPN API Strategy section)
-- Win probability bucket analysis (own historical data)
-- Matchup intelligence (pass rush, WR vs CB, run defense)
-- Historical trends, data export, weather impact
-- PFF licensing when revenue supports it
-- isPremium field already in users table (default false)
+- Powered by OUR OWN database — not a third-party API
+- Win probability bucket analysis, matchup intelligence, historical trends
+- isPremium field already in users table
 
 ### Private Pools
-- Commissioner, buy-in tracking, pool leaderboards, pool game modes
+Commissioner, buy-in tracking, pool leaderboards, pool game modes.
 
 ### Game Modes
-- Probability Mode: points scale with win probability (bracket thresholds TBD after data)
+- Probability Mode: points scale with win probability
 - Upset Hunter: underdog picks only
 - Lock of the Week: double or nothing one pick
-- pointsEarned field already in picks table
+
+### Trophies (Podium) System
+Season-end 1st/2nd/3rd/last place awards. Last-place prize keeps eliminated players engaged. Design with Nick before implementing.
 
 ### Additional Sports (curated)
-- March Madness brackets, FIFA World Cup brackets, NCAA Top 25
-
-### User Feedback / Support
-1. Simple feedback form → email (build after launch)
-2. Crisp.chat (~$30/month, when user base grows)
-Not building yet — 7 Longies = just text Nick.
+March Madness brackets, FIFA World Cup brackets, NCAA Top 25.
 
 ---
 
@@ -974,63 +916,54 @@ Not building yet — 7 Longies = just text Nick.
 Base: https://site.api.espn.com/apis/site/v2/sports/football/nfl
 - Scoreboard: /scoreboard?week={week}&seasontype=2&season={year}
 - Preseason: /scoreboard?week={week}&seasontype=1&season={year}
+- Game summary (stats + box score): /summary?event={espnId}
 - Team stats: /teams/{teamId}/statistics
-- Game summary: /summary?event={espnId}
-No API key required.
-NFL win probability range: ~20%-80%.
+No API key required. Win probability range: ~20%–80%.
 
 ---
 
-## Mobile Setup — Lessons Learned (Important for Next Session)
+## Mobile Setup — Lessons Learned
 
 These are hard-won fixes. Don't undo them.
 
 ### Node.js Version — REQUIRED: v20+
-- Expo SDK 54 requires **Node.js v20 or higher** — v18 is NOT compatible
-- Symptom of wrong version: `TypeError: configs.toReversed is not a function` → cascades into `ERR_UNSUPPORTED_ESM_URL_SCHEME` on Windows
+- Expo SDK 54 requires Node.js v20 or higher
 - Fix: `nvm install 20 && nvm use 20` (nvm-windows is installed)
-- Verify: `node --version` must show v20.x.x or higher
 
 ### Package Installation
-- Always use `--legacy-peer-deps` when running `npm install` in the mobile/ folder
-- There is a react-dom peer dep version conflict that's harmless but breaks install without the flag
+- Always use `--legacy-peer-deps` when running `npm install` in mobile/
 
 ### NativeWind v4
-- `babel.config.js` must have `jsxImportSource: 'nativewind'` inside `babel-preset-expo` options
-- `metro.config.js` must wrap config with `withNativeWind(config, { input: './src/global.css' })`
-- TypeScript className support requires `/// <reference types="nativewind/types" />` in `nativewind-env.d.ts`
+- `babel.config.js`: `jsxImportSource: 'nativewind'` inside babel-preset-expo options
+- `metro.config.js`: wrap with `withNativeWind(config, { input: './src/global.css' })`
 
 ### react-native-reanimated v4
-- The Babel plugin moved to a separate package: `react-native-worklets`
-- `babel.config.js` plugin must be `'react-native-worklets/plugin'` NOT `'react-native-reanimated/plugin'`
+- Babel plugin: `'react-native-worklets/plugin'` NOT `'react-native-reanimated/plugin'`
 
 ### Firebase Auth
-- Use Firebase JS SDK v12 (NOT the `@react-native-firebase` package)
-- `getReactNativePersistence` is not in the TypeScript types — module augmentation in `nativewind-env.d.ts` handles this
-- The file needs `export {}` at the top to be treated as a module (not ambient declaration)
+- Use Firebase JS SDK v12 (NOT @react-native-firebase)
+- `getReactNativePersistence` needs module augmentation in `nativewind-env.d.ts`
 
 ### TextInput (iOS)
-- NEVER set padding via className on TextInput — iOS clips the text
-- Always use `style={{ height: 52, paddingHorizontal: 16 }}` as a prop instead
-- ScrollView: use `contentContainerStyle` prop, NOT `contentContainerClassName`
+- NEVER set padding via className — iOS clips text
+- Use `style={{ height: 52, paddingHorizontal: 16 }}` as a prop
 
-### Apple Sign-In in Expo Go
-- Does NOT work in Expo Go — Apple identity token `aud` claim = `host.exp.exponent` (Expo's bundle ID)
-- Firebase rejects it because it's configured for `com.thelonggame.picks`
-- This is not a config bug. Fix = EAS dev build
-- All Apple config IS correct: App ID, Service ID, Firebase Team ID/Key ID/private key all set up
+### Apple/Google Sign-In in Expo Go
+- Both DO NOT work in Expo Go — bundle ID mismatch
+- Fix = EAS dev build. All config is correct and ready to test.
 
-### Google Sign-In in Expo Go
-- Gets "OAuth 2.0 policy violation" error in Expo Go
-- Fix = native Google Sign-In SDK during EAS dev build phase
-- Web Client ID already in `mobile/.env`
+### EAS CLI on Windows — CRITICAL
+EAS CLI v20 has a Windows `EPERM: rmdir` bug during project upload.
+**Patch location:** `C:\nvm4w\nodejs\node_modules\eas-cli\build\build\utils\repository.js`
+**Fix:** Wrap `finally { await fs_extra.remove(shallowClonePath) }` in try/catch swallowing EPERM.
+**This patch is lost on `npm install -g eas-cli` upgrades — re-apply after any upgrade.**
 
 ### To Start the App
 ```
 cd mobile
 npx expo start
 ```
-Add `--clear` if there are any Metro bundler cache issues.
+Add `--clear` for Metro cache issues.
 
 ---
 
@@ -1046,7 +979,7 @@ Add `--clear` if there are any Metro bundler cache issues.
 8. isPremium = future paid only. Not building yet.
 9. Never hardcode a year. Always getCurrentNFLSeason().
 10. Lock times admin-configurable per week.
-11. Preseason completely isolated from regular season.
+11. Preseason picks and leaderboard are FUNCTIONAL. Preseason stats kept separate from regular season via `seasonType` field. Preseason leaderboard is its own view, not mixed into regular season standings.
 12. H2H pick comparison: current week only, after lock only, other profiles only.
 13. Admin picks page: read-only default, confirm + audit log to edit.
 14. Activity: two tabs, paginated 20 per load.
@@ -1061,11 +994,13 @@ Add `--clear` if there are any Metro bundler cache issues.
 
 ## Open Questions — Ask Nick Before Deciding
 
-- New season/milestone trophy details (discuss when building)
-- Google Play account setup timing
-- Domain name decision
+- Preseason season flip: change `getCurrentNFLSeason()` to flip on Aug 7, or use app_settings `preseasonStartDate`?
+- Past seasons: how many years back to support in season selector?
+- Trophies (podium) system design — 1st/2nd/3rd/last place, prize details
 - Contrarian trophy artwork
 - Premium pricing and features
+- Google Play account setup timing
+- Domain name decision
 
 ---
 
@@ -1085,34 +1020,11 @@ Add `--clear` if there are any Metro bundler cache issues.
 
 **Lowest priority — do after launch or as OTA update.**
 
-A full visual polish pass is needed across all screens before the app feels fully production-ready. This is NOT urgent — functionality comes first, and most of these can ship as OTA updates after App Store approval.
+**Admin Dashboard** — tab bar polish, score editor inputs, avatar initials on user cards
+**Activity Panel** — empty state illustration, Dynamic Island safe area
+**Profile Tab** — achievement case custom artwork, gear icon layout
+**Picks Tab / GameCard** — CORRECT/WRONG badges could be icon-only; live pulsing indicator
+**Week Picks Tab** — name column width may truncate on some screen sizes
+**All Tabs** — haptic feedback (expo-haptics, OTA-safe), custom tab bar icon set, consistent activeOpacity
 
-### Known UI Issues to Address (by screen)
-
-**Admin Dashboard**
-- Tab bar and week picker styling could be more polished
-- Score editor inputs need better visual treatment
-- User cards could show avatar initials for consistency with rest of app
-
-**Activity Panel**
-- No empty state illustration — just text right now
-- Panel header should account for different device safe area heights (notch vs Dynamic Island)
-
-**Profile Tab**
-- Achievement case needs custom artwork instead of placeholder emojis (separate task — coordinate with designer)
-- Gear icon and Sign Out button layout in header could be cleaner
-
-**Picks Tab / GameCard**
-- The CORRECT / WRONG / MY PICK badges are functional but visually basic — consider icon-only treatment (✓ / ✗ circle)
-- Live game state could have a pulsing indicator
-
-**Week Picks Tab**
-- Name column width (88px) may truncate long team names awkwardly on some screen sizes
-
-**All Tabs**
-- No haptic feedback on picks or taps (add via `expo-haptics` — requires no App Store update)
-- Tab bar icons: consider custom icon set instead of Ionicons for a more branded feel
-- Consistent use of `activeOpacity` on all TouchableOpacity elements
-
-### Approach
-Do this as a dedicated polish session after the core launch requirements are met (Google/Apple Sign-In, push notifications, App Store submission). Most changes are OTA-safe and require no App Store review.
+Do as a dedicated polish session after core launch requirements are met. Most are OTA-safe.
