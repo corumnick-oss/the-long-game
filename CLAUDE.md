@@ -730,14 +730,14 @@ After lock: compact horizontal grid
 - After lock: player pick list with avatars, tappable to profiles
 
 ### Profile (own)
-- Header: avatar, name, member since, Longies rank + Global rank, Longie badge, ⚙️
-- 2×2 stats: Record | Accuracy | Best Week | Trophies
+- Header: avatar, name, member since, Longie badge, ⚙️ gear (admins only → Admin Dashboard), Sign Out
+- 2×2 stats: Record | Accuracy | Best Week | Achievements
 - This Week record
 - Week-by-week color-coded history (green = above .500, red = below)
 - Auto insights: best team, worst team, underdog record, home/away, upset rank, best day
 - NO current streak (games change too fast on Sundays)
 - H2H vs every Longie (W-L-T, ties counted as T)
-- Trophy Case: summary counts + 2-col grid, tap for detail
+- Achievement Case: type summary chips + 2-col grid (most recent 12), tap for detail (future)
 
 ### Other User Profiles
 Tappable from: Leaderboard rows, Week Picks names, Game Detail pick list
@@ -760,10 +760,20 @@ Activity visibility rules:
 - personal: pick_submit, trophy_earn, weekly_result, milestone
 - admin only: stats_update, account_delete, admin_action
 
-### Admin (3 tabs)
-**Users:** Vertical cards, Longie toggle, Manage Picks (read-only default, confirm+audit to edit)
-**NFL Tools:** Sync games/scores/correctness/stats, correct scores, season config, lock times, trophies, tiebreaker, preseason
-**Data:** Export All Data CSV, Export Win Probability CSV
+### Admin (3 tabs) — BUILT ✅
+Accessible from Profile → ⚙️ gear icon (admins only). Season selector in header lets Nick view any past season.
+
+**Users:** User cards with inline teamName edit (pencil icon), Longie toggle (Switch), Admin/Longie badges.
+
+**NFL Tools:** Week picker (+/−), then:
+- Sync Games from ESPN (full upsert — teams, logos, spread, scores)
+- Sync Scores Only (scores/status/clock only — faster, use when games are stuck)
+- Sync Win Probabilities
+- Award Achievements (confirmation alert)
+- Unlock Week (confirmation alert)
+- Inline score correction — tap any game in the list to edit away score, home score, and status (Pre-game / Live / Final)
+
+**Data:** Export Season Data (verifies record counts from Railway), Export Week X Picks (by week picker).
 
 ---
 
@@ -796,7 +806,7 @@ From ESPN public API, stored in player_stats table, refreshed Tuesday 6AM.
 | Week unlocked | "Week X picks are now open! 🏈" | Tue 6AM |
 | Deadline | "1 hour left for Week X picks!" | Wed 8PM |
 | Locked | "Picks locked. Good luck! 🏈" | Wed 9PM |
-| Trophy | "🏆 You won [Trophy] for Week X!" | Tue after scoring |
+| Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring |
 | Final | "Final: [score]. Your pick: ✓/✗" | As games end |
 
 Permission: in-app prompt 10 seconds after first login → system dialog. Maybe Later re-asks after 7 days.
@@ -865,7 +875,8 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 - [ ] Animations and transitions
 - [ ] Android testing
 - [ ] Edge cases
-- [ ] Trophy case UI redesign with custom images
+- [ ] Achievement case UI redesign with custom images (see Known TODOs)
+- [ ] UI + icon polish pass across all tabs (see Future Features — UI Polish)
 
 ### Phase 9 — App Store Submission (Target: Late July)
 
@@ -1066,3 +1077,41 @@ Add `--clear` if there are any Metro bundler cache issues.
 - Use Claude.ai chat for planning and strategy
 - Use Claude Code for building
 - Original Replit web app — do not reference that code
+
+---
+
+## Future: UI & Icon Polish Pass
+
+**Lowest priority — do after launch or as OTA update.**
+
+A full visual polish pass is needed across all screens before the app feels fully production-ready. This is NOT urgent — functionality comes first, and most of these can ship as OTA updates after App Store approval.
+
+### Known UI Issues to Address (by screen)
+
+**Admin Dashboard**
+- Tab bar and week picker styling could be more polished
+- Score editor inputs need better visual treatment
+- User cards could show avatar initials for consistency with rest of app
+
+**Activity Panel**
+- No empty state illustration — just text right now
+- Panel header should account for different device safe area heights (notch vs Dynamic Island)
+
+**Profile Tab**
+- Achievement case needs custom artwork instead of placeholder emojis (separate task — coordinate with designer)
+- Gear icon and Sign Out button layout in header could be cleaner
+
+**Picks Tab / GameCard**
+- The CORRECT / WRONG / MY PICK badges are functional but visually basic — consider icon-only treatment (✓ / ✗ circle)
+- Live game state could have a pulsing indicator
+
+**Week Picks Tab**
+- Name column width (88px) may truncate long team names awkwardly on some screen sizes
+
+**All Tabs**
+- No haptic feedback on picks or taps (add via `expo-haptics` — requires no App Store update)
+- Tab bar icons: consider custom icon set instead of Ionicons for a more branded feel
+- Consistent use of `activeOpacity` on all TouchableOpacity elements
+
+### Approach
+Do this as a dedicated polish session after the core launch requirements are met (Google/Apple Sign-In, push notifications, App Store submission). Most changes are OTA-safe and require no App Store review.
