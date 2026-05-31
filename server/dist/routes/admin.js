@@ -42,6 +42,7 @@ const espnService_1 = require("../services/espnService");
 const trophyService_1 = require("../services/trophyService");
 const season_1 = require("../utils/season");
 const activity_1 = require("./activity");
+const notificationService_1 = require("../services/notificationService");
 const router = (0, express_1.Router)();
 router.use(auth_1.requireAuth, auth_1.requireAdmin);
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -262,6 +263,43 @@ router.post('/tiebreaker/designate', async (req, res) => {
         description: description ?? `Week ${week} tiebreaker: predict combined score`,
     }).returning();
     res.status(201).json(created);
+});
+// ── Notification Testing ──────────────────────────────────────────────────────
+router.post('/notifications/test', async (req, res) => {
+    const userId = req.user.uid;
+    await (0, notificationService_1.sendPushToUsers)([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
+    res.json({ sent: true });
+});
+let scheduledTestTimeout = null;
+let scheduledTestUserId = null;
+router.post('/notifications/schedule-test', async (req, res) => {
+    const userId = req.user.uid;
+    const { delayMinutes } = req.body;
+    if (!delayMinutes || delayMinutes < 1 || delayMinutes > 60) {
+        res.status(400).json({ error: 'delayMinutes must be 1–60' });
+        return;
+    }
+    if (scheduledTestTimeout) {
+        clearTimeout(scheduledTestTimeout);
+    }
+    const fireAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+    scheduledTestUserId = userId;
+    scheduledTestTimeout = setTimeout(async () => {
+        if (scheduledTestUserId) {
+            await (0, notificationService_1.sendPushToUsers)([scheduledTestUserId], '1 hour left for picks! 🏈', 'Lock in your picks before they close. (Scheduled test)', { type: 'deadline_test' });
+        }
+        scheduledTestTimeout = null;
+        scheduledTestUserId = null;
+    }, delayMinutes * 60 * 1000);
+    res.json({ scheduled: true, fireAt: fireAt.toISOString(), delayMinutes });
+});
+router.delete('/notifications/schedule-test', async (req, res) => {
+    if (scheduledTestTimeout) {
+        clearTimeout(scheduledTestTimeout);
+        scheduledTestTimeout = null;
+        scheduledTestUserId = null;
+    }
+    res.json({ cancelled: true });
 });
 // ── Export ────────────────────────────────────────────────────────────────────
 router.get('/export', async (req, res) => {

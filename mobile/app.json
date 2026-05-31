@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.thelonggame.picks"
+      "bundleIdentifier": "com.thelonggame.picks",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.thelonggame.picks",
@@ -31,6 +34,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
       "expo-web-browser",
       "expo-secure-store",
@@ -38,6 +42,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cb389856-b1ab-42c9-a22b-803f25093e22"
+      }
+    },
+    "owner": "nickcorum"
   }
 }

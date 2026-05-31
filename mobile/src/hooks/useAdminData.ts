@@ -101,6 +101,32 @@ export function useExportWeekPicks() {
   });
 }
 
+export function useSendTestNotification() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: () => apiFetch<{ sent: boolean }>('/api/admin/notifications/test', { method: 'POST' }, user),
+  });
+}
+
+export function useScheduleTestNotification() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ delayMinutes }: { delayMinutes: number }) =>
+      apiFetch<{ scheduled: boolean; fireAt: string; delayMinutes: number }>(
+        '/api/admin/notifications/schedule-test',
+        { method: 'POST', body: JSON.stringify({ delayMinutes }) },
+        user,
+      ),
+  });
+}
+
+export function useCancelScheduledTest() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: () => apiFetch('/api/admin/notifications/schedule-test', { method: 'DELETE' }, user),
+  });
+}
+
 export function useExportData() {
   const { user } = useAuth();
   return useMutation({

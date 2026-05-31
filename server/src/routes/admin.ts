@@ -7,6 +7,7 @@ import { syncWeekGames, syncWeekScores, syncWinProbabilities } from '../services
 import { awardWeeklyTrophies } from '../services/trophyService';
 import { getCurrentNFLSeason } from '../utils/season';
 import { logActivity } from './activity';
+import { sendPushToUsers } from '../services/notificationService';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -226,6 +227,57 @@ router.post('/tiebreaker/designate', async (req, res) => {
     description: description ?? `Week ${week} tiebreaker: predict combined score`,
   }).returning();
   res.status(201).json(created);
+});
+
+// ── Notification Testing ──────────────────────────────────────────────────────
+
+router.post('/notifications/test', async (req, res) => {
+  const userId = (req as any).user.uid;
+  await sendPushToUsers([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
+  res.json({ sent: true });
+});
+
+let scheduledTestTimeout: ReturnType<typeof setTimeout> | null = null;
+let scheduledTestUserId: string | null = null;
+
+router.post('/notifications/schedule-test', async (req, res) => {
+  const userId = (req as any).user.uid;
+  const { delayMinutes } = req.body as { delayMinutes: number };
+
+  if (!delayMinutes || delayMinutes < 1 || delayMinutes > 60) {
+    res.status(400).json({ error: 'delayMinutes must be 1–60' });
+    return;
+  }
+
+  if (scheduledTestTimeout) {
+    clearTimeout(scheduledTestTimeout);
+  }
+
+  const fireAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+  scheduledTestUserId = userId;
+  scheduledTestTimeout = setTimeout(async () => {
+    if (scheduledTestUserId) {
+      await sendPushToUsers(
+        [scheduledTestUserId],
+        '1 hour left for picks! 🏈',
+        'Lock in your picks before they close. (Scheduled test)',
+        { type: 'deadline_test' }
+      );
+    }
+    scheduledTestTimeout = null;
+    scheduledTestUserId = null;
+  }, delayMinutes * 60 * 1000);
+
+  res.json({ scheduled: true, fireAt: fireAt.toISOString(), delayMinutes });
+});
+
+router.delete('/notifications/schedule-test', async (req, res) => {
+  if (scheduledTestTimeout) {
+    clearTimeout(scheduledTestTimeout);
+    scheduledTestTimeout = null;
+    scheduledTestUserId = null;
+  }
+  res.json({ cancelled: true });
 });
 
 // ── Export ────────────────────────────────────────────────────────────────────

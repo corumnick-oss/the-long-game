@@ -11,6 +11,7 @@ import {
   useSyncGames, useSyncScores, useSyncProbs,
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
+  useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
@@ -243,6 +244,11 @@ function ToolsTab({ season }: { season: number }) {
   const syncProbs = useSyncProbs();
   const awardTrophies = useAwardTrophies();
   const unlockWeek = useUnlockWeek();
+  const sendTest = useSendTestNotification();
+  const scheduleTest = useScheduleTestNotification();
+  const cancelScheduled = useCancelScheduledTest();
+  const [scheduleMinutes, setScheduleMinutes] = useState<number>(5);
+  const [scheduledFireAt, setScheduledFireAt] = useState<string | null>(null);
 
   const { data: games = [] } = useGames(week, season);
 
@@ -345,6 +351,81 @@ function ToolsTab({ season }: { season: number }) {
             ])
           }
         />
+
+        {/* Notifications */}
+        <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Notifications</Text>
+
+        <ActionBtn
+          label="Send Test Notification Now"
+          loading={sendTest.isPending}
+          result={results['notif_test']}
+          onPress={() =>
+            sendTest.mutate(undefined, {
+              onSuccess: () => setResult('notif_test', '✓ Sent — check your device'),
+              onError: () => setResult('notif_test', '✗ Failed — is push token registered?'),
+            })
+          }
+        />
+
+        <View className="mb-4">
+          <View className="bg-surface rounded-xl px-4 py-3.5">
+            <Text className="text-white font-medium mb-1">Schedule Deadline Reminder Test</Text>
+            <Text className="text-muted text-xs mb-3">Fires the "1 hour left for picks" message after a delay.</Text>
+            <View className="flex-row gap-2 mb-3">
+              {[1, 5, 10, 30].map(min => (
+                <TouchableOpacity
+                  key={min}
+                  onPress={() => setScheduleMinutes(min)}
+                  activeOpacity={0.7}
+                  className={`flex-1 py-2 rounded-lg items-center ${scheduleMinutes === min ? 'bg-primary' : 'bg-surface-2'}`}
+                >
+                  <Text className={`text-xs font-semibold ${scheduleMinutes === min ? 'text-white' : 'text-muted'}`}>
+                    {min}m
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {scheduledFireAt ? (
+              <View className="flex-row gap-2">
+                <View className="flex-1 bg-success/10 rounded-lg py-2.5 items-center">
+                  <Text className="text-success text-xs font-semibold">
+                    Fires at {new Date(scheduledFireAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    cancelScheduled.mutate(undefined, {
+                      onSuccess: () => { setScheduledFireAt(null); setResult('notif_schedule', '✓ Cancelled'); },
+                    })
+                  }
+                  className="bg-danger/20 rounded-lg px-4 py-2.5 items-center"
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-danger text-xs font-semibold">Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() =>
+                  scheduleTest.mutate({ delayMinutes: scheduleMinutes }, {
+                    onSuccess: (r) => { setScheduledFireAt(r.fireAt); setResult('notif_schedule', ''); },
+                    onError: () => setResult('notif_schedule', '✗ Schedule failed'),
+                  })
+                }
+                disabled={scheduleTest.isPending}
+                activeOpacity={0.7}
+                className={`bg-primary rounded-lg py-2.5 items-center ${scheduleTest.isPending ? 'opacity-60' : ''}`}
+              >
+                <Text className="text-white text-sm font-semibold">
+                  Schedule in {scheduleMinutes}m
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {results['notif_schedule'] ? (
+            <Text className="text-xs mt-1.5 ml-1 text-muted">{results['notif_schedule']}</Text>
+          ) : null}
+        </View>
 
         {/* Score correction */}
         <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Score Correction</Text>
