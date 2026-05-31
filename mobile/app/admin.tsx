@@ -1,0 +1,543 @@
+import { useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+  Switch, Alert, TextInput, KeyboardAvoidingView, Platform,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
+import { useGames } from '@/hooks/usePicksData';
+import {
+  useAdminUsers, useUpdateUser,
+  useSyncGames, useSyncScores, useSyncProbs,
+  useAwardTrophies, useUnlockWeek,
+  useCorrectScore, useExportWeekPicks, useExportData,
+} from '@/hooks/useAdminData';
+import type { Game } from '@/hooks/usePicksData';
+
+type Tab = 'users' | 'tools' | 'data';
+
+// ── Shared ────────────────────────────────────────────────────────────────────
+
+function ActionBtn({
+  label, onPress, loading, result,
+}: {
+  label: string; onPress: () => void; loading: boolean; result?: string;
+}) {
+  const isSuccess = result?.startsWith('✓');
+  const isError = result?.startsWith('✗');
+  return (
+    <View className="mb-4">
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={loading}
+        activeOpacity={0.7}
+        className={`bg-surface rounded-xl px-4 py-3.5 flex-row items-center justify-between ${loading ? 'opacity-60' : ''}`}
+      >
+        <Text className="text-white font-medium">{label}</Text>
+        {loading
+          ? <ActivityIndicator size="small" color="#3b82f6" />
+          : <Text className="text-muted text-xl leading-6">›</Text>
+        }
+      </TouchableOpacity>
+      {result ? (
+        <Text className={`text-xs mt-1.5 ml-1 ${isSuccess ? 'text-success' : isError ? 'text-danger' : 'text-muted'}`}>
+          {result}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+// ── Users Tab ──────────────────────────────────────────────────────────────────
+
+function UsersTab({ season }: { season: number }) {
+  const { data: users = [], isLoading, isError } = useAdminUsers();
+  const { mutate: updateUser, isPending } = useUpdateUser();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  if (isLoading) {
+    return <View className="flex-1 items-center justify-center"><ActivityIndicator color="#3b82f6" /></View>;
+  }
+  if (isError) {
+    return <View className="flex-1 items-center justify-center px-8"><Text className="text-muted text-sm text-center">Failed to load users</Text></View>;
+  }
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      {users.map(u => (
+        <View key={u.id} className="mx-4 mb-3 bg-surface rounded-xl px-4 py-3">
+          {/* Name row */}
+          <View className="flex-row items-center mb-1">
+            {editingId === u.id ? (
+              <TextInput
+                value={editValue}
+                onChangeText={setEditValue}
+                className="flex-1 text-white font-semibold text-base bg-surface-2 rounded-lg px-3 mr-2"
+                style={{ height: 36 }}
+                autoFocus
+                selectTextOnFocus
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (editValue.trim()) updateUser({ id: u.id, teamName: editValue.trim() });
+                  setEditingId(null);
+                }}
+              />
+            ) : (
+              <Text className="flex-1 text-white font-semibold text-base">{u.teamName}</Text>
+            )}
+            <View className="flex-row gap-1.5 items-center">
+              {u.isAdmin && <View className="bg-orange-600/30 rounded px-1.5 py-0.5"><Text className="text-orange-400 text-xs font-bold">ADMIN</Text></View>}
+              {u.isLongie && <View className="bg-primary/20 rounded px-1.5 py-0.5"><Text className="text-primary text-xs font-bold">LONGIE</Text></View>}
+              {editingId === u.id ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (editValue.trim()) updateUser({ id: u.id, teamName: editValue.trim() });
+                    setEditingId(null);
+                  }}
+                  className="bg-success/20 rounded px-2 py-0.5"
+                >
+                  <Text className="text-success text-xs font-bold">Save</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => { setEditingId(u.id); setEditValue(u.teamName); }}
+                  className="p-1"
+                >
+                  <Text className="text-muted text-xs">✏️</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <Text className="text-muted text-xs mb-3">{u.email}</Text>
+
+          {/* Longie toggle */}
+          <View className="flex-row items-center justify-between border-t border-border pt-2">
+            <Text className="text-muted text-sm">Longie</Text>
+            <Switch
+              value={u.isLongie}
+              onValueChange={val => updateUser({ id: u.id, isLongie: val })}
+              disabled={isPending}
+              trackColor={{ false: '#374151', true: '#1d4ed8' }}
+              thumbColor={u.isLongie ? '#3b82f6' : '#9ca3af'}
+            />
+          </View>
+        </View>
+      ))}
+      <View className="h-8" />
+    </ScrollView>
+  );
+}
+
+// ── Score Editor ───────────────────────────────────────────────────────────────
+
+function ScoreEditor({
+  game,
+  onDone,
+}: {
+  game: Game;
+  onDone: () => void;
+}) {
+  const [homeScore, setHomeScore] = useState(String(game.homeScore ?? ''));
+  const [awayScore, setAwayScore] = useState(String(game.awayScore ?? ''));
+  const [status, setStatus] = useState<'pre' | 'in' | 'post'>(game.status);
+  const { mutate: correctScore, isPending } = useCorrectScore();
+
+  const save = () => {
+    const home = parseInt(homeScore, 10);
+    const away = parseInt(awayScore, 10);
+    if (isNaN(home) || isNaN(away)) {
+      Alert.alert('Invalid scores', 'Enter valid numbers for both scores.');
+      return;
+    }
+    correctScore({ id: game.id, homeScore: home, awayScore: away, status }, {
+      onSuccess: () => onDone(),
+      onError: () => Alert.alert('Error', 'Failed to update score.'),
+    });
+  };
+
+  const statusOptions: { value: 'pre' | 'in' | 'post'; label: string }[] = [
+    { value: 'pre', label: 'Pre-game' },
+    { value: 'in', label: 'Live' },
+    { value: 'post', label: 'Final' },
+  ];
+
+  return (
+    <View className="mx-4 mb-4 bg-surface rounded-xl p-4">
+      <Text className="text-white font-semibold mb-3">
+        {game.awayTeam.split(' ').pop()} @ {game.homeTeam.split(' ').pop()}
+      </Text>
+
+      <View className="flex-row gap-3 mb-3">
+        <View className="flex-1">
+          <Text className="text-muted text-xs mb-1">Away score</Text>
+          <TextInput
+            value={awayScore}
+            onChangeText={setAwayScore}
+            keyboardType="number-pad"
+            className="bg-surface-2 text-white rounded-lg px-3 text-center"
+            style={{ height: 44 }}
+            placeholder="0"
+            placeholderTextColor="#6b7280"
+          />
+        </View>
+        <View className="flex-1">
+          <Text className="text-muted text-xs mb-1">Home score</Text>
+          <TextInput
+            value={homeScore}
+            onChangeText={setHomeScore}
+            keyboardType="number-pad"
+            className="bg-surface-2 text-white rounded-lg px-3 text-center"
+            style={{ height: 44 }}
+            placeholder="0"
+            placeholderTextColor="#6b7280"
+          />
+        </View>
+      </View>
+
+      <Text className="text-muted text-xs mb-1">Status</Text>
+      <View className="flex-row gap-2 mb-4">
+        {statusOptions.map(opt => (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => setStatus(opt.value)}
+            className={`flex-1 py-2 rounded-lg items-center ${status === opt.value ? 'bg-primary' : 'bg-surface-2'}`}
+          >
+            <Text className={`text-xs font-semibold ${status === opt.value ? 'text-white' : 'text-muted'}`}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View className="flex-row gap-2">
+        <TouchableOpacity onPress={onDone} className="flex-1 bg-surface-2 py-2.5 rounded-lg items-center">
+          <Text className="text-muted text-sm font-semibold">Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={save}
+          disabled={isPending}
+          className={`flex-1 bg-primary py-2.5 rounded-lg items-center ${isPending ? 'opacity-60' : ''}`}
+        >
+          {isPending
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text className="text-white text-sm font-semibold">Save Score</Text>
+          }
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ── NFL Tools Tab ──────────────────────────────────────────────────────────────
+
+function ToolsTab({ season }: { season: number }) {
+  const [week, setWeek] = useState(getCurrentNFLWeek());
+  const [results, setResults] = useState<Record<string, string>>({});
+  const setResult = (key: string, msg: string) => setResults(r => ({ ...r, [key]: msg }));
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+
+  const syncGames = useSyncGames();
+  const syncScores = useSyncScores();
+  const syncProbs = useSyncProbs();
+  const awardTrophies = useAwardTrophies();
+  const unlockWeek = useUnlockWeek();
+
+  const { data: games = [] } = useGames(week, season);
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4">
+        {/* Week picker */}
+        <View className="my-5 flex-row items-center justify-center" style={{ gap: 24 }}>
+          <TouchableOpacity
+            onPress={() => { setWeek(w => Math.max(1, w - 1)); setSelectedGame(null); }}
+            className="w-11 h-11 bg-surface rounded-full items-center justify-center"
+          >
+            <Text className="text-white text-2xl leading-7">−</Text>
+          </TouchableOpacity>
+          <View className="items-center" style={{ minWidth: 120 }}>
+            <Text className="text-white text-2xl font-bold">Week {week}</Text>
+            <Text className="text-muted text-xs mt-0.5">{season} Season</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => { setWeek(w => Math.min(22, w + 1)); setSelectedGame(null); }}
+            className="w-11 h-11 bg-surface rounded-full items-center justify-center"
+          >
+            <Text className="text-white text-2xl leading-7">+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sync buttons */}
+        <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Sync</Text>
+
+        <ActionBtn
+          label="Sync Games from ESPN"
+          loading={syncGames.isPending}
+          result={results['sync']}
+          onPress={() =>
+            syncGames.mutate({ week, season }, {
+              onSuccess: (r) => setResult('sync', `✓ Synced ${r.synced} games for Week ${week}`),
+              onError: () => setResult('sync', '✗ Sync failed'),
+            })
+          }
+        />
+        <ActionBtn
+          label="Sync Scores Only"
+          loading={syncScores.isPending}
+          result={results['scores']}
+          onPress={() =>
+            syncScores.mutate({ week, season }, {
+              onSuccess: (r) => setResult('scores', `✓ Updated scores for ${r.updated} games`),
+              onError: () => setResult('scores', '✗ Score sync failed'),
+            })
+          }
+        />
+        <ActionBtn
+          label="Sync Win Probabilities"
+          loading={syncProbs.isPending}
+          result={results['probs']}
+          onPress={() =>
+            syncProbs.mutate({ week, season }, {
+              onSuccess: () => setResult('probs', `✓ Win probabilities updated for Week ${week}`),
+              onError: () => setResult('probs', '✗ Sync failed'),
+            })
+          }
+        />
+
+        {/* Actions */}
+        <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Actions</Text>
+
+        <ActionBtn
+          label="Award Achievements"
+          loading={awardTrophies.isPending}
+          result={results['trophies']}
+          onPress={() =>
+            Alert.alert('Award Achievements', `Award weekly achievements for Week ${week}?`, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Award',
+                onPress: () =>
+                  awardTrophies.mutate({ week, season }, {
+                    onSuccess: (r) => setResult('trophies', `✓ Awarded ${r.awarded?.length ?? 0} achievements for Week ${week}`),
+                    onError: () => setResult('trophies', '✗ Failed'),
+                  }),
+              },
+            ])
+          }
+        />
+        <ActionBtn
+          label="Unlock Week"
+          loading={unlockWeek.isPending}
+          result={results['unlock']}
+          onPress={() =>
+            Alert.alert('Unlock Week', `Unlock Week ${week} picks?`, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Unlock',
+                onPress: () =>
+                  unlockWeek.mutate({ week, season }, {
+                    onSuccess: () => setResult('unlock', `✓ Week ${week} picks unlocked`),
+                    onError: () => setResult('unlock', '✗ Failed'),
+                  }),
+              },
+            ])
+          }
+        />
+
+        {/* Score correction */}
+        <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Score Correction</Text>
+
+        {selectedGame && (
+          <ScoreEditor
+            game={selectedGame}
+            onDone={() => setSelectedGame(null)}
+          />
+        )}
+
+        {games.length === 0 ? (
+          <View className="bg-surface rounded-xl px-4 py-5 mb-4 items-center">
+            <Text className="text-muted text-sm">No games loaded — tap Sync Games first</Text>
+          </View>
+        ) : (
+          <View className="bg-surface rounded-xl overflow-hidden mb-4">
+            {games.map((game, idx) => {
+              const isSelected = selectedGame?.id === game.id;
+              const scoreStr = game.status === 'pre'
+                ? new Date(game.gameTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                : `${game.awayScore ?? 0}–${game.homeScore ?? 0}`;
+              const statusLabel = game.status === 'post' ? 'F' : game.status === 'in' ? 'LIVE' : '';
+              return (
+                <TouchableOpacity
+                  key={game.id}
+                  onPress={() => setSelectedGame(isSelected ? null : game)}
+                  className={`flex-row items-center px-4 py-2.5 ${idx < games.length - 1 ? 'border-b border-border' : ''} ${isSelected ? 'bg-primary/10' : ''}`}
+                  activeOpacity={0.7}
+                >
+                  <Text className="flex-1 text-white text-sm" numberOfLines={1}>
+                    {game.awayTeam.split(' ').pop()} @ {game.homeTeam.split(' ').pop()}
+                  </Text>
+                  {statusLabel ? (
+                    <Text className={`text-xs font-bold mr-2 ${game.status === 'in' ? 'text-danger' : 'text-muted'}`}>
+                      {statusLabel}
+                    </Text>
+                  ) : null}
+                  <Text className="text-muted text-sm">{scoreStr}</Text>
+                  <Text className="text-primary text-sm ml-2">{isSelected ? '▲' : '✏️'}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        <View className="h-8" />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ── Data Tab ──────────────────────────────────────────────────────────────────
+
+function DataTab({ season }: { season: number }) {
+  const [week, setWeek] = useState(getCurrentNFLWeek());
+  const exportData = useExportData();
+  const exportWeekPicks = useExportWeekPicks();
+  const [seasonSummary, setSeasonSummary] = useState<string | undefined>();
+  const [weekSummary, setWeekSummary] = useState<string | undefined>();
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
+      <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-4">Season Export</Text>
+
+      <ActionBtn
+        label={`Export ${season} Season Data`}
+        loading={exportData.isPending}
+        result={seasonSummary}
+        onPress={() =>
+          exportData.mutate(season, {
+            onSuccess: (r) =>
+              setSeasonSummary(
+                `✓ ${r.users.length} users · ${r.games.length} games · ${r.picks.length} picks · ${r.trophies.length} achievements`,
+              ),
+            onError: () => setSeasonSummary('✗ Export failed'),
+          })
+        }
+      />
+
+      <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-4 mt-2">Weekly Export</Text>
+
+      {/* Week picker for weekly export */}
+      <View className="flex-row items-center mb-4" style={{ gap: 12 }}>
+        <TouchableOpacity
+          onPress={() => setWeek(w => Math.max(1, w - 1))}
+          className="w-9 h-9 bg-surface rounded-full items-center justify-center"
+        >
+          <Text className="text-white text-xl leading-6">−</Text>
+        </TouchableOpacity>
+        <Text className="text-white font-semibold" style={{ minWidth: 60, textAlign: 'center' }}>
+          Week {week}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setWeek(w => Math.min(22, w + 1))}
+          className="w-9 h-9 bg-surface rounded-full items-center justify-center"
+        >
+          <Text className="text-white text-xl leading-6">+</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ActionBtn
+        label={`Export Week ${week} Picks`}
+        loading={exportWeekPicks.isPending}
+        result={weekSummary}
+        onPress={() =>
+          exportWeekPicks.mutate({ week, season }, {
+            onSuccess: (picks) =>
+              setWeekSummary(`✓ ${Array.isArray(picks) ? picks.length : 0} picks verified for Week ${week}`),
+            onError: () => setWeekSummary('✗ Export failed'),
+          })
+        }
+      />
+
+      <Text className="text-muted text-xs leading-5 mt-2">
+        Export verifies record counts in the Railway database. Full CSV is available via the backend API directly.
+      </Text>
+
+      <View className="h-8" />
+    </ScrollView>
+  );
+}
+
+// ── Main Screen ────────────────────────────────────────────────────────────────
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'users', label: 'Users' },
+  { id: 'tools', label: 'NFL Tools' },
+  { id: 'data', label: 'Data' },
+];
+
+export default function AdminScreen() {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>('users');
+
+  // Season selector — defaults to current, allows viewing past seasons
+  const currentSeason = getCurrentNFLSeason();
+  const [adminSeason, setAdminSeason] = useState(currentSeason);
+  const minSeason = 2025;
+
+  return (
+    <View className="flex-1 bg-background">
+      {/* Header */}
+      <View className="flex-row items-center px-4 pt-14 pb-4 border-b border-border">
+        <TouchableOpacity onPress={() => router.back()} className="mr-4 py-1">
+          <Text className="text-primary text-base font-semibold">‹ Back</Text>
+        </TouchableOpacity>
+        <Text className="text-white text-lg font-bold flex-1">Admin Dashboard</Text>
+
+        {/* Season selector */}
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity
+            onPress={() => setAdminSeason(s => Math.max(minSeason, s - 1))}
+            disabled={adminSeason <= minSeason}
+            className={`w-7 h-7 bg-surface rounded-full items-center justify-center ${adminSeason <= minSeason ? 'opacity-30' : ''}`}
+          >
+            <Text className="text-white text-base leading-5">‹</Text>
+          </TouchableOpacity>
+          <Text className="text-white text-sm font-semibold" style={{ minWidth: 36, textAlign: 'center' }}>
+            {adminSeason}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setAdminSeason(s => Math.min(currentSeason, s + 1))}
+            disabled={adminSeason >= currentSeason}
+            className={`w-7 h-7 bg-surface rounded-full items-center justify-center ${adminSeason >= currentSeason ? 'opacity-30' : ''}`}
+          >
+            <Text className="text-white text-base leading-5">›</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Tab bar */}
+      <View className="flex-row border-b border-border">
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.id}
+            onPress={() => setTab(t.id)}
+            className="flex-1 items-center py-3"
+            style={{ borderBottomWidth: 2, borderBottomColor: tab === t.id ? '#3b82f6' : 'transparent' }}
+          >
+            <Text className={`text-sm font-semibold ${tab === t.id ? 'text-primary' : 'text-muted'}`}>
+              {t.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Content */}
+      <View className="flex-1 pt-2">
+        {tab === 'users' && <UsersTab season={adminSeason} />}
+        {tab === 'tools' && <ToolsTab season={adminSeason} />}
+        {tab === 'data' && <DataTab season={adminSeason} />}
+      </View>
+    </View>
+  );
+}

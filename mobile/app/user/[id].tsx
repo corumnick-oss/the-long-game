@@ -242,7 +242,7 @@ export default function PublicProfileScreen() {
         {/* Season stats */}
         <View className="mx-4 mb-5">
           <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
-            2025 Season
+            {getCurrentNFLSeason()} Season
           </Text>
           <View className="flex-row gap-2 mb-2">
             <StatBox
@@ -257,7 +257,7 @@ export default function PublicProfileScreen() {
               value={profile.bestWeek ? `Week ${profile.bestWeek.week}` : '—'}
               sub={profile.bestWeek ? `${profile.bestWeek.wins} wins` : undefined}
             />
-            <StatBox label="Trophies" value={String(profile.trophyCount)} />
+            <StatBox label="Achievements" value={String(profile.trophyCount)} />
           </View>
         </View>
 

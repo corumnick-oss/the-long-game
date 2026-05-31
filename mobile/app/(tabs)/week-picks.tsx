@@ -209,7 +209,12 @@ export default function WeekPicksScreen() {
                 style={{ minHeight: 56 }}
               >
                 {/* Fixed name column */}
-                <View style={{ width: NAME_W }} className="px-3 justify-center">
+                <TouchableOpacity
+                  style={{ width: NAME_W }}
+                  className="px-3 justify-center"
+                  onPress={() => router.push({ pathname: '/user/[id]' as any, params: { id: user.id } })}
+                  activeOpacity={0.7}
+                >
                   <Text className="text-white text-xs font-semibold" numberOfLines={1}>
                     {user.teamName}
                   </Text>
@@ -224,7 +229,7 @@ export default function WeekPicksScreen() {
                       </Text>
                     );
                   })()}
-                </View>
+                </TouchableOpacity>
 
                 {/* Scrollable pick cells */}
                 <ScrollView

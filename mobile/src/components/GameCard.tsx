@@ -56,6 +56,14 @@ function TeamRow({
   const showScore = isFinal || isLive;
   const winnerBg = isFinal && isWinner;
 
+  const rowBgColor = winnerBg
+    ? 'rgba(34,197,94,0.25)'
+    : pickOutcome === 'wrong'
+    ? 'rgba(239,68,68,0.12)'
+    : pickOutcome === 'pending'
+    ? 'rgba(59,130,246,0.08)'
+    : undefined;
+
   const badgeStyle = pickOutcome === 'correct'
     ? 'bg-success'
     : pickOutcome === 'wrong'
@@ -73,7 +81,8 @@ function TeamRow({
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.7}
-      className={`flex-row items-center px-4 py-3 ${winnerBg ? 'bg-green-900/40' : ''}`}
+      className="flex-row items-center px-4 py-3"
+      style={rowBgColor ? { backgroundColor: rowBgColor } : undefined}
     >
       {/* Logo */}
       <View className="w-10 h-10 mr-3 items-center justify-center">

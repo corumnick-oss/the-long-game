@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.syncWeekGames = syncWeekGames;
 exports.updateLiveScores = updateLiveScores;
+exports.syncWeekScores = syncWeekScores;
 exports.syncWinProbabilities = syncWinProbabilities;
 const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
@@ -97,6 +98,32 @@ async function updateLiveScores() {
     for (const week of weeks) {
         await syncWeekGames(week, season, 'regular');
     }
+}
+async function syncWeekScores(week, season, seasonType = 'regular') {
+    const st = SEASON_TYPE_MAP[seasonType] ?? 2;
+    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&limit=50`;
+    const { data } = await axios_1.default.get(url);
+    const events = data.events ?? [];
+    let updated = 0;
+    for (const event of events) {
+        const comp = event.competitions[0];
+        if (!comp)
+            continue;
+        const home = comp.competitors.find(c => c.homeAway === 'home');
+        const away = comp.competitors.find(c => c.homeAway === 'away');
+        if (!home || !away)
+            continue;
+        await db_1.db.update(schema_1.games).set({
+            status: parseStatus(comp.status.type.state),
+            homeScore: home.score ? parseInt(home.score, 10) : null,
+            awayScore: away.score ? parseInt(away.score, 10) : null,
+            period: comp.status.period ?? null,
+            displayClock: comp.status.displayClock ?? null,
+            statusType: comp.status.type.name ?? null,
+        }).where((0, drizzle_orm_1.eq)(schema_1.games.espnId, event.id));
+        updated++;
+    }
+    return updated;
 }
 async function syncWinProbabilities(week, season) {
     const weekGames = await db_1.db.query.games.findMany({

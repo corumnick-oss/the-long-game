@@ -25,10 +25,6 @@ export async function apiFetch<T = unknown>(
     ? await user.getIdToken()
     : await auth.currentUser?.getIdToken();
 
-  if (__DEV__) {
-    console.log('[apiFetch]', path, '| user:', user?.uid ?? 'null', '| hasToken:', !!token);
-  }
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),

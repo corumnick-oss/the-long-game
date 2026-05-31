@@ -3,7 +3,7 @@ import { db } from '../db';
 import * as schema from '../db/schema';
 import { sql, eq, and, desc, asc } from 'drizzle-orm';
 import { requireAuth, requireAdmin } from '../middleware/auth';
-import { syncWeekGames, syncWinProbabilities } from '../services/espnService';
+import { syncWeekGames, syncWeekScores, syncWinProbabilities } from '../services/espnService';
 import { awardWeeklyTrophies } from '../services/trophyService';
 import { getCurrentNFLSeason } from '../utils/season';
 import { logActivity } from './activity';
@@ -60,6 +60,16 @@ router.patch('/games/:id', async (req, res) => {
 
   await logActivity('score_correction', `Score corrected: ${updated.awayTeam} @ ${updated.homeTeam}`, 'global', { metadata: { gameId: updated.id } });
   res.json(updated);
+});
+
+router.post('/games/sync-scores', async (req, res) => {
+  const season = req.body.season ?? getCurrentNFLSeason();
+  const week = parseInt(req.body.week, 10);
+  const seasonType = req.body.seasonType ?? 'regular';
+  if (!week) { res.status(400).json({ error: 'week required' }); return; }
+
+  const count = await syncWeekScores(week, season, seasonType);
+  res.json({ updated: count, week, season });
 });
 
 // ── Win Probabilities ─────────────────────────────────────────────────────────

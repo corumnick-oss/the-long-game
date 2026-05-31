@@ -122,6 +122,34 @@ export async function updateLiveScores(): Promise<void> {
   }
 }
 
+export async function syncWeekScores(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
+  const st = SEASON_TYPE_MAP[seasonType] ?? 2;
+  const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&limit=50`;
+
+  const { data } = await axios.get<{ events: ESPNEvent[] }>(url);
+  const events = data.events ?? [];
+
+  let updated = 0;
+  for (const event of events) {
+    const comp = event.competitions[0];
+    if (!comp) continue;
+    const home = comp.competitors.find(c => c.homeAway === 'home');
+    const away = comp.competitors.find(c => c.homeAway === 'away');
+    if (!home || !away) continue;
+
+    await db.update(games).set({
+      status: parseStatus(comp.status.type.state),
+      homeScore: home.score ? parseInt(home.score, 10) : null,
+      awayScore: away.score ? parseInt(away.score, 10) : null,
+      period: comp.status.period ?? null,
+      displayClock: comp.status.displayClock ?? null,
+      statusType: comp.status.type.name ?? null,
+    }).where(eq(games.espnId, event.id));
+    updated++;
+  }
+  return updated;
+}
+
 export async function syncWinProbabilities(week: number, season: number): Promise<void> {
   const weekGames = await db.query.games.findMany({
     where: eq(games.week, week),

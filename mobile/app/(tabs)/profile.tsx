@@ -1,11 +1,13 @@
 import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useMyProfile, useMyTrophies, type H2HEntry, type WeekRecord, type Trophy } from '@/hooks/useProfile';
 
-// ── Trophy metadata ──────────────────────────────────────────────────────────
+// ── Achievement metadata ──────────────────────────────────────────────────────
 
-const TROPHY_META: Record<string, { emoji: string; label: string }> = {
+const ACHIEVEMENT_META: Record<string, { emoji: string; label: string }> = {
   most_wins:   { emoji: '🏆', label: 'Top Picker' },
   loser:       { emoji: '😢', label: 'Rough Week' },
   upset_pick:  { emoji: '⚡', label: 'Upset Pick' },
@@ -13,8 +15,8 @@ const TROPHY_META: Record<string, { emoji: string; label: string }> = {
   contrarian:  { emoji: '🎯', label: 'Contrarian' },
 };
 
-function trophyMeta(type: string) {
-  return TROPHY_META[type] ?? { emoji: '🏅', label: type };
+function achievementMeta(type: string) {
+  return ACHIEVEMENT_META[type] ?? { emoji: '🏅', label: type };
 }
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
@@ -131,10 +133,10 @@ function H2HRow({ entry }: { entry: H2HEntry }) {
   );
 }
 
-// ── Trophy card ───────────────────────────────────────────────────────────────
+// ── Achievement card ──────────────────────────────────────────────────────────
 
-function TrophyCard({ trophy }: { trophy: Trophy }) {
-  const meta = trophyMeta(trophy.type);
+function AchievementCard({ trophy }: { trophy: Trophy }) {
+  const meta = achievementMeta(trophy.type);
   return (
     <View className="flex-1 bg-surface rounded-xl p-3 m-1">
       <Text style={{ fontSize: 24 }}>{meta.emoji}</Text>
@@ -149,6 +151,7 @@ function TrophyCard({ trophy }: { trophy: Trophy }) {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { signOut } = useAuth();
   const { data: profile, isLoading } = useMyProfile();
   const { data: trophies = [] } = useMyTrophies();
@@ -177,12 +180,12 @@ export default function ProfileScreen() {
     year: 'numeric',
   });
 
-  // Trophy type summary counts
-  const trophyCounts: Record<string, number> = {};
+  // Achievement type summary counts
+  const achievementCounts: Record<string, number> = {};
   for (const t of trophies) {
-    trophyCounts[t.type] = (trophyCounts[t.type] ?? 0) + 1;
+    achievementCounts[t.type] = (achievementCounts[t.type] ?? 0) + 1;
   }
-  const trophyTypes = Object.entries(trophyCounts).sort((a, b) => b[1] - a[1]);
+  const trophyTypes = Object.entries(achievementCounts).sort((a, b) => b[1] - a[1]);
 
   return (
     <ScrollView className="flex-1 bg-background" showsVerticalScrollIndicator={false}>
@@ -200,16 +203,26 @@ export default function ProfileScreen() {
           </View>
           <Text className="text-muted text-xs mt-1">Member since {memberSince}</Text>
         </View>
-        <TouchableOpacity
-          onPress={signOut}
-          className="bg-surface rounded-xl p-2.5"
-        >
-          <Text className="text-muted text-xs font-semibold">Sign Out</Text>
-        </TouchableOpacity>
+        <View className="flex-row gap-2">
+          {profile.isAdmin && (
+            <TouchableOpacity
+              onPress={() => router.push('/admin' as any)}
+              className="bg-surface rounded-xl p-2.5"
+            >
+              <Ionicons name="settings-outline" size={18} color="#6b7280" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={signOut}
+            className="bg-surface rounded-xl p-2.5"
+          >
+            <Text className="text-muted text-xs font-semibold">Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Season stats ── */}
-      <Section title="2025 Season">
+      <Section title={`${getCurrentNFLSeason()} Season`}>
         <View className="flex-row gap-2 mb-2">
           <StatBox
             label="Record"
@@ -227,7 +240,7 @@ export default function ProfileScreen() {
             sub={profile.bestWeek ? `${profile.bestWeek.wins} wins` : undefined}
           />
           <StatBox
-            label="Trophies"
+            label="Achievements"
             value={String(profile.trophyCount)}
           />
         </View>
@@ -287,14 +300,14 @@ export default function ProfileScreen() {
         </Section>
       )}
 
-      {/* ── Trophy case ── */}
+      {/* ── Achievements ── */}
       {trophies.length > 0 && (
-        <Section title={`Trophy Case (${trophies.length})`}>
+        <Section title={`Achievements (${trophies.length})`}>
           {/* Type summary */}
           {trophyTypes.length > 0 && (
             <View className="flex-row flex-wrap gap-2 mb-4">
               {trophyTypes.map(([type, count]) => {
-                const meta = trophyMeta(type);
+                const meta = achievementMeta(type);
                 return (
                   <View key={type} className="flex-row items-center bg-surface rounded-full px-3 py-1.5 gap-1.5">
                     <Text>{meta.emoji}</Text>
@@ -309,7 +322,7 @@ export default function ProfileScreen() {
           <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
             {trophies.slice(0, 12).map(trophy => (
               <View key={trophy.id} style={{ width: '50%' }}>
-                <TrophyCard trophy={trophy} />
+                <AchievementCard trophy={trophy} />
               </View>
             ))}
           </View>

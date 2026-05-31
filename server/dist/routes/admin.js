@@ -99,6 +99,17 @@ router.patch('/games/:id', async (req, res) => {
     await (0, activity_1.logActivity)('score_correction', `Score corrected: ${updated.awayTeam} @ ${updated.homeTeam}`, 'global', { metadata: { gameId: updated.id } });
     res.json(updated);
 });
+router.post('/games/sync-scores', async (req, res) => {
+    const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
+    const week = parseInt(req.body.week, 10);
+    const seasonType = req.body.seasonType ?? 'regular';
+    if (!week) {
+        res.status(400).json({ error: 'week required' });
+        return;
+    }
+    const count = await (0, espnService_1.syncWeekScores)(week, season, seasonType);
+    res.json({ updated: count, week, season });
+});
 // ── Win Probabilities ─────────────────────────────────────────────────────────
 router.post('/games/sync-probs', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();

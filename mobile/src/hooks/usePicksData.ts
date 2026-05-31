@@ -44,14 +44,7 @@ export function useGames(week: number, season: number) {
     // user.uid in the key means the query re-runs with auth as soon as the
     // user is confirmed — no stale unauthenticated result ever shows picks
     queryKey: ['games', week, season, user?.uid ?? null],
-    queryFn: async () => {
-      const result = await apiFetch<Game[]>(`/api/games?week=${week}&season=${season}`, undefined, user);
-      if (__DEV__) {
-        const picked = result.filter(g => g.myPick !== null).length;
-        console.log(`[useGames] w${week} returned ${result.length} games, ${picked} with myPick`);
-      }
-      return result;
-    },
+    queryFn: () => apiFetch<Game[]>(`/api/games?week=${week}&season=${season}`, undefined, user),
     staleTime: 30_000,
   });
 }
