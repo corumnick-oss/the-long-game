@@ -105,6 +105,7 @@ EAS builds in the cloud (no Mac needed), ~15-30 minutes. Install via TestFlight 
 - **ESPN score-only sync** ✅ — `syncWeekScores()` in espnService.ts updates scores/status without touching game metadata; `POST /api/admin/games/sync-scores` route added
 
 ### Known TODOs (Before Launch)
+- **Week 18 2025 tiebreaker is wrong** — needs to be investigated and corrected. Check the `tiebreaker_games` and `tiebreaker_picks` tables for week 18, season 2025. The designated game or actual total may be incorrect. Use the Admin → NFL Tools → score correction or fix directly in the DB.
 - **EAS dev build** — needed immediately to test Google/Apple sign-in ← DO THIS FIRST
 - **Google/Apple Sign-In** — must work before launch, currently blocked by Expo Go limitation
 - **Splash/onboarding screen** — logo + tagline screen not yet built
