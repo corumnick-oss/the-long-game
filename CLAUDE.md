@@ -12,7 +12,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 **App Name:** The Long Game
 **Type:** iOS and Android mobile app (React Native / Expo)
 **Purpose:** NFL picks app where users predict winners of each week's games and compete on leaderboards
-**Current Status:** Phase 5 nearly complete. First EAS iOS dev build submitted (queued). Notification testing added. Google/Apple Sign-In, push cron triggers, preseason handling, past seasons, and team stats remain before launch.
+**Current Status:** Phase 5 in progress. EAS iOS dev build installed on Nick's iPhone. Push notification testing partially done — app registers token, but "Send Test Notification Now" returns `{"error":"Internal server error"}` from Railway. Root cause not yet found. Google/Apple Sign-In, push notifications working end-to-end, push cron triggers, preseason handling, past seasons, and team stats remain before launch.
 **Railway URL:** https://thelonggame-production.up.railway.app
 **Target Launch:** App Store submission late July 2026. Regular season starts September 4, 2026.
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone user — Admin team name: Nicholas
@@ -126,10 +126,15 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **EAS CLI Windows bug patched** ✅ — `repository.js` finally block patched to not throw on temp dir cleanup EPERM
 - **Notification testing in Admin Dashboard** ✅ — NFL Tools tab: "Send Test Notification Now" (immediate) + "Schedule Deadline Reminder Test" (1/5/10/30m presets that fire real "1 hour left for picks" message)
 - **notificationService.ts** ✅ — all 5 push triggers built: week unlocked, deadline, picks locked, trophy earned, game final. NOT YET wired to cron jobs.
-- **First EAS iOS dev build submitted** ⏳ — build queued on Expo's servers (submitted May 31 2026)
+- **EAS iOS dev build installed** ✅ — installed on Nick's iPhone (June 1 2026). Developer Mode enabled. App runs under bundle ID `com.thelonggame.picks`.
+- **mobile/.npmrc added** ✅ — `legacy-peer-deps=true` so EAS build server uses same install behavior as local
+- **Package versions fixed for SDK 54** ✅ — `expo-dev-client` `~6.0.21`, `react-native-worklets` `0.5.1`, `expo` `~54.0.35`, `expo-router` `~6.0.24` (were all mismatched, causing EAS build failures)
+- **Push token registration fixed** ✅ — `getExpoPushTokenAsync()` now passes `projectId` from `Constants.expoConfig.extra.eas.projectId` (was silently failing without it)
+- **Admin notification endpoints fixed** ✅ — `/notifications/test` and `/notifications/schedule-test` now use `req.currentUser!.id` (were crashing with `req.user.uid` which is undefined)
+- **Admin notification error display improved** ✅ — shows real server error message instead of generic "is push token registered?"
 
 ### Known TODOs (Before Launch)
-- **Install EAS dev build** — build currently queued. Once installed on Nick's iPhone, open app to register push token, then test notifications from Admin Dashboard.
+- **Push notification "Internal server error"** — `POST /api/admin/notifications/test` returns `{"error":"Internal server error"}` from Railway. The endpoint code is correct (uses `req.currentUser!.id`, checks for token in DB, calls `sendPushToUsers`). Root cause unknown — likely either (a) push token not actually in DB yet, (b) a Railway env/runtime error in the notification code path, or (c) the recent commits haven't deployed to Railway yet. **Investigate next session: check Railway logs for the specific error, verify push_tokens table has a row for Nick's UID.**
 - **Google/Apple Sign-In** — must work before launch. Currently blocked by Expo Go limitation. Needs native `@react-native-google-signin` package + second EAS build. Apple Sign-In config is already complete.
 - **Wire push notification cron triggers** — all 5 notification functions exist in notificationService.ts but are not called by the scheduler. Need to connect to scheduler.ts cron jobs.
 - **Preseason handling** — 2026 NFL preseason starts Aug 7. App needs to:
@@ -161,8 +166,8 @@ Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in ser
 `getCurrentNFLSeason()` correctly returns 2025 until the 2026 season begins. It will need updating to handle the preseason start date (Aug 7) — see Known TODOs above.
 
 ### What's Next — Priority Order
-1. **Install EAS dev build** — when build completes, install on iPhone, open app, register push token
-2. **Test push notifications** — Admin Dashboard → NFL Tools → "Send Test Notification Now"
+1. **Fix push notification "Internal server error"** — check Railway logs, verify push_tokens table has Nick's token, find root cause of the 500 error
+2. **Test push notifications end-to-end** — Admin Dashboard → NFL Tools → "Send Test Notification Now" should deliver to device
 3. **Google/Apple Sign-In** — install native Google Sign-In SDK, requires second EAS build
 4. **Wire push notification cron triggers** — connect 5 notification functions to scheduler.ts
 5. **Preseason handling** — season flip logic for Aug 7, functional preseason picks/leaderboard
@@ -951,6 +956,16 @@ These are hard-won fixes. Don't undo them.
 ### Apple/Google Sign-In in Expo Go
 - Both DO NOT work in Expo Go — bundle ID mismatch
 - Fix = EAS dev build. All config is correct and ready to test.
+
+### EAS Build — Package Versions Must Match SDK 54 Exactly
+EAS runs strict `npm ci` (no `--legacy-peer-deps`). Two things required:
+1. `mobile/.npmrc` must contain `legacy-peer-deps=true` — already committed.
+2. Package versions must satisfy Expo SDK 54 peer deps. Run `npx expo-doctor` before any EAS build. Correct versions for SDK 54:
+   - `expo`: `~54.0.35`
+   - `expo-dev-client`: `~6.0.21` (NOT `^56.x` — that's a completely wrong major)
+   - `expo-router`: `~6.0.24`
+   - `react-native-worklets`: `0.5.1` (reanimated 4.1.x hard-validates this at pod install level — `0.9.x` will fail)
+   - Always use `npx expo install <package>` not plain `npm install` for Expo packages
 
 ### EAS CLI on Windows — CRITICAL
 EAS CLI v20 has a Windows `EPERM: rmdir` bug during project upload.
