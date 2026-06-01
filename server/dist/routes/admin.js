@@ -266,14 +266,14 @@ router.post('/tiebreaker/designate', async (req, res) => {
 });
 // ── Notification Testing ──────────────────────────────────────────────────────
 router.post('/notifications/test', async (req, res) => {
-    const userId = req.user.uid;
+    const userId = req.currentUser.id;
     await (0, notificationService_1.sendPushToUsers)([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
     res.json({ sent: true });
 });
 let scheduledTestTimeout = null;
 let scheduledTestUserId = null;
 router.post('/notifications/schedule-test', async (req, res) => {
-    const userId = req.user.uid;
+    const userId = req.currentUser.id;
     const { delayMinutes } = req.body;
     if (!delayMinutes || delayMinutes < 1 || delayMinutes > 60) {
         res.status(400).json({ error: 'delayMinutes must be 1–60' });
