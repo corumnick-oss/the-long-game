@@ -233,8 +233,15 @@ router.post('/tiebreaker/designate', async (req, res) => {
 
 router.post('/notifications/test', async (req, res) => {
   const userId = req.currentUser!.id;
+  const tokens = await db.query.pushTokens.findMany({
+    where: eq(schema.pushTokens.userId, userId),
+  });
+  if (tokens.length === 0) {
+    res.status(400).json({ error: 'No push token registered for this user' });
+    return;
+  }
   await sendPushToUsers([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
-  res.json({ sent: true });
+  res.json({ sent: true, tokenCount: tokens.length });
 });
 
 let scheduledTestTimeout: ReturnType<typeof setTimeout> | null = null;

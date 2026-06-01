@@ -362,7 +362,7 @@ function ToolsTab({ season }: { season: number }) {
           onPress={() =>
             sendTest.mutate(undefined, {
               onSuccess: () => setResult('notif_test', '✓ Sent — check your device'),
-              onError: () => setResult('notif_test', '✗ Failed — is push token registered?'),
+              onError: (err: any) => setResult('notif_test', `✗ ${err?.message ?? 'Send failed'}`),
             })
           }
         />

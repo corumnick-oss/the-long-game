@@ -267,8 +267,15 @@ router.post('/tiebreaker/designate', async (req, res) => {
 // ── Notification Testing ──────────────────────────────────────────────────────
 router.post('/notifications/test', async (req, res) => {
     const userId = req.currentUser.id;
+    const tokens = await db_1.db.query.pushTokens.findMany({
+        where: (0, drizzle_orm_1.eq)(schema.pushTokens.userId, userId),
+    });
+    if (tokens.length === 0) {
+        res.status(400).json({ error: 'No push token registered for this user' });
+        return;
+    }
     await (0, notificationService_1.sendPushToUsers)([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
-    res.json({ sent: true });
+    res.json({ sent: true, tokenCount: tokens.length });
 });
 let scheduledTestTimeout = null;
 let scheduledTestUserId = null;
