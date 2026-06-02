@@ -38,7 +38,7 @@ export type MyProfile = {
   };
 };
 
-export type Trophy = {
+export type Achievement = {
   id: string;
   type: string;
   name: string;
@@ -58,13 +58,13 @@ export function useMyProfile() {
   });
 }
 
-export function useMyTrophies() {
+export function useMyAchievements() {
   const { user } = useAuth();
   const season = getCurrentNFLSeason();
   return useQuery({
     queryKey: ['trophies', 'me', season, user?.uid ?? null],
     queryFn: () =>
-      apiFetch<Trophy[]>(`/api/trophies?userId=${user!.uid}&season=${season}`, undefined, user),
+      apiFetch<Achievement[]>(`/api/trophies?userId=${user!.uid}&season=${season}`, undefined, user),
     enabled: !!user,
     staleTime: 120_000,
   });

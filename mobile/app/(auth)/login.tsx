@@ -22,7 +22,7 @@ const FEATURES = [
   { icon: '🏈', title: 'Season-Long Picks', description: 'Pick every game, every week, all 18 weeks long.' },
   { icon: '👥', title: 'Compete With Friends', description: 'Private leaderboard, bragging rights, real stakes.' },
   { icon: '📈', title: 'Climb the Rankings', description: 'Weekly and season standings, live all year.' },
-  { icon: '⚡', title: 'Chase the Upset', description: "Call the games nobody else does. Earn trophies for it." },
+  { icon: '⚡', title: 'Chase the Upset', description: "Call the games nobody else does. Earn achievements for it." },
 ];
 
 // Shared style for all text inputs — explicit height prevents iOS text clipping

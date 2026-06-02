@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
-import { useMyProfile, useMyTrophies, type H2HEntry, type WeekRecord, type Trophy } from '@/hooks/useProfile';
+import { useMyProfile, useMyAchievements, type H2HEntry, type WeekRecord, type Achievement } from '@/hooks/useProfile';
 
 // ── Achievement metadata ──────────────────────────────────────────────────────
 
@@ -135,7 +135,7 @@ function H2HRow({ entry }: { entry: H2HEntry }) {
 
 // ── Achievement card ──────────────────────────────────────────────────────────
 
-function AchievementCard({ trophy }: { trophy: Trophy }) {
+function AchievementCard({ trophy }: { trophy: Achievement }) {
   const meta = achievementMeta(trophy.type);
   return (
     <View className="flex-1 bg-surface rounded-xl p-3 m-1">
@@ -154,7 +154,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const { data: profile, isLoading } = useMyProfile();
-  const { data: trophies = [] } = useMyTrophies();
+  const { data: trophies = [] } = useMyAchievements();
 
   if (isLoading) {
     return (

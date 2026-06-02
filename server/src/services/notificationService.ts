@@ -84,12 +84,12 @@ export async function notifyPicksLocked(week: number): Promise<void> {
   );
 }
 
-export async function notifyTrophyEarned(userId: string, trophyName: string, week: number): Promise<void> {
+export async function notifyAchievementEarned(userId: string, achievementName: string, week: number): Promise<void> {
   await sendPushToUsers(
     [userId],
-    "You won " + trophyName + "!",
-    "You earned the " + trophyName + " trophy for Week " + week + ".",
-    { type: 'trophy', week }
+    "You earned " + achievementName + "! 🏅",
+    "Week " + week + " achievement unlocked.",
+    { type: 'achievement', week }
   );
 }
 

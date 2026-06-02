@@ -207,7 +207,7 @@ async function awardWeeklyTrophies(week, season, specificType) {
         if (!existing) {
             await db_1.db.insert(schema.trophies).values(trophy);
             awarded++;
-            (0, notificationService_1.notifyTrophyEarned)(trophy.userId, trophy.name, week).catch(err => console.error('[Trophies] notifyTrophyEarned failed:', err));
+            (0, notificationService_1.notifyAchievementEarned)(trophy.userId, trophy.name, week).catch(err => console.error('[Trophies] notifyAchievementEarned failed:', err));
         }
     }
     console.log(`Awarded ${awarded} trophies for Week ${week}`);

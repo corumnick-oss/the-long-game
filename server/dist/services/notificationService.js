@@ -8,7 +8,7 @@ exports.sendPushToAllUsers = sendPushToAllUsers;
 exports.notifyWeekUnlocked = notifyWeekUnlocked;
 exports.notifyDeadlineApproaching = notifyDeadlineApproaching;
 exports.notifyPicksLocked = notifyPicksLocked;
-exports.notifyTrophyEarned = notifyTrophyEarned;
+exports.notifyAchievementEarned = notifyAchievementEarned;
 exports.notifyGameFinal = notifyGameFinal;
 const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
@@ -64,8 +64,8 @@ async function notifyDeadlineApproaching(week) {
 async function notifyPicksLocked(week) {
     await sendPushToAllUsers("Picks locked. Good luck!", "Week " + week + " picks are locked. Games start soon.", { type: 'picks_locked', week });
 }
-async function notifyTrophyEarned(userId, trophyName, week) {
-    await sendPushToUsers([userId], "You won " + trophyName + "!", "You earned the " + trophyName + " trophy for Week " + week + ".", { type: 'trophy', week });
+async function notifyAchievementEarned(userId, achievementName, week) {
+    await sendPushToUsers([userId], "You earned " + achievementName + "! 🏅", "Week " + week + " achievement unlocked.", { type: 'achievement', week });
 }
 async function notifyGameFinal(userId, homeTeam, awayTeam, homeScore, awayScore, isCorrect) {
     const result = isCorrect ? 'correct ✓' : 'wrong ✗';
