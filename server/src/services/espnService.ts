@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { db } from '../db';
-import { games } from '../db/schema';
+import { games, picks } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { getCurrentNFLSeason } from '../utils/season';
+import { notifyGameFinal } from './notificationService';
 
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 
@@ -47,6 +48,13 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
   const { data } = await axios.get<{ events: ESPNEvent[] }>(url);
   const events = data.events ?? [];
 
+  // Pre-fetch existing games to detect in→post transitions for notifications
+  const existingGames = await db.query.games.findMany({ where: eq(games.week, week) });
+  const existingByEspnId = new Map(existingGames.map(g => [g.espnId, g]));
+
+  type JustFinished = { id: string; homeTeam: string; awayTeam: string; homeScore: number; awayScore: number };
+  const justFinished: JustFinished[] = [];
+
   let upserted = 0;
   for (const event of events) {
     const comp = event.competitions[0];
@@ -60,6 +68,8 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
     const odds = comp.odds?.[0];
     const spread = odds?.spread ? parseFloat(odds.spread) : null;
     const favoriteTeam = odds?.homeTeamOdds?.favorite === false ? away.team.displayName : home.team.displayName;
+    const homeScore = home.score ? parseInt(home.score, 10) : null;
+    const awayScore = away.score ? parseInt(away.score, 10) : null;
 
     const row = {
       espnId: event.id,
@@ -77,13 +87,19 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
       favoriteTeam: spread ? favoriteTeam : null,
       gameTime: new Date(event.date),
       status,
-      homeScore: home.score ? parseInt(home.score, 10) : null,
-      awayScore: away.score ? parseInt(away.score, 10) : null,
+      homeScore,
+      awayScore,
       period: comp.status.period ?? null,
       displayClock: comp.status.displayClock ?? null,
       statusType: comp.status.type.name ?? null,
       isScoreLocked: false,
     };
+
+    // Detect in→post transition for game-final notifications
+    const existing = existingByEspnId.get(event.id);
+    if (existing?.status === 'in' && status === 'post' && homeScore != null && awayScore != null) {
+      justFinished.push({ id: existing.id, homeTeam: row.homeTeam, awayTeam: row.awayTeam, homeScore, awayScore });
+    }
 
     await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
       target: games.espnId,
@@ -104,6 +120,22 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
       },
     });
     upserted++;
+  }
+
+  // Fire game-final notifications for any games that just finished
+  for (const game of justFinished) {
+    try {
+      const gamePicks = await db.query.picks.findMany({ where: eq(picks.gameId, game.id) });
+      const homeWon = game.homeScore > game.awayScore;
+      for (const pick of gamePicks) {
+        const isCorrect = pick.pick === 'home' ? homeWon : !homeWon;
+        notifyGameFinal(pick.userId, game.homeTeam, game.awayTeam, game.homeScore, game.awayScore, isCorrect).catch(err =>
+          console.error('[ESPN] notifyGameFinal failed for user', pick.userId, err)
+        );
+      }
+    } catch (err) {
+      console.error('[ESPN] Game final notification batch failed for game', game.id, err);
+    }
   }
 
   return upserted;

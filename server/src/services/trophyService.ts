@@ -1,6 +1,7 @@
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
+import { notifyTrophyEarned } from './notificationService';
 
 export interface TrophyCandidate { userId: string; value: number }
 export interface LoneWolfCandidate extends TrophyCandidate { gameId: string; teamName: string; opponentName: string }
@@ -193,6 +194,9 @@ export async function awardWeeklyTrophies(week: number, season: number, specific
     if (!existing) {
       await db.insert(schema.trophies).values(trophy);
       awarded++;
+      notifyTrophyEarned(trophy.userId, trophy.name, week).catch(err =>
+        console.error('[Trophies] notifyTrophyEarned failed:', err)
+      );
     }
   }
 

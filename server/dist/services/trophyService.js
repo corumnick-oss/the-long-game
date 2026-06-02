@@ -38,6 +38,7 @@ exports.awardWeeklyTrophies = awardWeeklyTrophies;
 const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
+const notificationService_1 = require("./notificationService");
 async function calculateWeeklyTrophies(week, season) {
     const weekGames = await db_1.db.query.games.findMany({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
@@ -206,6 +207,7 @@ async function awardWeeklyTrophies(week, season, specificType) {
         if (!existing) {
             await db_1.db.insert(schema.trophies).values(trophy);
             awarded++;
+            (0, notificationService_1.notifyTrophyEarned)(trophy.userId, trophy.name, week).catch(err => console.error('[Trophies] notifyTrophyEarned failed:', err));
         }
     }
     console.log(`Awarded ${awarded} trophies for Week ${week}`);
