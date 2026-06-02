@@ -13,18 +13,21 @@ import {
 } from 'firebase/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth } from '../lib/firebase';
 import { API_BASE } from '../lib/queryClient';
 
-WebBrowser.maybeCompleteAuthSession();
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  offlineAccess: false,
+});
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, teamName: string) => Promise<void>;
-  signInWithGoogleCredential: (idToken: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -77,9 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await syncUserToBackend(cred.user, teamName);
   };
 
-  // Called from the login screen after expo-auth-session completes the Google OAuth flow
-  const signInWithGoogleCredential = async (idToken: string) => {
-    const credential = GoogleAuthProvider.credential(idToken);
+  const signInWithGoogle = async () => {
+    await GoogleSignin.hasPlayServices();
+    const { data } = await GoogleSignin.signIn();
+    if (!data?.idToken) throw new Error('No ID token from Google');
+    const credential = GoogleAuthProvider.credential(data.idToken);
     const result = await signInWithCredential(auth, credential);
     await syncUserToBackend(result.user);
   };
@@ -127,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         signInWithEmail,
         signUpWithEmail,
-        signInWithGoogleCredential,
+        signInWithGoogle,
         signInWithApple,
         signOut,
         resetPassword,

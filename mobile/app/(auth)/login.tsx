@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -7,45 +7,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '@/context/AuthContext';
-
-// To enable Google Sign-In:
-// 1. Firebase Console > Authentication > Sign-in method > Google > copy Web client ID
-// 2. Add to mobile/.env:  EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
 
 // Shared style for all text inputs — explicit height prevents iOS text clipping
 const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
 
 export default function LoginScreen() {
-  const { signInWithEmail, signInWithGoogleCredential, signInWithApple } = useAuth();
+  const { signInWithEmail, signInWithGoogle, signInWithApple } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  const [_request, response, promptGoogleAsync] = Google.useIdTokenAuthRequest({
-    clientId: GOOGLE_WEB_CLIENT_ID || 'not-configured',
-  });
-
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      setIsSubmitting(true);
-      signInWithGoogleCredential(id_token)
-        .catch((err: Error) => setError(err.message))
-        .finally(() => setIsSubmitting(false));
-    } else if (response?.type === 'error') {
-      setError(response.error?.message ?? 'Google sign-in failed');
-    }
-  }, [response]);
 
   const handleEmailSignIn = async () => {
     if (!email || !password) {
@@ -64,16 +41,21 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    if (!GOOGLE_WEB_CLIENT_ID) {
-      Alert.alert(
-        'Google Sign-In Not Configured',
-        'Add your Google Web Client ID to mobile/.env:\n\nEXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=YOUR_ID.apps.googleusercontent.com\n\nFind it in Firebase Console → Authentication → Sign-in method → Google.',
-      );
-      return;
-    }
+  const handleGoogleSignIn = async () => {
     setError('');
-    promptGoogleAsync();
+    setIsSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === 'SIGN_IN_CANCELLED') {
+        setIsSubmitting(false);
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'Google sign-in failed';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAppleSignIn = async () => {
@@ -121,8 +103,13 @@ export default function LoginScreen() {
           style={{ height: 50 }}
           onPress={handleGoogleSignIn}
           disabled={isSubmitting}
+          activeOpacity={0.8}
         >
-          <Text className="text-[#333] font-semibold text-base">Sign in with Google</Text>
+          {isSubmitting ? (
+            <ActivityIndicator color="#333" />
+          ) : (
+            <Text className="text-[#333] font-semibold text-base">Sign in with Google</Text>
+          )}
         </TouchableOpacity>
 
         <AppleAuthentication.AppleAuthenticationButton

@@ -38,7 +38,13 @@
       "expo-router",
       "expo-web-browser",
       "expo-secure-store",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.63838358971-fv3guakh4ib42uag36n98jp121fr7m0h"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -49,6 +55,12 @@
         "projectId": "cb389856-b1ab-42c9-a22b-803f25093e22"
       }
     },
-    "owner": "nickcorum"
+    "owner": "nickcorum",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cb389856-b1ab-42c9-a22b-803f25093e22"
+    }
   }
 }
