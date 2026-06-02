@@ -19,6 +19,7 @@ import { API_BASE } from '../lib/queryClient';
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  iosClientId: '63838358971-fv3guakh4ib42uag36n98jp121fr7m0h.apps.googleusercontent.com',
   offlineAccess: false,
 });
 
