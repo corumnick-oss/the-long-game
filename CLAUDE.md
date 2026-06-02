@@ -153,6 +153,7 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image was never created. Consider full-screen detail on tap.
 - **Trophies (podium) system** — season-end 1st/2nd/3rd/last place awards. NOT YET BUILT. Design with Nick before implementing.
 - **Admin: email editing** — deferred. Workaround: new account + UID reassignment.
+- **In-app feedback / bug report** — users should be able to submit feedback or report bugs from within the app. Sends an email to Nick (nickcorum@gmail.com). Location: Profile tab (accessible to all users, not just admins). Implementation decision needed: simple `mailto:` deep link (OTA-safe, zero backend) vs. in-app form that POSTs to a backend endpoint which sends via nodemailer/SendGrid (better UX, no dependency on native mail app). Discuss with Nick before building.
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) must be re-run any time Nick's test data is wiped. It:
@@ -179,6 +180,7 @@ Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in ser
 11. **2025 data migration** — when Longies sign up with Google/Apple
 12. **App Store + Google Play submission** — target late July
 13. **Trophies (podium) system** — design with Nick first
+14. **In-app feedback / bug report** — Profile tab, email to Nick, decide mailto vs backend form first
 
 ### Important: Railway Environment Variables (Learned the Hard Way)
 - `FIREBASE_PROJECT_ID` had trailing whitespace which caused all token verification to silently fail
@@ -863,6 +865,7 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 - [ ] Achievement case UI redesign with custom images
 - [ ] UI + icon polish pass
 - [ ] Haptic feedback via expo-haptics (OTA-safe)
+- [ ] **In-app feedback / bug report** — Profile tab, sends email to nickcorum@gmail.com. Decide mailto vs backend form before building.
 
 ### Phase 10 — App Store Submission (Target: Late July)
 
@@ -900,8 +903,24 @@ Tapping a team logo opens that team's past game history. ESPN `/teams/{teamId}/s
 - Win probability bucket analysis, matchup intelligence, historical trends
 - isPremium field already in users table
 
-### Private Pools
-Commissioner, buy-in tracking, pool leaderboards, pool game modes.
+### Private Pools — Target: 2026–2027 Season
+Commissioner, buy-in tracking, pool leaderboards, pool game modes. Friends/coworkers compete in their own group with optional buy-in.
+
+**Architecture notes (discussed June 2026):**
+- Current `isLongie` boolean is a hardcoded single-pool concept — when pools arrive, "Longies" becomes just one pool among many and `isLongie` migrates to pool membership
+- Needs: `pools` table (id, name, commissioner, invite code, buy-in) + `pool_members` table (poolId, userId, role)
+- Leaderboard, tiebreaker, and trophy queries need a `poolId` filter option added
+- Current architecture is clean enough to add pools without a rebuild — it's an addition, not a rewrite
+
+### Admin: Custom Push Broadcast — Target: 2026 Season
+Allow admins to send a custom push notification message to all users (or a subset) directly from the Admin Dashboard. Use case: announcements, hype messages, reminders.
+
+**Scope when building:**
+- New "Broadcast" section in Admin → NFL Tools tab (or its own tab)
+- Input: message title + body text
+- Target selector: All Users / Longies Only / specific user(s)
+- Sends via existing `notificationService.ts` / Expo Push API infrastructure
+- Log sent broadcasts to `activity_log` for audit trail
 
 ### Game Modes
 - Probability Mode: points scale with win probability

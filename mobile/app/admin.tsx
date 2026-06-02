@@ -11,7 +11,7 @@ import {
   useSyncGames, useSyncScores, useSyncProbs,
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
-  useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest,
+  useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
@@ -247,6 +247,7 @@ function ToolsTab({ season }: { season: number }) {
   const sendTest = useSendTestNotification();
   const scheduleTest = useScheduleTestNotification();
   const cancelScheduled = useCancelScheduledTest();
+  const tokenStatus = useTokenStatus();
   const [scheduleMinutes, setScheduleMinutes] = useState<number>(5);
   const [scheduledFireAt, setScheduledFireAt] = useState<string | null>(null);
 
@@ -354,6 +355,17 @@ function ToolsTab({ season }: { season: number }) {
 
         {/* Notifications */}
         <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Notifications</Text>
+
+        <View className="bg-surface rounded-xl px-4 py-3 mb-3 flex-row items-center justify-between">
+          <Text className="text-muted text-xs">Push token registered</Text>
+          {tokenStatus.isLoading ? (
+            <ActivityIndicator size="small" color="#888" />
+          ) : (
+            <Text className={`text-xs font-bold ${tokenStatus.data?.hasToken ? 'text-success' : 'text-danger'}`}>
+              {tokenStatus.data?.hasToken ? '✓ Yes' : '✗ No — open app on device first'}
+            </Text>
+          )}
+        </View>
 
         <ActionBtn
           label="Send Test Notification Now"

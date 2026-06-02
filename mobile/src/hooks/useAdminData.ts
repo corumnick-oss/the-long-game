@@ -101,6 +101,16 @@ export function useExportWeekPicks() {
   });
 }
 
+export function useTokenStatus() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['admin', 'token-status', user?.uid ?? null],
+    queryFn: () => apiFetch<{ hasToken: boolean; tokenCount: number; userId: string }>('/api/admin/notifications/token-status', undefined, user),
+    enabled: !!user,
+    staleTime: 10_000,
+  });
+}
+
 export function useSendTestNotification() {
   const { user } = useAuth();
   return useMutation({

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from '../lib/queryClient';
 import { auth } from '../lib/firebase';
@@ -23,9 +24,10 @@ async function registerPushToken() {
 
   let tokenData: Awaited<ReturnType<typeof Notifications.getExpoPushTokenAsync>>;
   try {
-    tokenData = await Notifications.getExpoPushTokenAsync();
-  } catch {
-    // Requires an EAS project ID — not available until EAS dev build
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+  } catch (err) {
+    console.error('Failed to get push token:', err);
     return;
   }
   const token = tokenData.data;
