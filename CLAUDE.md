@@ -12,7 +12,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 **App Name:** The Long Game
 **Type:** iOS and Android mobile app (React Native / Expo)
 **Purpose:** NFL picks app where users predict winners of each week's games and compete on leaderboards
-**Current Status:** Phase 5 in progress. EAS iOS dev build installed on Nick's iPhone. Push notifications working end-to-end ✅ — both "Send Test Notification Now" and scheduled deadline reminder confirmed delivered on June 1 2026. Google/Apple Sign-In, push cron triggers, preseason handling, past seasons, and team stats remain before launch.
+**Current Status:** Phase 5 in progress. Second EAS iOS dev build installed (June 1 2026) with native Google Sign-In. Push notifications, all 5 cron triggers, Google Sign-In, and onboarding screen are all built. BLOCKED: OTA updates appear to not be applying on Nick's device — app is stuck on a cached bundle with a broken `/(auth)/onboarding` route causing "screen not found". Must debug Expo Updates / OTA delivery next session before anything else.
 **Railway URL:** https://thelonggame-production.up.railway.app
 **Target Launch:** App Store submission late July 2026. Regular season starts September 4, 2026.
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone user — Admin team name: Nicholas
@@ -133,10 +133,20 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **Admin notification endpoints fixed** ✅ — `/notifications/test` and `/notifications/schedule-test` now use `req.currentUser!.id` (were crashing with `req.user.uid` which is undefined)
 - **Admin notification error display improved** ✅ — shows real server error message instead of generic "is push token registered?"
 - **Push notifications working end-to-end** ✅ — confirmed June 1 2026. Token registered, test notification delivered, scheduled deadline reminder delivered. `setNotificationHandler` added so notifications show in foreground. Expo ticket errors surface in admin UI.
+- **All 5 push cron triggers wired** ✅ — week unlocked + deadline + picks locked in scheduler.ts; achievement earned in trophyService.ts; game final in espnService.ts (detects in→post transition, notifies each user who picked that game).
+- **Google Sign-In working** ✅ — native `@react-native-google-signin/google-signin` SDK installed. `iosClientId` and `iosUrlScheme` configured. Second EAS dev build `3e80fdb9` installed on Nick's iPhone. Google account picker confirmed working.
+- **Apple Sign-In** ✅ — `expo-apple-authentication` already in plugins, code complete in AuthContext. Works in EAS dev build.
+- **Onboarding/splash screen built** ✅ — embedded inside `login.tsx` as a view state (shown once via AsyncStorage, skipped on return visits). Logo + tagline + 4 feature rows + Get Started CTA. No separate route — avoids Expo Router routing issues.
+- **Trophy → Achievement terminology** ✅ — `notifyTrophyEarned` renamed to `notifyAchievementEarned`, notification message updated, `type Trophy` → `Achievement`, `useMyTrophies` → `useMyAchievements` in all mobile code. DB table `trophies` and API routes unchanged.
+- **iOS Firebase app registered** ✅ — bundle ID `com.thelonggame.picks` registered in Firebase, `GoogleService-Info.plist` downloaded. Reversed client ID: `com.googleusercontent.apps.63838358971-fv3guakh4ib42uag36n98jp121fr7m0h`.
+
+### BLOCKED — Fix First Next Session
+- **OTA updates not applying on Nick's device** — App is stuck showing "screen not found" from a cached OTA bundle that tried to navigate to `/(auth)/onboarding` (now deleted). Multiple subsequent OTA fixes have been published but are not applying. Root cause: likely a stale OTA cached on device that won't update. **Fix options to try next session:**
+  1. Delete and reinstall the app fresh from the EAS build QR code — this wipes all cached OTAs and uses the clean embedded bundle
+  2. If OTAs still don't apply after reinstall, investigate `runtimeVersion` / fingerprint mismatch between EAS build and OTA updates
+  3. As last resort, trigger a new EAS build which would have the current code embedded
 
 ### Known TODOs (Before Launch)
-- **Google/Apple Sign-In** — must work before launch. Currently blocked by Expo Go limitation. Needs native `@react-native-google-signin` package + second EAS build. Apple Sign-In config is already complete.
-- **Wire push notification cron triggers** — all 5 notification functions exist in notificationService.ts but are not called by the scheduler. Need to connect to scheduler.ts cron jobs.
 - **Preseason handling** — 2026 NFL preseason starts Aug 7. App needs to:
   - Show preseason games starting Aug 7 (season flips to 2026 for preseason)
   - Picks, leaderboard, live scores all work during preseason
@@ -148,11 +158,12 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
   - Profile: add "Past Seasons" row showing W-L per season
 - **Pre-game team stats on GameCard** — BEFORE LAUNCH. Show PPG, OppPPG, total yards, pass yards/TDs, rush yards/TDs, defensive yards allowed, offensive/defensive rankings for both teams. ESPN `/summary?event={id}` predictor section. DB tables already exist (`team_game_stats`, `player_stats`).
 - **Post-game box scores on Game Detail** — BEFORE LAUNCH. Store team totals + top QB/RB/WR stats permanently after each game. Builds our own proprietary database. Same ESPN endpoint, boxscore section.
-- **Splash/onboarding screen** — logo + tagline screen not yet built. Required for App Store review.
+- **Splash/onboarding screen** ✅ — built, embedded in login.tsx. Blocked by OTA issue above.
 - **Week 18 2025 tiebreaker is wrong** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025. Fix via Admin → NFL Tools → score correction or directly in DB.
 - **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image was never created. Consider full-screen detail on tap.
 - **Trophies (podium) system** — season-end 1st/2nd/3rd/last place awards. NOT YET BUILT. Design with Nick before implementing.
 - **Admin: email editing** — deferred. Workaround: new account + UID reassignment.
+- **Week Picks scroll jitter** — horizontal swipe glitches and gets stuck jiggling. Reported June 2026. Fix before TestFlight/launch.
 - **In-app feedback / bug report** — users should be able to submit feedback or report bugs from within the app. Sends an email to Nick (nickcorum@gmail.com). Location: Profile tab (accessible to all users, not just admins). Implementation decision needed: simple `mailto:` deep link (OTA-safe, zero backend) vs. in-app form that POSTs to a backend endpoint which sends via nodemailer/SendGrid (better UX, no dependency on native mail app). Discuss with Nick before building.
 
 ### seed:nick — Re-run After Any Cleanup
@@ -167,13 +178,13 @@ Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in ser
 `getCurrentNFLSeason()` correctly returns 2025 until the 2026 season begins. It will need updating to handle the preseason start date (Aug 7) — see Known TODOs above.
 
 ### What's Next — Priority Order
-1. **Google/Apple Sign-In** — install native Google Sign-In SDK, requires second EAS build
-2. ~~**Wire push notification cron triggers**~~ ✅ DONE
-3. **Preseason handling** — season flip logic for Aug 7, functional preseason picks/leaderboard
-4. **Past seasons** — leaderboard season selector + profile past seasons row
-5. **Pre-game team stats** — ESPN sync → GameCard display (PPG, yards, rankings)
-6. **Post-game box scores** — ESPN sync after finals → Game Detail display + permanent DB storage
-7. **Splash/onboarding screen**
+1. **Fix OTA delivery** — delete/reinstall app from EAS build QR, verify OTA updates apply cleanly
+2. **Verify onboarding + Google/Apple Sign-In end-to-end** — confirm working after OTA fix
+3. **Week Picks scroll jitter** — fix before TestFlight
+4. **Preseason handling** — season flip logic for Aug 7, functional preseason picks/leaderboard
+5. **Past seasons** — leaderboard season selector + profile past seasons row
+6. **Pre-game team stats** — ESPN sync → GameCard display (PPG, yards, rankings)
+7. **Post-game box scores** — ESPN sync after finals → Game Detail display + permanent DB storage
 8. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
 9. **2025 data migration** — when Longies sign up with Google/Apple
 10. **App Store + Google Play submission** — target late July
