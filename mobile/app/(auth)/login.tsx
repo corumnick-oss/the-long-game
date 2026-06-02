@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,22 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  SafeAreaView,
+  StyleSheet,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '@/context/AuthContext';
+
+const ONBOARDING_KEY = 'has_seen_onboarding';
+
+const FEATURES = [
+  { icon: '🏈', title: 'Season-Long Picks', description: 'Pick every game, every week, all 18 weeks long.' },
+  { icon: '👥', title: 'Compete With Friends', description: 'Private leaderboard, bragging rights, real stakes.' },
+  { icon: '📈', title: 'Climb the Rankings', description: 'Weekly and season standings, live all year.' },
+  { icon: '⚡', title: 'Chase the Upset', description: "Call the games nobody else does. Earn trophies for it." },
+];
 
 // Shared style for all text inputs — explicit height prevents iOS text clipping
 const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
@@ -23,6 +35,58 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
+      if (!val) setShowOnboarding(true);
+    });
+  }, []);
+
+  const handleGetStarted = async () => {
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    setShowOnboarding(false);
+  };
+
+  if (showOnboarding) {
+    return (
+      <SafeAreaView style={ob.safe}>
+        <View style={ob.container}>
+          <View style={ob.logoSection}>
+            <View style={ob.iconCircle}>
+              <Text style={ob.footballEmoji}>🏈</Text>
+            </View>
+            <Text style={ob.appName}>The Long Game</Text>
+            <Text style={ob.tagline}>NFL Picks &amp; Leaderboards</Text>
+          </View>
+          <View style={ob.featuresSection}>
+            {FEATURES.map(f => (
+              <View key={f.title} style={ob.featureRow}>
+                <View style={ob.featureIconBox}>
+                  <Text style={ob.featureIcon}>{f.icon}</Text>
+                </View>
+                <View style={ob.featureText}>
+                  <Text style={ob.featureTitle}>{f.title}</Text>
+                  <Text style={ob.featureDesc}>{f.description}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+          <View style={ob.ctaSection}>
+            <TouchableOpacity style={ob.button} onPress={handleGetStarted} activeOpacity={0.85}>
+              <Text style={ob.buttonText}>Get Started</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={ob.signInLink} onPress={handleGetStarted} activeOpacity={0.7}>
+              <Text style={ob.signInText}>
+                Already have an account?{'  '}
+                <Text style={ob.signInHighlight}>Sign in</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const handleEmailSignIn = async () => {
     if (!email || !password) {
@@ -191,3 +255,26 @@ function friendlyFirebaseError(msg: string): string {
   }
   return msg;
 }
+
+const ob = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#0f0f0f' },
+  container: { flex: 1, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 24, justifyContent: 'space-between' },
+  logoSection: { alignItems: 'center' },
+  iconCircle: { width: 84, height: 84, borderRadius: 42, backgroundColor: 'rgba(59,130,246,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  footballEmoji: { fontSize: 40 },
+  appName: { color: '#ffffff', fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
+  tagline: { color: '#6b7280', fontSize: 14, marginTop: 6 },
+  featuresSection: { gap: 18 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  featureIconBox: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  featureIcon: { fontSize: 22 },
+  featureText: { flex: 1 },
+  featureTitle: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
+  featureDesc: { color: '#9ca3af', fontSize: 13, marginTop: 2, lineHeight: 18 },
+  ctaSection: { gap: 8 },
+  button: { backgroundColor: '#3b82f6', borderRadius: 16, height: 54, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  signInLink: { alignItems: 'center', paddingVertical: 10 },
+  signInText: { color: '#6b7280', fontSize: 14 },
+  signInHighlight: { color: '#3b82f6', fontWeight: '600' },
+});
