@@ -373,7 +373,14 @@ function ToolsTab({ season }: { season: number }) {
           result={results['notif_test']}
           onPress={() =>
             sendTest.mutate(undefined, {
-              onSuccess: () => setResult('notif_test', '✓ Sent — check your device'),
+              onSuccess: (r: any) => {
+                const ticket = r?.tickets?.[0];
+                if (ticket?.status === 'error') {
+                  setResult('notif_test', `✗ Expo error: ${ticket.message}`);
+                } else {
+                  setResult('notif_test', '✓ Sent — check your device');
+                }
+              },
               onError: (err: any) => setResult('notif_test', `✗ ${err?.message ?? 'Send failed'}`),
             })
           }

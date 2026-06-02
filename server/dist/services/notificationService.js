@@ -20,7 +20,7 @@ async function sendPushToUsers(userIds, title, body, data) {
         where: (0, drizzle_orm_1.inArray)(schema_1.pushTokens.userId, userIds),
     });
     if (tokens.length === 0)
-        return;
+        return [];
     const messages = tokens.map(t => ({
         to: t.token,
         title,
@@ -28,18 +28,27 @@ async function sendPushToUsers(userIds, title, body, data) {
         sound: 'default',
         data,
     }));
+    const allTickets = [];
     // Expo push API accepts up to 100 messages per request
     const BATCH = 100;
     for (let i = 0; i < messages.length; i += BATCH) {
         try {
-            await axios_1.default.post(EXPO_PUSH_URL, messages.slice(i, i + BATCH), {
+            const response = await axios_1.default.post(EXPO_PUSH_URL, messages.slice(i, i + BATCH), {
                 headers: { 'Content-Type': 'application/json' },
             });
+            const tickets = response.data?.data ?? [];
+            tickets.forEach((ticket, idx) => {
+                if (ticket.status === 'error') {
+                    console.error(`[Push] Ticket error for token ${messages[i + idx]?.to}:`, ticket.message, ticket.details);
+                }
+            });
+            allTickets.push(...tickets);
         }
         catch (err) {
             console.error('[Push] Batch send failed:', err);
         }
     }
+    return allTickets;
 }
 async function sendPushToAllUsers(title, body, data) {
     const allUsers = await db_1.db.query.users.findMany({ where: (0, drizzle_orm_1.eq)(schema_1.users.nflAccess, true) });

@@ -13,12 +13,14 @@ interface ExpoPushMessage {
   sound?: 'default';
 }
 
-export async function sendPushToUsers(userIds: string[], title: string, body: string, data?: Record<string, unknown>): Promise<void> {
+type PushTicket = { status: string; id?: string; message?: string; details?: unknown };
+
+export async function sendPushToUsers(userIds: string[], title: string, body: string, data?: Record<string, unknown>): Promise<PushTicket[]> {
   const tokens = await db.query.pushTokens.findMany({
     where: inArray(pushTokens.userId, userIds),
   });
 
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) return [];
 
   const messages: ExpoPushMessage[] = tokens.map(t => ({
     to: t.token,
@@ -28,17 +30,28 @@ export async function sendPushToUsers(userIds: string[], title: string, body: st
     data,
   }));
 
+  const allTickets: PushTicket[] = [];
+
   // Expo push API accepts up to 100 messages per request
   const BATCH = 100;
   for (let i = 0; i < messages.length; i += BATCH) {
     try {
-      await axios.post(EXPO_PUSH_URL, messages.slice(i, i + BATCH), {
+      const response = await axios.post(EXPO_PUSH_URL, messages.slice(i, i + BATCH), {
         headers: { 'Content-Type': 'application/json' },
       });
+      const tickets: PushTicket[] = response.data?.data ?? [];
+      tickets.forEach((ticket, idx) => {
+        if (ticket.status === 'error') {
+          console.error(`[Push] Ticket error for token ${messages[i + idx]?.to}:`, ticket.message, ticket.details);
+        }
+      });
+      allTickets.push(...tickets);
     } catch (err) {
       console.error('[Push] Batch send failed:', err);
     }
   }
+
+  return allTickets;
 }
 
 export async function sendPushToAllUsers(title: string, body: string, data?: Record<string, unknown>): Promise<void> {

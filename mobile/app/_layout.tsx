@@ -4,10 +4,20 @@ import { View, ActivityIndicator } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { NotificationPrompt } from '@/components/NotificationPrompt';
+
+// Show notifications even when app is in the foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 function AuthGate() {
   const { user, isLoading } = useAuth();

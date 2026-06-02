@@ -282,8 +282,8 @@ router.post('/notifications/test', async (req, res) => {
             res.status(400).json({ error: 'No push token registered for this user. Open the app on your device and grant notification permission first.' });
             return;
         }
-        await (0, notificationService_1.sendPushToUsers)([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
-        res.json({ sent: true, tokenCount: tokens.length });
+        const tickets = await (0, notificationService_1.sendPushToUsers)([userId], 'Test Notification 🏈', 'Push notifications are working!', { type: 'test' });
+        res.json({ sent: true, tokenCount: tokens.length, tickets });
     }
     catch (err) {
         console.error('[Admin] notifications/test error:', err);
