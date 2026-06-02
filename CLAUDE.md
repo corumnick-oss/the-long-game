@@ -125,7 +125,7 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **expo-dev-client installed** ✅ — required for EAS development builds
 - **EAS CLI Windows bug patched** ✅ — `repository.js` finally block patched to not throw on temp dir cleanup EPERM
 - **Notification testing in Admin Dashboard** ✅ — NFL Tools tab: "Send Test Notification Now" (immediate) + "Schedule Deadline Reminder Test" (1/5/10/30m presets that fire real "1 hour left for picks" message)
-- **notificationService.ts** ✅ — all 5 push triggers built: week unlocked, deadline, picks locked, trophy earned, game final. NOT YET wired to cron jobs.
+- **notificationService.ts** ✅ — all 5 push triggers built and wired: week unlocked + deadline + picks locked in scheduler.ts; trophy earned in trophyService.ts; game final in espnService.ts (in→post transition detection).
 - **EAS iOS dev build installed** ✅ — installed on Nick's iPhone (June 1 2026). Developer Mode enabled. App runs under bundle ID `com.thelonggame.picks`.
 - **mobile/.npmrc added** ✅ — `legacy-peer-deps=true` so EAS build server uses same install behavior as local
 - **Package versions fixed for SDK 54** ✅ — `expo-dev-client` `~6.0.21`, `react-native-worklets` `0.5.1`, `expo` `~54.0.35`, `expo-router` `~6.0.24` (were all mismatched, causing EAS build failures)
@@ -168,7 +168,7 @@ Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in ser
 
 ### What's Next — Priority Order
 1. **Google/Apple Sign-In** — install native Google Sign-In SDK, requires second EAS build
-2. **Wire push notification cron triggers** — connect 5 notification functions to scheduler.ts
+2. ~~**Wire push notification cron triggers**~~ ✅ DONE
 3. **Preseason handling** — season flip logic for Aug 7, functional preseason picks/leaderboard
 4. **Past seasons** — leaderboard season selector + profile past seasons row
 5. **Pre-game team stats** — ESPN sync → GameCard display (PPG, yards, rankings)
