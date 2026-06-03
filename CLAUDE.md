@@ -12,7 +12,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 **App Name:** The Long Game
 **Type:** iOS and Android mobile app (React Native / Expo)
 **Purpose:** NFL picks app where users predict winners of each week's games and compete on leaderboards
-**Current Status:** Phase 5 in progress. Second EAS iOS dev build installed (June 1 2026) with native Google Sign-In. Push notifications, all 5 cron triggers, Google Sign-In, and onboarding screen are all built. BLOCKED: OTA updates appear to not be applying on Nick's device — app is stuck on a cached bundle with a broken `/(auth)/onboarding` route causing "screen not found". Must debug Expo Updates / OTA delivery next session before anything else.
+**Current Status:** Phase 5 in progress. Preview build (`cfa11e3a`) active on Nick's iPhone. OTA updates confirmed working on preview channel (`eas update --branch preview`). Google/Apple Sign-In still blocked (Firebase config fixes needed — see BLOCKED section). Picks by Team, Team Central, and Team Detail screens shipped June 2 2026. Navigation bugs fixed, pick % bars fixed, Week Picks scroll sync fixed.
 **Railway URL:** https://thelonggame-production.up.railway.app
 **Target Launch:** App Store submission late July 2026. Regular season starts September 4, 2026.
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone user — Admin team name: Nicholas
@@ -29,7 +29,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 - Regular season starts **September 4, 2026** — hard deadline
 
 ### Why This Works — 3 Ways to Push Updates
-1. **OTA Updates (Expo Updates)** — INSTANT, no App Store review needed. Covers 95% of all fixes: UI bugs, logic fixes, API changes, screen redesigns. Run `eas update --branch production --message "fix description"` and users get it automatically.
+1. **OTA Updates (Expo Updates)** — INSTANT, no App Store review needed. Covers 95% of all fixes: UI bugs, logic fixes, API changes, screen redesigns. Run `eas update --branch development --message "fix description"` for dev builds, `eas update --branch preview --message "fix description"` for preview builds. **CRITICAL: the preview build uses `--branch preview`. Publishing to `development` or `production` will NOT reach it.**
 2. **Backend Updates** — INSTANT. Push to GitHub → Railway auto-deploys. No App Store involved.
 3. **App Store Update** — Only needed for new native packages, permission changes, or major version bumps. Takes 1-3 days review. Rarely needed for bug fixes.
 
@@ -134,17 +134,43 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **Admin notification error display improved** ✅ — shows real server error message instead of generic "is push token registered?"
 - **Push notifications working end-to-end** ✅ — confirmed June 1 2026. Token registered, test notification delivered, scheduled deadline reminder delivered. `setNotificationHandler` added so notifications show in foreground. Expo ticket errors surface in admin UI.
 - **All 5 push cron triggers wired** ✅ — week unlocked + deadline + picks locked in scheduler.ts; achievement earned in trophyService.ts; game final in espnService.ts (detects in→post transition, notifies each user who picked that game).
-- **Google Sign-In working** ✅ — native `@react-native-google-signin/google-signin` SDK installed. `iosClientId` and `iosUrlScheme` configured. Second EAS dev build `3e80fdb9` installed on Nick's iPhone. Google account picker confirmed working.
-- **Apple Sign-In** ✅ — `expo-apple-authentication` already in plugins, code complete in AuthContext. Works in EAS dev build.
-- **Onboarding/splash screen built** ✅ — embedded inside `login.tsx` as a view state (shown once via AsyncStorage, skipped on return visits). Logo + tagline + 4 feature rows + Get Started CTA. No separate route — avoids Expo Router routing issues.
+- **Google Sign-In** — native SDK installed, account picker works. Firebase credential failing (see BLOCKED below).
+- **Apple Sign-In** — `expo-apple-authentication` in plugins, code complete. Firebase credential failing (see BLOCKED below).
+- **Onboarding/splash screen built** ✅ — embedded inside `login.tsx` as a view state (shown once via AsyncStorage, skipped on return visits). Logo + tagline + 4 feature rows + Get Started CTA. No separate route — avoids Expo Router routing issues. Working on preview build.
 - **Trophy → Achievement terminology** ✅ — `notifyTrophyEarned` renamed to `notifyAchievementEarned`, notification message updated, `type Trophy` → `Achievement`, `useMyTrophies` → `useMyAchievements` in all mobile code. DB table `trophies` and API routes unchanged.
 - **iOS Firebase app registered** ✅ — bundle ID `com.thelonggame.picks` registered in Firebase, `GoogleService-Info.plist` downloaded. Reversed client ID: `com.googleusercontent.apps.63838358971-fv3guakh4ib42uag36n98jp121fr7m0h`.
+- **OTA branch mismatch fixed** ✅ — dev builds use `--branch development`, preview/prod use `--branch preview`/`production`. Was root cause of all OTA failures.
+- **Preview build created** ✅ — `cfa11e3a` installed on Nick's iPhone (June 2 2026). Works standalone, no Metro needed. OTA via `eas update --branch preview`.
+- **AuthGate routing fixed** ✅ — logged-in users can navigate to game detail, user profiles, admin, picks-by-team, and team routes without being redirected back to picks. Named routes are explicitly excluded from the cold-launch redirect. Cold launch (undefined segments) still redirects to tabs correctly.
+- **Navigation bug fixed** ✅ — tapping game cards, leaderboard rows, and week picks names was redirecting to week 18 picks screen. Root cause: AuthGate `!inTabsGroup` check was too broad. Fixed by explicitly listing valid non-tab routes.
+- **Pick % bars fixed** ✅ — `showPct` now derives from `game.homePickPct !== null` (server truth) instead of the client-side Wednesday 9PM lock check. Fixes bars disappearing in offseason and Wednesday pre-lock edge cases.
+- **Week Picks scroll sync fixed** ✅ — all rows now scroll together at the same rate. Final approach: `isSyncing` mutex with `requestAnimationFrame` reset (~16ms). Blocks echo events from programmatic `scrollTo` while resetting fast enough that every user scroll event still propagates. Two prior attempts (50ms timeout → rate difference; scrollSource tracking → no sync at all) both abandoned.
+- **Picks by Team screen** ✅ — accessible from Profile → Insights → "Picks by Team →". Shows user's W-L record for every team they've picked, sortable by most picked / accuracy / A-Z. Summary bar (overall record, team count, accuracy). Each team row taps to Team Detail. Backend: `GET /api/picks/by-team?season=X`.
+- **Team Central screen** ✅ — accessible from Picks tab ("Team Central" entry button). Shows all 32 NFL teams with season W-L record and community pick accuracy. Search bar + 3 sort modes. Backend: `GET /api/teams?season=X`.
+- **Team Detail screen** ✅ — accessible from Team Central and Picks by Team. Shows team logo/record, PPG/PPG Allowed/point differential (calculated from actual game scores), community picks (total picks across all users, W-L, accuracy bar), and last 10 games with result/score/opponent. Backend: `GET /api/teams/:name?season=X`.
 
 ### BLOCKED — Fix First Next Session
-- **OTA updates not applying on Nick's device** — App is stuck showing "screen not found" from a cached OTA bundle that tried to navigate to `/(auth)/onboarding` (now deleted). Multiple subsequent OTA fixes have been published but are not applying. Root cause: likely a stale OTA cached on device that won't update. **Fix options to try next session:**
-  1. Delete and reinstall the app fresh from the EAS build QR code — this wipes all cached OTAs and uses the clean embedded bundle
-  2. If OTAs still don't apply after reinstall, investigate `runtimeVersion` / fingerprint mismatch between EAS build and OTA updates
-  3. As last resort, trigger a new EAS build which would have the current code embedded
+
+#### Google Sign-In — Wrong OAuth Client IDs (config fix needed)
+- **Root cause:** The OAuth clients in use (`63838358971-*`) belong to a **different Google Cloud project** than the Firebase project. Firebase project GCP number is `309276847432` (from `messagingSenderId` in firebase config). The clients starting with `63838358971-` are from an entirely different GCP project. Firebase rejects ALL tokens from these clients.
+- **Errors seen (all caused by this):**
+  - `invalid_idp_response: the Google id_token is not allowed to be used with this application`
+  - `access_token audience is not for this project (auth/invalid-credential)`
+- **Fix — no code change needed, two config steps:**
+  1. **Get the correct web client ID:** Firebase Console → Authentication → Sign-in method → Google → expand "Web SDK configuration" → copy the Web client ID shown there. This is auto-created by Firebase in the correct GCP project (`309276847432-*`).
+  2. **Update `mobile/.env`:** Replace `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` with the correct client ID from step 1.
+  3. **Get the correct iOS client ID:** Google Cloud Console → select project `the-long-game-prod-bef05` → APIs & Services → Credentials → find or create an iOS OAuth client with bundle ID `com.thelonggame.picks`. Update `iosClientId` in `mobile/src/context/AuthContext.tsx` if it differs.
+  4. Push OTA with updated `.env` — OTA-deployable, no rebuild needed.
+- **Current code state:** `signInWithGoogle()` in AuthContext.tsx uses `GoogleSignin.getTokens()` to get accessToken, calls `GoogleAuthProvider.credential(null, accessToken)`. This is the correct approach once the client IDs are from the right GCP project.
+
+#### Apple Sign-In — Service ID mismatch (Firebase config fix needed)
+- **Root cause:** `expo-apple-authentication` is native iOS. The identity token Apple generates has `aud` = bundle ID (`com.thelonggame.picks`). Firebase is configured with Service ID = `com.thelonggame.picks.siwa`. These don't match → "identity provider configuration is not found".
+- **Fix — Firebase Console only, no code change:**
+  1. Firebase Console → Authentication → Sign-in method → Apple
+  2. Change **Service ID** from `com.thelonggame.picks.siwa` to `com.thelonggame.picks`
+  3. Keep Team ID (`NMR4HYNN3K`), Key ID, and Private Key exactly as-is
+  4. Save — no OTA or rebuild needed, takes effect immediately
+- **Why:** The `.siwa` Service ID is for web-based Apple Sign-In only. Native iOS Sign-In tokens use the bundle ID as the audience, so Firebase must be configured to match.
 
 ### Known TODOs (Before Launch)
 - **Preseason handling** — 2026 NFL preseason starts Aug 7. App needs to:
@@ -159,11 +185,13 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **Pre-game team stats on GameCard** — BEFORE LAUNCH. Show PPG, OppPPG, total yards, pass yards/TDs, rush yards/TDs, defensive yards allowed, offensive/defensive rankings for both teams. ESPN `/summary?event={id}` predictor section. DB tables already exist (`team_game_stats`, `player_stats`).
 - **Post-game box scores on Game Detail** — BEFORE LAUNCH. Store team totals + top QB/RB/WR stats permanently after each game. Builds our own proprietary database. Same ESPN endpoint, boxscore section.
 - **Splash/onboarding screen** ✅ — built, embedded in login.tsx. Blocked by OTA issue above.
+- **Onboarding polish (before launch)** — Nick wants the splash/onboarding screen redesigned before launch. Currently looks generic with plain emoji icons. Needs custom imagery, better visual design, more branded feel. OTA-safe change.
 - **Week 18 2025 tiebreaker is wrong** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025. Fix via Admin → NFL Tools → score correction or directly in DB.
 - **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image was never created. Consider full-screen detail on tap.
 - **Trophies (podium) system** — season-end 1st/2nd/3rd/last place awards. NOT YET BUILT. Design with Nick before implementing.
 - **Admin: email editing** — deferred. Workaround: new account + UID reassignment.
-- **Week Picks scroll jitter** — horizontal swipe glitches and gets stuck jiggling. Reported June 2026. Fix before TestFlight/launch.
+- **Team Central + Picks by Team — real-time updates needed** — both features currently use static query data (staleTime: 5min / 2min). During the season, team records, PPG, and pick accuracy all change as games complete. To make these live: either (a) reduce staleTime to 30s so they poll alongside the game score refresh, or (b) wire TanStack Query cache invalidation for `['teams', ...]` and `['picks-by-team', ...]` keys inside the same logic that invalidates `['games', ...]` after the live score sync. Option (b) is cleaner. Must be done before 2026 season opens.
+- **Team Central — expand stats** — currently shows PPG / PPG Allowed / point differential derived from game scores. Nick wants to add yards per game, yards allowed, sacks, defensive stats, pass/rush breakdown. These require populating `team_game_stats` table via `syncTeamStats()` (not yet built — see Phase 7). Once that's built, Team Detail screen should pull from that table instead of aggregating raw scores.
 - **In-app feedback / bug report** — users should be able to submit feedback or report bugs from within the app. Sends an email to Nick (nickcorum@gmail.com). Location: Profile tab (accessible to all users, not just admins). Implementation decision needed: simple `mailto:` deep link (OTA-safe, zero backend) vs. in-app form that POSTs to a backend endpoint which sends via nodemailer/SendGrid (better UX, no dependency on native mail app). Discuss with Nick before building.
 
 ### seed:nick — Re-run After Any Cleanup
@@ -178,12 +206,12 @@ Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in ser
 `getCurrentNFLSeason()` correctly returns 2025 until the 2026 season begins. It will need updating to handle the preseason start date (Aug 7) — see Known TODOs above.
 
 ### What's Next — Priority Order
-1. **Fix OTA delivery** — delete/reinstall app from EAS build QR, verify OTA updates apply cleanly
-2. **Verify onboarding + Google/Apple Sign-In end-to-end** — confirm working after OTA fix
-3. **Week Picks scroll jitter** — fix before TestFlight
+1. **Fix Google Sign-In** — get correct web client ID from Firebase Console → update `mobile/.env` → push OTA (see BLOCKED section above)
+2. **Fix Apple Sign-In** — change Service ID in Firebase Console from `com.thelonggame.picks.siwa` to `com.thelonggame.picks` (see BLOCKED section above)
+3. **Team Central + Picks by Team real-time updates** — wire cache invalidation for `['teams', ...]` and `['picks-by-team', ...]` when live score sync runs (see Known TODOs above)
 4. **Preseason handling** — season flip logic for Aug 7, functional preseason picks/leaderboard
 5. **Past seasons** — leaderboard season selector + profile past seasons row
-6. **Pre-game team stats** — ESPN sync → GameCard display (PPG, yards, rankings)
+6. **Pre-game team stats** — ESPN sync → GameCard display + Team Central expanded stats (PPG, yards, sacks, rankings)
 7. **Post-game box scores** — ESPN sync after finals → Game Detail display + permanent DB storage
 8. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
 9. **2025 data migration** — when Longies sign up with Google/Apple
@@ -196,11 +224,9 @@ Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in ser
 - If picks/myPick ever stop working: check Railway Variables for trailing spaces on FIREBASE_PROJECT_ID
 - Symptom: optionalAuth logs "incorrect aud claim" with spaces in the expected value
 
-### Apple + Google Sign-In — DEFERRED TO EAS DEV BUILD
-- **Why deferred:** Both require a real build with bundle ID `com.thelonggame.picks`. Expo Go runs under `host.exp.exponent` so Apple identity tokens fail Firebase validation and Google OAuth is blocked. This is NOT a configuration bug — it is a fundamental Expo Go limitation.
-- **Apple:** Apple Developer Portal App ID + Service ID (`com.thelonggame.picks.siwa`) configured. Firebase has Team ID `NMR4HYNN3K`, Key ID, and private key entered. Nonce fix in code with expo-crypto. Ready to test once EAS dev build is installed.
-- **Google:** Web Client ID in `mobile/.env`. Gets "OAuth 2.0 policy" error in Expo Go. Will fix with native `@react-native-google-signin` SDK during EAS dev build phase.
-- **These are CRITICAL for launch** — must be tested and working before App Store submission.
+### Apple + Google Sign-In — IN PROGRESS (June 2 2026)
+- Both tested on preview build. Native flows (account picker) work. Firebase credential step fails for both. See BLOCKED section for exact fixes needed.
+- **These are CRITICAL for launch** — must be working before App Store submission.
 
 ### Important Deployment Notes (Learned the Hard Way)
 - Railway injects NODE_ENV=production which breaks TypeScript compilation
@@ -322,6 +348,14 @@ TheLongGame/
 │   ├── app/
 │   │   ├── _layout.tsx              ← root layout (QueryClientProvider + AuthProvider + AuthGate)
 │   │   ├── admin.tsx                ← Admin Dashboard (3 tabs: Users, NFL Tools, Data)
+│   │   ├── picks-by-team.tsx        ← Picks by Team screen (from Profile → Insights)
+│   │   ├── team-central.tsx         ← Team Central list (all 32 teams, from Picks tab)
+│   │   ├── team/
+│   │   │   └── [name].tsx           ← Team Detail (record, PPG, community picks, recent games)
+│   │   ├── game/
+│   │   │   └── [id].tsx             ← Game Detail screen
+│   │   ├── user/
+│   │   │   └── [id].tsx             ← Public profile screen
 │   │   ├── (auth)/
 │   │   │   ├── _layout.tsx
 │   │   │   ├── login.tsx            ← login screen (email working; Apple/Google need EAS build)
@@ -345,7 +379,11 @@ TheLongGame/
 │   │   ├── hooks/
 │   │   │   ├── usePicksData.ts      ← TanStack Query hooks for picks/games
 │   │   │   ├── useAdminData.ts      ← Admin hooks including notification testing
-│   │   │   └── useNotificationPermission.ts ← permission + push token registration
+│   │   │   ├── useNotificationPermission.ts ← permission + push token registration
+│   │   │   ├── useProfile.ts        ← useMyProfile, useMyAchievements, usePicksByTeam
+│   │   │   ├── useTeams.ts          ← useTeamList, useTeamDetail
+│   │   │   ├── useLeaderboard.ts    ← leaderboard hook
+│   │   │   └── useWeekPicks.ts      ← week picks grid hook
 │   │   └── lib/
 │   │       ├── firebase.ts          ← Firebase init with AsyncStorage persistence
 │   │       ├── queryClient.ts       ← TanStack Query + apiFetch() with Bearer token
@@ -372,8 +410,9 @@ TheLongGame/
     │   │   ├── admin.ts             ← includes notification test endpoints
     │   │   ├── games.ts
     │   │   ├── leaderboard.ts
-    │   │   ├── picks.ts
+    │   │   ├── picks.ts             ← includes GET /by-team?season=X endpoint
     │   │   ├── pushTokens.ts
+    │   │   ├── teams.ts             ← GET /api/teams, GET /api/teams/:name
     │   │   ├── tiebreaker.ts
     │   │   ├── trophies.ts
     │   │   └── users.ts
@@ -421,10 +460,10 @@ CURRENT_SEASON=2025
 - **CRITICAL:** No trailing whitespace on any variable — especially FIREBASE_PROJECT_ID
 
 ### Railway Deployment (IMPORTANT — DO NOT CHANGE)
-- Builder: DOCKERFILE (set in server/railway.toml)
+- Builder: DOCKERFILE (configured in Railway dashboard — `railway.toml` was deleted from repo, Railway setting persists)
 - Dockerfile copies pre-compiled dist — does NOT run tsc on Railway
 - When making backend changes: ALWAYS run `npm run build` in server/ locally first
-- Commit both src/ changes AND dist/ changes together
+- Commit both src/ changes AND dist/ changes together (`git add -f server/dist/`)
 
 ---
 
@@ -744,10 +783,37 @@ After lock: compact horizontal grid with synchronized scroll
 - Header: avatar, name, member since, Longie badge, ⚙️ gear (admins only), Sign Out
 - 2×2 stats: Record | Accuracy | Best Week | Achievements
 - Week-by-week color-coded history
-- Auto insights: best team, worst team, underdog record, etc.
+- Auto insights: best team, worst team, underdog record, etc. + "Picks by Team →" tappable row
 - H2H vs every Longie
 - Achievement Case
 - **Past Seasons row (TO BUILD)** — W-L per season for historical context
+
+### Picks by Team Screen ✅ BUILT
+- Accessible from Profile → Insights → "Picks by Team →"
+- User's own W-L record for every team they've picked this season (only settled games)
+- Summary bar: overall record, team count, accuracy %
+- Sort by: Most Picked (default) | Accuracy | A–Z
+- Each row: team logo, name, W-L record, accuracy % (color coded green/yellow/red)
+- Tapping a team row navigates to Team Detail
+- Only visible to the user themselves (not on public profiles)
+- **TODO: real-time updates** — invalidate `['picks-by-team', ...]` when scores sync
+
+### Team Central Screen ✅ BUILT
+- Accessible from Picks tab ("Team Central 🏟️" button below WeekSelector)
+- Lists all 32 NFL teams with season W-L record + community pick accuracy
+- Search bar to filter by team name
+- Sort by: Record (default) | Pick % | A–Z
+- Each row: logo, name, games played, season W-L, pick accuracy %
+- Tapping a team navigates to Team Detail
+- **TODO: real-time updates** — invalidate `['teams', ...]` when scores sync
+
+### Team Detail Screen ✅ BUILT
+- Accessible from Team Central and Picks by Team
+- Team logo hero + season record (color coded) + games played
+- Scoring stats: PPG / PPG Allowed / point differential (calculated from actual game scores, NOT ESPN pregame estimates)
+- Community Picks section: total picks from all users, W-L breakdown, accuracy bar
+- Recent Games: last 10 games with W/L badge, score, opponent logo, vs/@ indicator, week number
+- **TODO: expand stats** when `syncTeamStats()` is built — add yards, sacks, rankings from `team_game_stats` table
 
 ### Other User Profiles
 - H2H vs YOU specifically
@@ -837,14 +903,19 @@ Permission: in-app prompt 10 seconds after first login → system dialog. Maybe 
 
 ### Phase 5 — Advanced Features (IN PROGRESS)
 - [x] EAS project initialized, eas.json created, expo-dev-client installed ✅
-- [x] First iOS dev build submitted (⏳ queued as of May 31 2026)
-- [ ] Install EAS dev build on iPhone, register push token
-- [ ] Google/Apple Sign-In (needs second EAS build after native SDK installed)
+- [x] EAS iOS dev build installed on Nick's iPhone ✅ (June 1 2026)
+- [x] Preview build installed on Nick's iPhone ✅ (June 2 2026, `cfa11e3a`)
+- [x] OTA updates working on preview channel ✅ — `eas update --branch preview`
+- [ ] Google/Apple Sign-In — code complete, Firebase config fixes needed (see BLOCKED)
 - [x] Activity bell panel ✅
 - [x] notificationService.ts — all 5 triggers built ✅
 - [x] Notification testing in Admin Dashboard ✅ (Send Test Now + Schedule)
 - [ ] Wire push notification cron triggers to scheduler.ts
 - [x] Admin dashboard ✅
+- [x] Picks by Team screen ✅ (June 2 2026)
+- [x] Team Central screen ✅ (June 2 2026)
+- [x] Team Detail screen ✅ (June 2 2026)
+- [ ] Team Central + Picks by Team real-time cache invalidation
 
 ### Phase 6 — Season & History
 - [ ] Preseason handling — season flip Aug 7, functional picks/leaderboard for preseason
