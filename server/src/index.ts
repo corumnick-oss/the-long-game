@@ -13,6 +13,7 @@ import activityRouter from './routes/activity';
 import tiebreakerRouter from './routes/tiebreaker';
 import pushTokensRouter from './routes/pushTokens';
 import adminRouter from './routes/admin';
+import teamsRouter from './routes/teams';
 
 // ── Firebase Admin ────────────────────────────────────────────────────────────
 admin.initializeApp({
@@ -40,6 +41,7 @@ app.use('/api/activity',    activityRouter);
 app.use('/api/tiebreaker',  tiebreakerRouter);
 app.use('/api/push-tokens', pushTokensRouter);
 app.use('/api/admin',       adminRouter);
+app.use('/api/teams',       teamsRouter);
 
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

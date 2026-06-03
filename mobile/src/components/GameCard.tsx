@@ -154,7 +154,8 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
     ? isFinal ? (awayWins ? 'correct' : 'wrong') : 'pending'
     : null;
 
-  const showPct = isLocked;
+  // Show percentages whenever the server returns them (server only does so after lock)
+  const showPct = game.homePickPct !== null;
   const homePct = game.homePickPct ?? 50;
   const awayPct = game.awayPickPct ?? 50;
 

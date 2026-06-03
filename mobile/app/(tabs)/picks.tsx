@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker } from '@/hooks/usePicksData';
@@ -43,6 +43,18 @@ export default function PicksScreen() {
         selectedWeek={selectedWeek}
         onSelect={setSelectedWeek}
       />
+
+      {/* Team Central link */}
+      <TouchableOpacity
+        onPress={() => router.push('/team-central' as any)}
+        activeOpacity={0.7}
+        className="flex-row items-center mx-4 mb-2 px-4 py-2.5 bg-surface rounded-xl"
+      >
+        <Text className="text-base mr-2">🏟️</Text>
+        <Text className="flex-1 text-white text-sm font-medium">Team Central</Text>
+        <Text className="text-muted text-xs mr-1">Stats · Records · Picks</Text>
+        <Text className="text-primary text-sm">›</Text>
+      </TouchableOpacity>
 
       {/* Pick progress header */}
       {!isLoading && games && games.length > 0 && (

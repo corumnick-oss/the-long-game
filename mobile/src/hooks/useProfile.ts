@@ -58,6 +58,25 @@ export function useMyProfile() {
   });
 }
 
+export type TeamPickRecord = {
+  team: string;
+  wins: number;
+  losses: number;
+  logo: string | null;
+  total: number;
+  accuracy: number;
+};
+
+export function usePicksByTeam(season: number) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['picks-by-team', season, user?.uid ?? null],
+    queryFn: () => apiFetch<TeamPickRecord[]>(`/api/picks/by-team?season=${season}`, undefined, user),
+    enabled: !!user,
+    staleTime: 120_000,
+  });
+}
+
 export function useMyAchievements() {
   const { user } = useAuth();
   const season = getCurrentNFLSeason();

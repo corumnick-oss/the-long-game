@@ -30,9 +30,14 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
     const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
+    const inNamedRoute = segments[0] === 'game' || segments[0] === 'user' || segments[0] === 'admin' || segments[0] === 'picks-by-team' || segments[0] === 'team';
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
+      router.replace('/(tabs)/picks');
+    } else if (user && !inTabsGroup && !inNamedRoute) {
+      // Cold launch: segments unresolved (undefined/root) — send to tabs
       router.replace('/(tabs)/picks');
     }
   }, [user, isLoading, segments]);

@@ -271,7 +271,7 @@ export default function ProfileScreen() {
               </View>
             )}
             {profile.insights.worstTeam && (
-              <View className="flex-row items-center px-4 py-3">
+              <View className="flex-row items-center px-4 py-3 border-b border-border">
                 <Text className="text-danger text-base mr-2">↓</Text>
                 <View className="flex-1">
                   <Text className="text-white text-sm font-medium">{profile.insights.worstTeam.team}</Text>
@@ -285,6 +285,15 @@ export default function ProfileScreen() {
                 </View>
               </View>
             )}
+            <TouchableOpacity
+              onPress={() => router.push('/picks-by-team' as any)}
+              activeOpacity={0.7}
+              className="flex-row items-center px-4 py-3"
+            >
+              <Text className="text-base mr-2">🏈</Text>
+              <Text className="flex-1 text-white text-sm font-medium">Picks by Team</Text>
+              <Text className="text-primary text-sm">›</Text>
+            </TouchableOpacity>
           </View>
         </Section>
       )}

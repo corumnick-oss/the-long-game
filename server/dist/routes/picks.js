@@ -115,6 +115,49 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
         picksByUser,
     });
 });
+// GET /api/picks/by-team?season=X  — caller's W-L record grouped by team picked
+router.get('/by-team', auth_1.requireAuth, async (req, res) => {
+    const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
+    const seasonGames = await db_1.db.query.games.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+    });
+    if (!seasonGames.length) {
+        res.json([]);
+        return;
+    }
+    const gameIds = seasonGames.map(g => g.id);
+    const userPicks = await db_1.db.query.picks.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.picks.userId, req.currentUser.id), (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds)),
+    });
+    const gamesMap = Object.fromEntries(seasonGames.map(g => [g.id, g]));
+    const byTeam = {};
+    for (const pick of userPicks) {
+        if (pick.isCorrect === null)
+            continue; // unsettled game
+        const game = gamesMap[pick.gameId];
+        if (!game)
+            continue;
+        const teamName = pick.pick === 'home' ? game.homeTeam : game.awayTeam;
+        const logo = pick.pick === 'home' ? game.homeTeamLogo : game.awayTeamLogo;
+        if (!byTeam[teamName])
+            byTeam[teamName] = { wins: 0, losses: 0, logo: logo ?? null };
+        if (pick.isCorrect)
+            byTeam[teamName].wins++;
+        else
+            byTeam[teamName].losses++;
+    }
+    const result = Object.entries(byTeam).map(([team, stats]) => ({
+        team,
+        wins: stats.wins,
+        losses: stats.losses,
+        logo: stats.logo,
+        total: stats.wins + stats.losses,
+        accuracy: stats.wins + stats.losses > 0
+            ? Math.round((stats.wins / (stats.wins + stats.losses)) * 100)
+            : 0,
+    })).sort((a, b) => b.total - a.total);
+    res.json(result);
+});
 // POST /api/picks  — submit or update a pick (before lock)
 router.post('/', auth_1.requireAuth, async (req, res) => {
     const { gameId, pick } = req.body;

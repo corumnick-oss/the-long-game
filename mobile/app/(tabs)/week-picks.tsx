@@ -103,6 +103,14 @@ export default function WeekPicksScreen() {
   // Synchronized horizontal scroll across header + all user rows
   const headerScrollRef = useRef<ScrollView>(null);
   const rowScrollRefs = useRef<(ScrollView | null)[]>([]);
+  // Track which view the user is actively touching so we only propagate from that source.
+  // programmatic scrollTo on the other views fires onScroll too — those echoes are ignored
+  // because their view ID won't match scrollSource/momentumSource.
+  const scrollSource = useRef<'header' | number | null>(null);
+  const momentumSource = useRef<'header' | number | null>(null);
+
+  const isActiveSource = (id: 'header' | number) =>
+    scrollSource.current === id || momentumSource.current === id;
 
   const syncScroll = (x: number, skipHeader: boolean, skipRowIdx: number | null) => {
     if (!skipHeader) headerScrollRef.current?.scrollTo({ x, animated: false });
@@ -112,10 +120,12 @@ export default function WeekPicksScreen() {
   };
 
   const onHeaderScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!isActiveSource('header')) return;
     syncScroll(e.nativeEvent.contentOffset.x, true, null);
   };
 
   const onRowScroll = (e: NativeSyntheticEvent<NativeScrollEvent>, rowIdx: number) => {
+    if (!isActiveSource(rowIdx)) return;
     syncScroll(e.nativeEvent.contentOffset.x, false, rowIdx);
   };
 
@@ -183,6 +193,10 @@ export default function WeekPicksScreen() {
               horizontal
               onScroll={onHeaderScroll}
               scrollEventThrottle={16}
+              onScrollBeginDrag={() => { scrollSource.current = 'header'; }}
+              onScrollEndDrag={() => { scrollSource.current = null; }}
+              onMomentumScrollBegin={() => { momentumSource.current = 'header'; }}
+              onMomentumScrollEnd={() => { momentumSource.current = null; }}
               bounces={false}
               overScrollMode="never"
               showsHorizontalScrollIndicator={false}
@@ -237,6 +251,10 @@ export default function WeekPicksScreen() {
                   horizontal
                   onScroll={e => onRowScroll(e, rowIdx)}
                   scrollEventThrottle={16}
+                  onScrollBeginDrag={() => { scrollSource.current = rowIdx; }}
+                  onScrollEndDrag={() => { scrollSource.current = null; }}
+                  onMomentumScrollBegin={() => { momentumSource.current = rowIdx; }}
+                  onMomentumScrollEnd={() => { momentumSource.current = null; }}
                   bounces={false}
                   overScrollMode="never"
                   showsHorizontalScrollIndicator={false}
