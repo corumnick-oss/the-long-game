@@ -43,7 +43,7 @@ function totalRecord(comp: ESPNCompetitor): string | null {
 
 export async function syncWeekGames(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-  const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&limit=50`;
+  const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&dates=${season}&limit=50`;
 
   const { data } = await axios.get<{ events: ESPNEvent[] }>(url);
   const events = data.events ?? [];
@@ -156,7 +156,7 @@ export async function updateLiveScores(): Promise<void> {
 
 export async function syncWeekScores(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-  const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&limit=50`;
+  const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&dates=${season}&limit=50`;
 
   const { data } = await axios.get<{ events: ESPNEvent[] }>(url);
   const events = data.events ?? [];

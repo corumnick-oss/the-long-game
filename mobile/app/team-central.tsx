@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useTeamList, type TeamSummary } from '@/hooks/useTeams';
 
-const SEASON = getCurrentNFLSeason();
+const MIN_SEASON = 2025;
+const MAX_SEASON = new Date().getFullYear();
 
 type SortKey = 'record' | 'pick-accuracy' | 'name';
 
@@ -89,9 +89,10 @@ function SortToggle({ value, onChange }: { value: SortKey; onChange: (k: SortKey
 
 export default function TeamCentralScreen() {
   const router = useRouter();
+  const [season, setSeason] = useState(MAX_SEASON);
   const [sort, setSort] = useState<SortKey>('record');
   const [search, setSearch] = useState('');
-  const { data = [], isLoading, isError } = useTeamList(SEASON);
+  const { data = [], isLoading, isError } = useTeamList(season);
 
   const sorted = useMemo(() => {
     let list = search.trim()
@@ -113,11 +114,27 @@ export default function TeamCentralScreen() {
         <TouchableOpacity onPress={() => router.back()} className="mr-3 p-1">
           <Text className="text-primary text-base">← Back</Text>
         </TouchableOpacity>
-        <View className="flex-1 items-center">
-          <Text className="text-white font-bold text-base">Team Central</Text>
-          <Text className="text-muted text-xs">{SEASON} Season</Text>
-        </View>
+        <Text className="flex-1 text-white font-bold text-base text-center">Team Central</Text>
         <View style={{ width: 56 }} />
+      </View>
+
+      {/* Season selector */}
+      <View className="flex-row items-center justify-center gap-4 py-3 border-b border-border">
+        <TouchableOpacity
+          onPress={() => setSeason(s => Math.max(MIN_SEASON, s - 1))}
+          disabled={season <= MIN_SEASON}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season <= MIN_SEASON ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">‹</Text>
+        </TouchableOpacity>
+        <Text className="text-white text-base font-bold">{season} Season</Text>
+        <TouchableOpacity
+          onPress={() => setSeason(s => Math.min(MAX_SEASON, s + 1))}
+          disabled={season >= MAX_SEASON}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= MAX_SEASON ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">›</Text>
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -160,7 +177,7 @@ export default function TeamCentralScreen() {
           renderItem={({ item }) => (
             <TeamRow
               item={item}
-              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.name } })}
+              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.name, season: String(season) } })}
             />
           )}
           showsVerticalScrollIndicator={false}
