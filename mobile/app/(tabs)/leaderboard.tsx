@@ -2,8 +2,9 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicat
 import { useLeaderboard, type LeaderboardEntry } from '../../src/hooks/useLeaderboard';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '../../src/lib/nflSeason';
 
-const season = getCurrentNFLSeason();
+const currentSeason = getCurrentNFLSeason();
 const currentWeek = getCurrentNFLWeek();
+const MIN_SEASON = 2025;
 
 type Filter = 'longies' | 'global';
 type ViewType = 'season' | 'weekly';
@@ -90,15 +91,37 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
   );
 }
 
-function ListHeader({ filter, setFilter, type, setType, isLongie }: {
+function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSeason }: {
   filter: Filter;
   setFilter: (f: Filter) => void;
   type: ViewType;
   setType: (t: ViewType) => void;
   isLongie: boolean;
+  season: number;
+  setSeason: (s: number) => void;
 }) {
+  const isPastSeason = season < currentSeason;
   return (
     <View className="px-4 pt-4 pb-2 gap-2">
+      {/* Season selector */}
+      <View className="flex-row items-center justify-center gap-4">
+        <TouchableOpacity
+          onPress={() => setSeason(s => Math.max(MIN_SEASON, s - 1))}
+          disabled={season <= MIN_SEASON}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season <= MIN_SEASON ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">‹</Text>
+        </TouchableOpacity>
+        <Text className="text-white text-base font-bold">{season} Season</Text>
+        <TouchableOpacity
+          onPress={() => setSeason(s => Math.min(currentSeason, s + 1))}
+          disabled={season >= currentSeason}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= currentSeason ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">›</Text>
+        </TouchableOpacity>
+      </View>
+
       {isLongie && (
         <Toggle<Filter>
           options={[
@@ -109,14 +132,16 @@ function ListHeader({ filter, setFilter, type, setType, isLongie }: {
           onChange={setFilter}
         />
       )}
-      <Toggle<ViewType>
-        options={[
-          { label: 'Season', value: 'season' },
-          { label: `Week ${currentWeek}`, value: 'weekly' },
-        ]}
-        value={type}
-        onChange={setType}
-      />
+      {!isPastSeason && (
+        <Toggle<ViewType>
+          options={[
+            { label: 'Season', value: 'season' },
+            { label: `Week ${currentWeek}`, value: 'weekly' },
+          ]}
+          value={type}
+          onChange={setType}
+        />
+      )}
 
       {/* Column headers */}
       <View className="flex-row items-center px-4 pt-2 pb-1">
@@ -140,10 +165,16 @@ export default function LeaderboardScreen() {
   const isLongie = profile?.isLongie ?? false;
   const [filter, setFilter] = useState<Filter>('global');
   const [type, setType] = useState<ViewType>('season');
+  const [season, setSeason] = useState(currentSeason);
 
   useEffect(() => {
     if (profile?.isLongie) setFilter('longies');
   }, [profile?.isLongie]);
+
+  // Past seasons only have season view — reset weekly if user goes back in time
+  useEffect(() => {
+    if (season < currentSeason) setType('season');
+  }, [season]);
 
   const { data, isLoading, isError, refetch, isFetching } = useLeaderboard(
     filter,
@@ -195,6 +226,8 @@ export default function LeaderboardScreen() {
             type={type}
             setType={setType}
             isLongie={isLongie}
+            season={season}
+            setSeason={setSeason}
           />
         }
         ListEmptyComponent={
