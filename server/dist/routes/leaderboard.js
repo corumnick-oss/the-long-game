@@ -39,6 +39,7 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
     LEFT JOIN picks p ON p.user_id = u.id AND p.game_id = g.id
     WHERE ${userFilter}
     GROUP BY u.id, u.team_name, u.profile_image_url, u.is_longie, u.is_premium, u.is_admin
+    HAVING COUNT(p.id) > 0
     ORDER BY wins DESC, losses ASC
   `);
     const rows = result.rows ?? result;

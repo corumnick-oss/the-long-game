@@ -5,6 +5,7 @@ import { getCurrentNFLSeason, getCurrentNFLWeek } from '../../src/lib/nflSeason'
 const currentSeason = getCurrentNFLSeason();
 const currentWeek = getCurrentNFLWeek();
 const MIN_SEASON = 2025;
+const MAX_SEASON = new Date().getFullYear();
 
 type Filter = 'longies' | 'global';
 type ViewType = 'season' | 'weekly';
@@ -100,7 +101,7 @@ function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSea
   season: number;
   setSeason: (s: number) => void;
 }) {
-  const isPastSeason = season < currentSeason;
+  const isPastSeason = season < MAX_SEASON;
   return (
     <View className="px-4 pt-4 pb-2 gap-2">
       {/* Season selector */}
@@ -114,9 +115,9 @@ function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSea
         </TouchableOpacity>
         <Text className="text-white text-base font-bold">{season} Season</Text>
         <TouchableOpacity
-          onPress={() => setSeason(s => Math.min(currentSeason, s + 1))}
-          disabled={season >= currentSeason}
-          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= currentSeason ? 'opacity-30' : ''}`}
+          onPress={() => setSeason(s => Math.min(MAX_SEASON, s + 1))}
+          disabled={season >= MAX_SEASON}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= MAX_SEASON ? 'opacity-30' : ''}`}
         >
           <Text className="text-white text-base">›</Text>
         </TouchableOpacity>
@@ -173,7 +174,7 @@ export default function LeaderboardScreen() {
 
   // Past seasons only have season view — reset weekly if user goes back in time
   useEffect(() => {
-    if (season < currentSeason) setType('season');
+    if (season < MAX_SEASON) setType('season');
   }, [season]);
 
   const { data, isLoading, isError, refetch, isFetching } = useLeaderboard(
