@@ -90,22 +90,25 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
   );
 }
 
-function ListHeader({ filter, setFilter, type, setType }: {
+function ListHeader({ filter, setFilter, type, setType, isLongie }: {
   filter: Filter;
   setFilter: (f: Filter) => void;
   type: ViewType;
   setType: (t: ViewType) => void;
+  isLongie: boolean;
 }) {
   return (
     <View className="px-4 pt-4 pb-2 gap-2">
-      <Toggle<Filter>
-        options={[
-          { label: 'Longies', value: 'longies' },
-          { label: 'Global', value: 'global' },
-        ]}
-        value={filter}
-        onChange={setFilter}
-      />
+      {isLongie && (
+        <Toggle<Filter>
+          options={[
+            { label: 'Longies', value: 'longies' },
+            { label: 'Global', value: 'global' },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
+      )}
       <Toggle<ViewType>
         options={[
           { label: 'Season', value: 'season' },
@@ -127,13 +130,20 @@ function ListHeader({ filter, setFilter, type, setType }: {
   );
 }
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import { useMyProfile } from '../../src/hooks/useProfile';
 
 export default function LeaderboardScreen() {
   const router = useRouter();
-  const [filter, setFilter] = useState<Filter>('longies');
+  const { data: profile } = useMyProfile();
+  const isLongie = profile?.isLongie ?? false;
+  const [filter, setFilter] = useState<Filter>('global');
   const [type, setType] = useState<ViewType>('season');
+
+  useEffect(() => {
+    if (profile?.isLongie) setFilter('longies');
+  }, [profile?.isLongie]);
 
   const { data, isLoading, isError, refetch, isFetching } = useLeaderboard(
     filter,
@@ -184,6 +194,7 @@ export default function LeaderboardScreen() {
             setFilter={setFilter}
             type={type}
             setType={setType}
+            isLongie={isLongie}
           />
         }
         ListEmptyComponent={
