@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAuth = requireAuth;
 exports.optionalAuth = optionalAuth;
+exports.requireFirebaseToken = requireFirebaseToken;
 exports.requireAdmin = requireAdmin;
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
 const db_1 = require("../db");
@@ -51,6 +52,25 @@ async function optionalAuth(req, res, next) {
         console.error('[optionalAuth] token verification failed:', err?.message ?? err);
     }
     next();
+}
+// For endpoints that create the user record — verifies Firebase token but doesn't require DB user yet
+async function requireFirebaseToken(req, res, next) {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
+    try {
+        const decoded = await firebase_admin_1.default.auth().verifyIdToken(token);
+        req.uid = decoded.uid;
+        const user = await db_1.db.query.users.findFirst({ where: (0, drizzle_orm_1.eq)(schema_1.users.id, decoded.uid) });
+        if (user)
+            req.currentUser = user;
+        next();
+    }
+    catch {
+        res.status(401).json({ error: 'Invalid token' });
+    }
 }
 function requireAdmin(req, res, next) {
     if (!req.currentUser?.isAdmin) {

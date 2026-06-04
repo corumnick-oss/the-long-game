@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { sql, eq, and, desc, asc } from 'drizzle-orm';
-import { requireAuth, optionalAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth, requireFirebaseToken } from '../middleware/auth';
 import { getCurrentNFLSeason } from '../utils/season';
 import { isWeekLocked } from '../utils/lockTime';
 
@@ -30,7 +30,7 @@ router.patch('/me', requireAuth, async (req, res) => {
 });
 
 // POST /api/users — create user profile on first login
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireFirebaseToken, async (req, res) => {
   const { teamName, profileImageUrl } = req.body as { teamName?: string; profileImageUrl?: string };
   const uid = req.currentUser?.id ?? req.uid!;
 

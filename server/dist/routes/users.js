@@ -60,7 +60,7 @@ router.patch('/me', auth_1.requireAuth, async (req, res) => {
     res.json(updated);
 });
 // POST /api/users — create user profile on first login
-router.post('/', auth_1.requireAuth, async (req, res) => {
+router.post('/', auth_1.requireFirebaseToken, async (req, res) => {
     const { teamName, profileImageUrl } = req.body;
     const uid = req.currentUser?.id ?? req.uid;
     const existing = await db_1.db.query.users.findFirst({ where: (0, drizzle_orm_1.eq)(schema.users.id, uid) });
