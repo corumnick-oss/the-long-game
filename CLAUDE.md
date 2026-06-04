@@ -7,6 +7,27 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
+## ⚠️ DO THIS FIRST NEXT SESSION — Fix These 3 Bugs
+
+1. **Admin dashboard year selector max is 2025** — can't select 2026 to run Sync Full Season. Fix: change `adminSeason` max to use `new Date().getFullYear()` instead of `currentSeason` in admin.tsx header (same fix applied to leaderboard/picks already).
+
+2. **Week Picks tab missing year selector** — needs the same season + Preseason/Regular Season treatment as the Picks tab.
+
+3. **Team Central: 2026 preseason not available** — has a year selector but no preseason toggle. Use the same combined entry approach as the leaderboard (`‹ 2025 Season / 2026 Preseason / 2026 Season ›`).
+
+After fixing bugs, run **Admin → NFL Tools → Sync Full Preseason** and **Sync Full Regular Season** for 2026 to populate game data.
+
+---
+
+## ⚠️ ALSO CHECK AT SESSION START
+
+Files that should exist but are NOT in git (verify manually):
+- `mobile/.env` (gitignored — contains EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = 309276847432-j5unna6kj6k780gsk6fksveoklv57673.apps.googleusercontent.com)
+- `server/.env` (gitignored — contains all Railway secrets)
+- `server/dist/` (in .gitignore but force-committed — check `git ls-files server/dist | head` to confirm it's tracked)
+
+---
+
 ## Project Overview
 
 **App Name:** The Long Game
@@ -149,39 +170,17 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 - **Team Central screen** ✅ — accessible from Picks tab ("Team Central" entry button). Shows all 32 NFL teams with season W-L record and community pick accuracy. Search bar + 3 sort modes. Backend: `GET /api/teams?season=X`.
 - **Team Detail screen** ✅ — accessible from Team Central and Picks by Team. Shows team logo/record, PPG/PPG Allowed/point differential (calculated from actual game scores), community picks (total picks across all users, W-L, accuracy bar), and last 10 games with result/score/opponent. Backend: `GET /api/teams/:name?season=X`.
 
-### BLOCKED — Fix First Next Session
-
-#### Google Sign-In — Wrong OAuth Client IDs (config fix needed)
-- **Root cause:** The OAuth clients in use (`63838358971-*`) belong to a **different Google Cloud project** than the Firebase project. Firebase project GCP number is `309276847432` (from `messagingSenderId` in firebase config). The clients starting with `63838358971-` are from an entirely different GCP project. Firebase rejects ALL tokens from these clients.
-- **Errors seen (all caused by this):**
-  - `invalid_idp_response: the Google id_token is not allowed to be used with this application`
-  - `access_token audience is not for this project (auth/invalid-credential)`
-- **Fix — no code change needed, two config steps:**
-  1. **Get the correct web client ID:** Firebase Console → Authentication → Sign-in method → Google → expand "Web SDK configuration" → copy the Web client ID shown there. This is auto-created by Firebase in the correct GCP project (`309276847432-*`).
-  2. **Update `mobile/.env`:** Replace `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` with the correct client ID from step 1.
-  3. **Get the correct iOS client ID:** Google Cloud Console → select project `the-long-game-prod-bef05` → APIs & Services → Credentials → find or create an iOS OAuth client with bundle ID `com.thelonggame.picks`. Update `iosClientId` in `mobile/src/context/AuthContext.tsx` if it differs.
-  4. Push OTA with updated `.env` — OTA-deployable, no rebuild needed.
-- **Current code state:** `signInWithGoogle()` in AuthContext.tsx uses `GoogleSignin.getTokens()` to get accessToken, calls `GoogleAuthProvider.credential(null, accessToken)`. This is the correct approach once the client IDs are from the right GCP project.
-
-#### Apple Sign-In — Service ID mismatch (Firebase config fix needed)
-- **Root cause:** `expo-apple-authentication` is native iOS. The identity token Apple generates has `aud` = bundle ID (`com.thelonggame.picks`). Firebase is configured with Service ID = `com.thelonggame.picks.siwa`. These don't match → "identity provider configuration is not found".
-- **Fix — Firebase Console only, no code change:**
-  1. Firebase Console → Authentication → Sign-in method → Apple
-  2. Change **Service ID** from `com.thelonggame.picks.siwa` to `com.thelonggame.picks`
-  3. Keep Team ID (`NMR4HYNN3K`), Key ID, and Private Key exactly as-is
-  4. Save — no OTA or rebuild needed, takes effect immediately
-- **Why:** The `.siwa` Service ID is for web-based Apple Sign-In only. Native iOS Sign-In tokens use the bundle ID as the audience, so Firebase must be configured to match.
+### Auth — FIXED (June 3 2026) ✅
+- **Google Sign-In** ✅ — OAuth clients now from correct Firebase project `the-long-game-prod-bef05` (`309276847432-*`). `mobile/.env` and `AuthContext.tsx` updated. New preview build with correct `iosUrlScheme`.
+- **Apple Sign-In** ✅ — Firebase Service ID changed to `com.thelonggame.picks`. Working on preview build.
+- **New user account creation** ✅ — `requireFirebaseToken` middleware added for `POST /api/users` to allow brand-new OAuth users to create their DB record.
 
 ### Known TODOs (Before Launch)
-- **Preseason handling** — 2026 NFL preseason starts Aug 7. App needs to:
-  - Show preseason games starting Aug 7 (season flips to 2026 for preseason)
-  - Picks, leaderboard, live scores all work during preseason
-  - Preseason results tracked separately from regular season (via seasonType)
-  - Seamlessly transition to regular season games on Sept 4
-  - Design decision needed: how does `getCurrentNFLSeason()` handle the Aug 7 flip?
-- **Past seasons feature** — once 2026 season starts, users need to see 2025 historical data:
-  - Leaderboard: add season selector (like admin has) for all users
-  - Profile: add "Past Seasons" row showing W-L per season
+- **Preseason handling** ✅ — season flips August 1, preseason games synced separately via seasonType. Picks tab has Preseason/Regular toggle + P1-P4 weeks. Defaults to 2026 Preseason, flips to Regular Season Sept 7.
+- **Past seasons feature** ✅ (partial) — Leaderboard and Picks tab have season selectors. Profile past seasons row still needed.
+- **Week Picks tab** — needs year selector + preseason/regular toggle (next session)
+- **Team Central** — preseason view not yet available; needs combined entry selector like leaderboard (next session)
+- **Admin dashboard** — year selector max is 2025, can't select 2026 (next session fix)
 - **Pre-game team stats on GameCard** — BEFORE LAUNCH. Show PPG, OppPPG, total yards, pass yards/TDs, rush yards/TDs, defensive yards allowed, offensive/defensive rankings for both teams. ESPN `/summary?event={id}` predictor section. DB tables already exist (`team_game_stats`, `player_stats`).
 - **Post-game box scores on Game Detail** — BEFORE LAUNCH. Store team totals + top QB/RB/WR stats permanently after each game. Builds our own proprietary database. Same ESPN endpoint, boxscore section.
 - **Splash/onboarding screen** ✅ — built, embedded in login.tsx. Blocked by OTA issue above.
