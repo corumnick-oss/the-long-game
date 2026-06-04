@@ -14,7 +14,15 @@ const SEASON_ENTRIES: SeasonEntry[] = [
   { year: 2026, seasonType: 'preseason', label: '2026 Preseason' },
   { year: 2026, seasonType: 'regular', label: '2026 Season' },
 ];
-const DEFAULT_IDX = SEASON_ENTRIES.length - 1; // default to most recent (2026 Season)
+// Default to 2026 Preseason; switch to 2026 Regular Season on Sept 7 (day after last preseason game)
+function getDefaultEntryIdx(): number {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const afterPreseason = now >= new Date(yr, 8, 7); // Sept 7
+  if (afterPreseason) return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
+  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'preseason');
+}
+const DEFAULT_IDX = Math.max(0, getDefaultEntryIdx());
 
 function Toggle<T extends string>({
   options,

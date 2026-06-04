@@ -14,10 +14,16 @@ const CURRENT_WEEK = getCurrentNFLWeek();
 const MIN_SEASON = 2025;
 const MAX_SEASON = new Date().getFullYear();
 
+// Default to preseason; switch to regular season on Sept 7 (after last preseason game)
+function getDefaultSeasonType(): 'regular' | 'preseason' {
+  const now = new Date();
+  return now >= new Date(now.getFullYear(), 8, 7) ? 'regular' : 'preseason';
+}
+
 export default function PicksScreen() {
   const router = useRouter();
   const [season, setSeason] = useState(MAX_SEASON);
-  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
+  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>(getDefaultSeasonType);
   const [selectedWeek, setSelectedWeek] = useState(CURRENT_WEEK);
 
   // Reset to week 1 when switching season type or year
