@@ -12,11 +12,12 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
     const type = req.query['type'] ?? 'season';
     const week = req.query['week'] ? parseInt(req.query['week'], 10) : undefined;
     const filter = req.query['filter'] ?? (req.currentUser?.isLongie ? 'longies' : 'global');
+    const seasonType = req.query['seasonType'] ?? 'regular';
     const isWeekly = type === 'weekly' && week != null;
     const longiesOnly = filter === 'longies';
     const gameFilter = isWeekly
-        ? (0, drizzle_orm_1.sql) `g.season = ${season} AND g.week = ${week} AND g.sport = 'nfl'`
-        : (0, drizzle_orm_1.sql) `g.season = ${season} AND g.sport = 'nfl'`;
+        ? (0, drizzle_orm_1.sql) `g.season = ${season} AND g.week = ${week} AND g.sport = 'nfl' AND g.season_type = ${seasonType}`
+        : (0, drizzle_orm_1.sql) `g.season = ${season} AND g.sport = 'nfl' AND g.season_type = ${seasonType}`;
     const userFilter = longiesOnly ? (0, drizzle_orm_1.sql) `u.is_longie = true` : (0, drizzle_orm_1.sql) `u.nfl_access = true`;
     // Join order: users → games (filtered) → picks
     // This ensures is_correct counts only apply to the filtered game set

@@ -47,6 +47,25 @@ router.post('/games/sync', async (req, res) => {
   res.json({ synced: count, week, season });
 });
 
+// Sync all weeks for a full season + seasonType in one shot
+router.post('/games/sync-full-season', async (req, res) => {
+  const season = req.body.season ?? getCurrentNFLSeason();
+  const seasonType: 'preseason' | 'regular' = req.body.seasonType ?? 'regular';
+  const maxWeek = seasonType === 'preseason' ? 4 : 18;
+
+  let total = 0;
+  const results: { week: number; synced: number }[] = [];
+
+  for (let week = 1; week <= maxWeek; week++) {
+    const count = await syncWeekGames(week, season, seasonType);
+    total += count;
+    results.push({ week, synced: count });
+  }
+
+  await logActivity('admin_sync', `Admin synced full ${seasonType} season ${season}: ${total} games`, 'admin', { metadata: { season, seasonType, total } });
+  res.json({ total, season, seasonType, results });
+});
+
 router.patch('/games/:id', async (req, res) => {
   const { homeScore, awayScore, status, isScoreLocked } = req.body as Record<string, any>;
   const updates: Partial<typeof schema.games.$inferInsert> = {};

@@ -13,13 +13,14 @@ router.get('/', optionalAuth, async (req, res) => {
   const type = (req.query['type'] as string) ?? 'season';
   const week = req.query['week'] ? parseInt(req.query['week'] as string, 10) : undefined;
   const filter = (req.query['filter'] as string) ?? (req.currentUser?.isLongie ? 'longies' : 'global');
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
 
   const isWeekly = type === 'weekly' && week != null;
   const longiesOnly = filter === 'longies';
 
   const gameFilter = isWeekly
-    ? sql`g.season = ${season} AND g.week = ${week} AND g.sport = 'nfl'`
-    : sql`g.season = ${season} AND g.sport = 'nfl'`;
+    ? sql`g.season = ${season} AND g.week = ${week} AND g.sport = 'nfl' AND g.season_type = ${seasonType}`
+    : sql`g.season = ${season} AND g.sport = 'nfl' AND g.season_type = ${seasonType}`;
 
   const userFilter = longiesOnly ? sql`u.is_longie = true` : sql`u.nfl_access = true`;
 

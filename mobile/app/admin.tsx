@@ -8,7 +8,7 @@ import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useGames } from '@/hooks/usePicksData';
 import {
   useAdminUsers, useUpdateUser,
-  useSyncGames, useSyncScores, useSyncProbs,
+  useSyncGames, useSyncScores, useSyncProbs, useSyncFullSeason,
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
@@ -239,9 +239,13 @@ function ToolsTab({ season }: { season: number }) {
   const setResult = (key: string, msg: string) => setResults(r => ({ ...r, [key]: msg }));
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
+  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
+  const maxWeek = seasonType === 'preseason' ? 4 : 22;
+
   const syncGames = useSyncGames();
   const syncScores = useSyncScores();
   const syncProbs = useSyncProbs();
+  const syncFullSeason = useSyncFullSeason();
   const awardTrophies = useAwardTrophies();
   const unlockWeek = useUnlockWeek();
   const sendTest = useSendTestNotification();
@@ -256,8 +260,23 @@ function ToolsTab({ season }: { season: number }) {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4">
+        {/* Season type toggle */}
+        <View className="flex-row bg-surface rounded-xl p-1 my-4">
+          {(['regular', 'preseason'] as const).map(st => (
+            <TouchableOpacity
+              key={st}
+              onPress={() => { setSeasonType(st); setWeek(1); setSelectedGame(null); }}
+              className={`flex-1 py-2 rounded-lg items-center ${seasonType === st ? 'bg-primary' : ''}`}
+            >
+              <Text className={`text-sm font-semibold ${seasonType === st ? 'text-white' : 'text-muted'}`}>
+                {st === 'regular' ? 'Regular Season' : 'Preseason'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Week picker */}
-        <View className="my-5 flex-row items-center justify-center" style={{ gap: 24 }}>
+        <View className="mb-5 flex-row items-center justify-center" style={{ gap: 24 }}>
           <TouchableOpacity
             onPress={() => { setWeek(w => Math.max(1, w - 1)); setSelectedGame(null); }}
             className="w-11 h-11 bg-surface rounded-full items-center justify-center"
@@ -265,11 +284,13 @@ function ToolsTab({ season }: { season: number }) {
             <Text className="text-white text-2xl leading-7">−</Text>
           </TouchableOpacity>
           <View className="items-center" style={{ minWidth: 120 }}>
-            <Text className="text-white text-2xl font-bold">Week {week}</Text>
+            <Text className="text-white text-2xl font-bold">
+              {seasonType === 'preseason' ? `Pre ${week}` : `Week ${week}`}
+            </Text>
             <Text className="text-muted text-xs mt-0.5">{season} Season</Text>
           </View>
           <TouchableOpacity
-            onPress={() => { setWeek(w => Math.min(22, w + 1)); setSelectedGame(null); }}
+            onPress={() => { setWeek(w => Math.min(maxWeek, w + 1)); setSelectedGame(null); }}
             className="w-11 h-11 bg-surface rounded-full items-center justify-center"
           >
             <Text className="text-white text-2xl leading-7">+</Text>
@@ -280,12 +301,34 @@ function ToolsTab({ season }: { season: number }) {
         <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Sync</Text>
 
         <ActionBtn
-          label="Sync Games from ESPN"
+          label={`Sync Full ${seasonType === 'preseason' ? 'Preseason' : 'Regular Season'} (All Weeks)`}
+          loading={syncFullSeason.isPending}
+          result={results['fullsync']}
+          onPress={() =>
+            Alert.alert(
+              'Sync Full Season',
+              `Sync all ${seasonType === 'preseason' ? '4 preseason' : '18 regular season'} weeks for ${season}? This may take a minute.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Sync All',
+                  onPress: () =>
+                    syncFullSeason.mutate({ season, seasonType }, {
+                      onSuccess: (r) => setResult('fullsync', `✓ Synced ${r.total} games across all weeks`),
+                      onError: () => setResult('fullsync', '✗ Full sync failed'),
+                    }),
+                },
+              ],
+            )
+          }
+        />
+        <ActionBtn
+          label={`Sync ${seasonType === 'preseason' ? `Pre ${week}` : `Week ${week}`} from ESPN`}
           loading={syncGames.isPending}
           result={results['sync']}
           onPress={() =>
-            syncGames.mutate({ week, season }, {
-              onSuccess: (r) => setResult('sync', `✓ Synced ${r.synced} games for Week ${week}`),
+            syncGames.mutate({ week, season, seasonType }, {
+              onSuccess: (r) => setResult('sync', `✓ Synced ${r.synced} games`),
               onError: () => setResult('sync', '✗ Sync failed'),
             })
           }
@@ -307,7 +350,7 @@ function ToolsTab({ season }: { season: number }) {
           result={results['probs']}
           onPress={() =>
             syncProbs.mutate({ week, season }, {
-              onSuccess: () => setResult('probs', `✓ Win probabilities updated for Week ${week}`),
+              onSuccess: () => setResult('probs', `✓ Win probs updated`),
               onError: () => setResult('probs', '✗ Sync failed'),
             })
           }

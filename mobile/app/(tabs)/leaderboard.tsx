@@ -9,6 +9,7 @@ const MAX_SEASON = new Date().getFullYear();
 
 type Filter = 'longies' | 'global';
 type ViewType = 'season' | 'weekly';
+type SeasonType = 'regular' | 'preseason';
 
 function Toggle<T extends string>({
   options,
@@ -92,7 +93,7 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
   );
 }
 
-function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSeason }: {
+function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSeason, seasonType, setSeasonType }: {
   filter: Filter;
   setFilter: (f: Filter) => void;
   type: ViewType;
@@ -100,8 +101,10 @@ function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSea
   isLongie: boolean;
   season: number;
   setSeason: (s: number) => void;
+  seasonType: SeasonType;
+  setSeasonType: (st: SeasonType) => void;
 }) {
-  const isPastSeason = season < MAX_SEASON;
+  const isCurrentSeason = season === MAX_SEASON;
   return (
     <View className="px-4 pt-4 pb-2 gap-2">
       {/* Season selector */}
@@ -123,6 +126,16 @@ function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSea
         </TouchableOpacity>
       </View>
 
+      {/* Preseason / Regular Season toggle */}
+      <Toggle<SeasonType>
+        options={[
+          { label: 'Regular Season', value: 'regular' },
+          { label: 'Preseason', value: 'preseason' },
+        ]}
+        value={seasonType}
+        onChange={setSeasonType}
+      />
+
       {isLongie && (
         <Toggle<Filter>
           options={[
@@ -133,7 +146,7 @@ function ListHeader({ filter, setFilter, type, setType, isLongie, season, setSea
           onChange={setFilter}
         />
       )}
-      {!isPastSeason && (
+      {isCurrentSeason && seasonType === 'regular' && (
         <Toggle<ViewType>
           options={[
             { label: 'Season', value: 'season' },
@@ -167,21 +180,23 @@ export default function LeaderboardScreen() {
   const [filter, setFilter] = useState<Filter>('global');
   const [type, setType] = useState<ViewType>('season');
   const [season, setSeason] = useState(currentSeason);
+  const [seasonType, setSeasonType] = useState<SeasonType>('regular');
 
   useEffect(() => {
     if (profile?.isLongie) setFilter('longies');
   }, [profile?.isLongie]);
 
-  // Past seasons only have season view — reset weekly if user goes back in time
+  // Reset weekly view when switching away from current regular season
   useEffect(() => {
-    if (season < MAX_SEASON) setType('season');
-  }, [season]);
+    if (season < MAX_SEASON || seasonType === 'preseason') setType('season');
+  }, [season, seasonType]);
 
   const { data, isLoading, isError, refetch, isFetching } = useLeaderboard(
     filter,
     type,
     currentWeek,
     season,
+    seasonType,
   );
 
   if (isLoading) {
@@ -229,6 +244,8 @@ export default function LeaderboardScreen() {
             isLongie={isLongie}
             season={season}
             setSeason={setSeason}
+            seasonType={seasonType}
+            setSeasonType={setSeasonType}
           />
         }
         ListEmptyComponent={

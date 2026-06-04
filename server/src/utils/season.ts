@@ -6,7 +6,8 @@ export function getCurrentNFLSeason(): number {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
-  return month >= 9 ? year : year - 1;
+  // Flip to new season on August 1 — preseason starts Aug 7
+  return month >= 8 ? year : year - 1;
 }
 
 export async function getCurrentNFLWeek(): Promise<number> {

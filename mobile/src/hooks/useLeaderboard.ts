@@ -28,12 +28,13 @@ export function useLeaderboard(
   type: 'season' | 'weekly',
   week: number,
   season: number,
+  seasonType: 'regular' | 'preseason' = 'regular',
 ) {
-  const params = new URLSearchParams({ filter, type, season: String(season) });
+  const params = new URLSearchParams({ filter, type, season: String(season), seasonType });
   if (type === 'weekly') params.set('week', String(week));
 
   return useQuery({
-    queryKey: ['leaderboard', filter, type, type === 'weekly' ? week : null, season],
+    queryKey: ['leaderboard', filter, type, type === 'weekly' ? week : null, season, seasonType],
     queryFn: () => apiFetch<LeaderboardResponse>(`/api/leaderboard?${params}`),
     staleTime: 60_000,
   });

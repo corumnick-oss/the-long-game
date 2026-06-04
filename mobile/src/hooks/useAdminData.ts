@@ -137,6 +137,18 @@ export function useCancelScheduledTest() {
   });
 }
 
+export function useSyncFullSeason() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ season, seasonType }: { season: number; seasonType: 'regular' | 'preseason' }) =>
+      apiFetch<{ total: number; season: number; seasonType: string; results: { week: number; synced: number }[] }>(
+        '/api/admin/games/sync-full-season',
+        { method: 'POST', body: JSON.stringify({ season, seasonType }) },
+        user,
+      ),
+  });
+}
+
 export function useExportData() {
   const { user } = useAuth();
   return useMutation({
