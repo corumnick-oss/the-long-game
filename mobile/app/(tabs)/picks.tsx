@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
@@ -9,39 +9,80 @@ import { TiebreakerCard } from '@/components/TiebreakerCard';
 import { isWeekCurrentlyLocked } from '@/lib/lockTime';
 import type { Game } from '@/hooks/usePicksData';
 
-const SEASON = getCurrentNFLSeason();
+const CURRENT_SEASON = getCurrentNFLSeason();
+const CURRENT_WEEK = getCurrentNFLWeek();
+const MIN_SEASON = 2025;
+const MAX_SEASON = new Date().getFullYear();
 
 export default function PicksScreen() {
   const router = useRouter();
-  const currentWeek = getCurrentNFLWeek();
-  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
+  const [season, setSeason] = useState(MAX_SEASON);
+  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
+  const [selectedWeek, setSelectedWeek] = useState(CURRENT_WEEK);
 
-  const { data: games, isLoading, isError, refetch, isRefetching } = useGames(selectedWeek, SEASON);
-  const { data: tiebreaker } = useTiebreaker(selectedWeek, SEASON);
+  // Reset to week 1 when switching season type or year
+  useEffect(() => { setSelectedWeek(1); }, [season, seasonType]);
+
+  const { data: games, isLoading, isError, refetch, isRefetching } = useGames(selectedWeek, season, seasonType);
+  const { data: tiebreaker } = useTiebreaker(selectedWeek, season);
   const submitPick = useSubmitPick();
   const submitTiebreaker = useSubmitTiebreaker();
 
   const isLocked = isWeekCurrentlyLocked();
 
   const handlePick = useCallback(async (game: Game, pick: 'home' | 'away') => {
-    // Toggle off if already picked the same team
     if (game.myPick === pick) return;
-    submitPick.mutate({ gameId: game.id, pick, week: selectedWeek, season: SEASON });
-  }, [selectedWeek, submitPick]);
+    submitPick.mutate({ gameId: game.id, pick, week: selectedWeek, season });
+  }, [selectedWeek, season, submitPick]);
 
   const handleTiebreaker = useCallback(async (tiebreakerGameId: string, predictedTotal: number) => {
-    await submitTiebreaker.mutateAsync({ tiebreakerGameId, predictedTotal, week: selectedWeek, season: SEASON });
-  }, [selectedWeek, submitTiebreaker]);
+    await submitTiebreaker.mutateAsync({ tiebreakerGameId, predictedTotal, week: selectedWeek, season });
+  }, [selectedWeek, season, submitTiebreaker]);
 
   const pickedCount = games?.filter(g => g.myPick !== null).length ?? 0;
   const totalGames = games?.length ?? 0;
 
   return (
     <View className="flex-1 bg-background">
+      {/* Season selector */}
+      <View className="flex-row items-center justify-center gap-4 pt-3 pb-1">
+        <TouchableOpacity
+          onPress={() => setSeason(s => Math.max(MIN_SEASON, s - 1))}
+          disabled={season <= MIN_SEASON}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season <= MIN_SEASON ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">‹</Text>
+        </TouchableOpacity>
+        <Text className="text-white text-base font-bold">{season} Season</Text>
+        <TouchableOpacity
+          onPress={() => setSeason(s => Math.min(MAX_SEASON, s + 1))}
+          disabled={season >= MAX_SEASON}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= MAX_SEASON ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Preseason / Regular Season toggle */}
+      <View className="flex-row bg-surface rounded-xl p-1 mx-4 my-2">
+        {(['regular', 'preseason'] as const).map(st => (
+          <TouchableOpacity
+            key={st}
+            onPress={() => setSeasonType(st)}
+            className={`flex-1 py-2 rounded-lg items-center ${seasonType === st ? 'bg-primary' : ''}`}
+          >
+            <Text className={`text-sm font-semibold ${seasonType === st ? 'text-white' : 'text-muted'}`}>
+              {st === 'regular' ? 'Regular Season' : 'Preseason'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <WeekSelector
-        currentWeek={currentWeek}
+        currentWeek={season === MAX_SEASON ? CURRENT_WEEK : 18}
         selectedWeek={selectedWeek}
         onSelect={setSelectedWeek}
+        seasonType={seasonType}
       />
 
       {/* Team Central link */}
@@ -60,7 +101,7 @@ export default function PicksScreen() {
       {!isLoading && games && games.length > 0 && (
         <View className="flex-row items-center justify-between px-4 py-2">
           <Text className="text-muted text-xs">
-            Week {selectedWeek} · {isLocked ? 'Picks locked' : `${pickedCount}/${totalGames} picked`}
+            {seasonType === 'preseason' ? `Pre ${selectedWeek}` : `Week ${selectedWeek}`} · {isLocked ? 'Picks locked' : `${pickedCount}/${totalGames} picked`}
           </Text>
           {!isLocked && pickedCount > 0 && (
             <View className="bg-primary/20 rounded-full px-2 py-0.5">
@@ -97,7 +138,7 @@ export default function PicksScreen() {
               onPick={pick => handlePick(item, pick)}
               onPress={() => router.push({
                 pathname: '/game/[id]' as any,
-                params: { id: item.id, week: String(selectedWeek), season: String(SEASON) },
+                params: { id: item.id, week: String(selectedWeek), season: String(season), seasonType },
               })}
             />
           )}

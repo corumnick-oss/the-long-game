@@ -12,8 +12,9 @@ const router = Router();
 router.get('/', optionalAuth, async (req, res) => {
   const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
   const week = req.query['week'] ? parseInt(req.query['week'] as string, 10) : undefined;
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
 
-  const conditions = [eq(schema.games.season, season), eq(schema.games.sport, 'nfl')];
+  const conditions = [eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)];
   if (week) conditions.push(eq(schema.games.week, week));
 
   const gameList = await db.query.games.findMany({

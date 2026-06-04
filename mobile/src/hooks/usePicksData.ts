@@ -38,13 +38,13 @@ export type TiebreakerData = {
   isLocked: boolean;
 } | null;
 
-export function useGames(week: number, season: number) {
+export function useGames(week: number, season: number, seasonType: 'regular' | 'preseason' = 'regular') {
   const { user } = useAuth();
   return useQuery({
     // user.uid in the key means the query re-runs with auth as soon as the
     // user is confirmed — no stale unauthenticated result ever shows picks
-    queryKey: ['games', week, season, user?.uid ?? null],
-    queryFn: () => apiFetch<Game[]>(`/api/games?week=${week}&season=${season}`, undefined, user),
+    queryKey: ['games', week, season, seasonType, user?.uid ?? null],
+    queryFn: () => apiFetch<Game[]>(`/api/games?week=${week}&season=${season}&seasonType=${seasonType}`, undefined, user),
     staleTime: 30_000,
   });
 }

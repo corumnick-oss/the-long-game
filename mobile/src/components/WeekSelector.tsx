@@ -6,9 +6,11 @@ type Props = {
   selectedWeek: number;
   onSelect: (week: number) => void;
   totalWeeks?: number;
+  seasonType?: 'regular' | 'preseason';
 };
 
-export function WeekSelector({ currentWeek, selectedWeek, onSelect, totalWeeks = 18 }: Props) {
+export function WeekSelector({ currentWeek, selectedWeek, onSelect, totalWeeks, seasonType = 'regular' }: Props) {
+  const weeks = totalWeeks ?? (seasonType === 'preseason' ? 4 : 18);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export function WeekSelector({ currentWeek, selectedWeek, onSelect, totalWeeks =
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10 }}
       >
-        {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
+        {Array.from({ length: weeks }, (_, i) => i + 1).map(week => {
           const isSelected = week === selectedWeek;
           const isCurrent = week === currentWeek;
           return (
@@ -38,9 +40,9 @@ export function WeekSelector({ currentWeek, selectedWeek, onSelect, totalWeeks =
               style={isCurrent && !isSelected ? { borderWidth: 1, borderColor: '#3b82f6' } : undefined}
             >
               <Text
-                className={`text-sm font-semibold ${isSelected ? 'text-white' : isCurrent ? 'text-primary' : 'text-muted'}`}
+                className={`text-xs font-semibold ${isSelected ? 'text-white' : isCurrent ? 'text-primary' : 'text-muted'}`}
               >
-                {week}
+                {seasonType === 'preseason' ? `P${week}` : week}
               </Text>
             </TouchableOpacity>
           );
