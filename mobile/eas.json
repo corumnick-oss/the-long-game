@@ -8,13 +8,23 @@
       "distribution": "internal",
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "309276847432-j5unna6kj6k780gsk6fksveoklv57673.apps.googleusercontent.com"
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "309276847432-j5unna6kj6k780gsk6fksveoklv57673.apps.googleusercontent.com"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "309276847432-j5unna6kj6k780gsk6fksveoklv57673.apps.googleusercontent.com"
+      }
     }
   },
   "submit": {

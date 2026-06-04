@@ -19,7 +19,7 @@ import { API_BASE } from '../lib/queryClient';
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  iosClientId: '63838358971-fv3guakh4ib42uag36n98jp121fr7m0h.apps.googleusercontent.com',
+  iosClientId: '309276847432-bnou8iej3ud65ai014pa1fh70gdtm6e1.apps.googleusercontent.com',
   offlineAccess: false,
 });
 
@@ -83,9 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     await GoogleSignin.hasPlayServices();
-    const { data } = await GoogleSignin.signIn();
-    if (!data?.idToken) throw new Error('No ID token from Google');
-    const credential = GoogleAuthProvider.credential(data.idToken);
+    await GoogleSignin.signIn();
+    const { accessToken } = await GoogleSignin.getTokens();
+    const credential = GoogleAuthProvider.credential(null, accessToken);
     const result = await signInWithCredential(auth, credential);
     await syncUserToBackend(result.user);
   };
