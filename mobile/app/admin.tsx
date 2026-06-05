@@ -651,9 +651,9 @@ export default function AdminScreen() {
             {adminSeason}
           </Text>
           <TouchableOpacity
-            onPress={() => setAdminSeason(s => Math.min(currentSeason, s + 1))}
+            onPress={() => setAdminSeason(s => Math.min(maxSeason, s + 1))}
             disabled={adminSeason >= maxSeason}
-            className={`w-7 h-7 bg-surface rounded-full items-center justify-center ${adminSeason >= currentSeason ? 'opacity-30' : ''}`}
+            className={`w-7 h-7 bg-surface rounded-full items-center justify-center ${adminSeason >= maxSeason ? 'opacity-30' : ''}`}
           >
             <Text className="text-white text-base leading-5">›</Text>
           </TouchableOpacity>
