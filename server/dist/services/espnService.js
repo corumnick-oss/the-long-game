@@ -32,31 +32,45 @@ function parseStatus(state) {
 function totalRecord(comp) {
     return comp.records?.find(r => r.type === 'total')?.summary ?? null;
 }
-// Fallback sync for future seasons where ESPN's scoreboard API returns no events.
-// Uses the core API to get event IDs, then fetches each via the summary endpoint.
-async function syncWeekGamesFromCoreApi(week, season, seasonType) {
+// Sync for future seasons: ESPN's scoreboard and core API are blocked from server-side
+// requests. Instead, collect event IDs by fetching each team's schedule (same domain
+// as summary/winprobs — works from Railway), then fetch a summary per unique event.
+async function syncWeekGamesFromTeamSchedules(week, season, seasonType) {
     const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-    const coreUrl = `${CORE_BASE}/seasons/${season}/types/${st}/weeks/${week}/events?limit=100`;
-    let coreData;
+    // Step 1: get all 32 team IDs
+    let teamIds = [];
     try {
-        const resp = await axios_1.default.get(coreUrl, { headers: ESPN_HEADERS });
-        coreData = resp.data;
+        const teamsResp = await axios_1.default.get(`${BASE}/teams?limit=100`, { headers: ESPN_HEADERS });
+        const items = teamsResp.data?.sports?.[0]?.leagues?.[0]?.teams ?? [];
+        teamIds = items.map((t) => t.team?.id).filter(Boolean);
     }
     catch (err) {
-        // Week not available in core API (e.g. preseason schedule not published yet)
-        console.warn(`[ESPN] core API unavailable for ${seasonType} ${season} week ${week}:`, err?.message);
+        throw new Error(`Failed to fetch NFL teams: ${err?.message}`);
+    }
+    if (teamIds.length === 0)
+        throw new Error('No NFL teams returned from ESPN');
+    // Step 2: collect unique event IDs for the requested week from all team schedules
+    const eventIds = new Set();
+    for (const teamId of teamIds) {
+        try {
+            const schedResp = await axios_1.default.get(`${BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`, { headers: ESPN_HEADERS });
+            const events = schedResp.data?.events ?? [];
+            for (const ev of events) {
+                if (ev.week?.number === week && ev.id) {
+                    eventIds.add(String(ev.id));
+                }
+            }
+        }
+        catch { /* skip teams that fail */ }
+    }
+    if (eventIds.size === 0) {
+        console.warn(`[ESPN] no events found via team schedules for ${seasonType} ${season} week ${week}`);
         return 0;
     }
-    const refs = coreData.items ?? [];
-    if (refs.length === 0)
-        return 0;
-    const eventIds = refs
-        .map(r => r.$ref.match(/events\/(\d+)/)?.[1])
-        .filter((id) => !!id);
-    // Process first event without try-catch so any error surfaces to the caller
-    // with a useful message rather than silently returning 0.
+    // Step 3: fetch summary + upsert for each unique event
+    const allEventIds = [...eventIds];
     let upserted = 0;
-    for (const eventId of eventIds) {
+    for (const eventId of allEventIds) {
         const { data } = await axios_1.default.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
         const comp = data.header?.competitions?.[0];
         if (!comp) {
@@ -115,7 +129,7 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
     // For future seasons ESPN's scoreboard returns 400 or wrong-year data from server-side requests.
     // Skip it entirely and use the core API which has the actual schedule.
     if (season > (0, season_1.getCurrentNFLSeason)()) {
-        return syncWeekGamesFromCoreApi(week, season, seasonType);
+        return syncWeekGamesFromTeamSchedules(week, season, seasonType);
     }
     const st = SEASON_TYPE_MAP[seasonType] ?? 2;
     const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
