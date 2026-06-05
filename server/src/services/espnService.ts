@@ -8,6 +8,12 @@ import { notifyGameFinal } from './notificationService';
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 const CORE_BASE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
 
+// ESPN blocks server-side requests without a browser UA on some endpoints
+const ESPN_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'Accept': 'application/json',
+};
+
 // 1=preseason, 2=regular, 3=postseason
 const SEASON_TYPE_MAP: Record<string, number> = { preseason: 1, regular: 2, postseason: 3 };
 
@@ -50,7 +56,7 @@ async function syncWeekGamesFromCoreApi(week: number, season: number, seasonType
 
   let coreData: { items?: Array<{ $ref: string }> };
   try {
-    const resp = await axios.get<{ items?: Array<{ $ref: string }> }>(coreUrl);
+    const resp = await axios.get<{ items?: Array<{ $ref: string }> }>(coreUrl, { headers: ESPN_HEADERS });
     coreData = resp.data;
   } catch (err: any) {
     // Week not available in core API (e.g. preseason schedule not published yet)
@@ -69,7 +75,7 @@ async function syncWeekGamesFromCoreApi(week: number, season: number, seasonType
   // with a useful message rather than silently returning 0.
   let upserted = 0;
   for (const eventId of eventIds) {
-    const { data } = await axios.get(`${BASE}/summary?event=${eventId}`);
+    const { data } = await axios.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
     const comp = data.header?.competitions?.[0];
     if (!comp) { console.warn(`[ESPN] no competition in summary for event ${eventId}`); continue; }
 
@@ -124,18 +130,19 @@ async function syncWeekGamesFromCoreApi(week: number, season: number, seasonType
 }
 
 export async function syncWeekGames(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
+  // For future seasons ESPN's scoreboard returns 400 or wrong-year data from server-side requests.
+  // Skip it entirely and use the core API which has the actual schedule.
+  if (season > getCurrentNFLSeason()) {
+    return syncWeekGamesFromCoreApi(week, season, seasonType);
+  }
+
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
   const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
 
-  const { data } = await axios.get<{ events?: ESPNEvent[]; season?: { year?: number } }>(url);
+  const { data } = await axios.get<{ events?: ESPNEvent[] }>(url, { headers: ESPN_HEADERS });
   const events = data.events ?? [];
 
-  // ESPN ignores future season params and silently returns current-season data.
-  // Detect this by comparing returned season.year to what we asked for.
-  const returnedYear = data.season?.year;
-  if (events.length === 0 || (returnedYear != null && returnedYear !== season)) {
-    return syncWeekGamesFromCoreApi(week, season, seasonType);
-  }
+  if (events.length === 0) return 0;
 
   // Pre-fetch existing games to detect in→post transitions for notifications
   const existingGames = await db.query.games.findMany({ where: eq(games.week, week) });
@@ -247,7 +254,7 @@ export async function syncWeekScores(week: number, season: number, seasonType: '
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
   const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
 
-  const { data } = await axios.get<{ events: ESPNEvent[] }>(url);
+  const { data } = await axios.get<{ events: ESPNEvent[] }>(url, { headers: ESPN_HEADERS });
   const events = data.events ?? [];
 
   let updated = 0;

@@ -234,7 +234,8 @@ function ScoreEditor({
 // ── NFL Tools Tab ──────────────────────────────────────────────────────────────
 
 function ToolsTab({ season }: { season: number }) {
-  const [week, setWeek] = useState(getCurrentNFLWeek());
+  const currentSeason = getCurrentNFLSeason();
+  const [week, setWeek] = useState(() => season > currentSeason ? 1 : getCurrentNFLWeek());
   const [results, setResults] = useState<Record<string, string>>({});
   const setResult = (key: string, msg: string) => setResults(r => ({ ...r, [key]: msg }));
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);

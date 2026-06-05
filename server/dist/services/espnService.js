@@ -15,6 +15,11 @@ const season_1 = require("../utils/season");
 const notificationService_1 = require("./notificationService");
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 const CORE_BASE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
+// ESPN blocks server-side requests without a browser UA on some endpoints
+const ESPN_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+};
 // 1=preseason, 2=regular, 3=postseason
 const SEASON_TYPE_MAP = { preseason: 1, regular: 2, postseason: 3 };
 function parseStatus(state) {
@@ -34,7 +39,7 @@ async function syncWeekGamesFromCoreApi(week, season, seasonType) {
     const coreUrl = `${CORE_BASE}/seasons/${season}/types/${st}/weeks/${week}/events?limit=100`;
     let coreData;
     try {
-        const resp = await axios_1.default.get(coreUrl);
+        const resp = await axios_1.default.get(coreUrl, { headers: ESPN_HEADERS });
         coreData = resp.data;
     }
     catch (err) {
@@ -52,7 +57,7 @@ async function syncWeekGamesFromCoreApi(week, season, seasonType) {
     // with a useful message rather than silently returning 0.
     let upserted = 0;
     for (const eventId of eventIds) {
-        const { data } = await axios_1.default.get(`${BASE}/summary?event=${eventId}`);
+        const { data } = await axios_1.default.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
         const comp = data.header?.competitions?.[0];
         if (!comp) {
             console.warn(`[ESPN] no competition in summary for event ${eventId}`);
@@ -107,16 +112,17 @@ async function syncWeekGamesFromCoreApi(week, season, seasonType) {
     return upserted;
 }
 async function syncWeekGames(week, season, seasonType = 'regular') {
-    const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
-    const { data } = await axios_1.default.get(url);
-    const events = data.events ?? [];
-    // ESPN ignores future season params and silently returns current-season data.
-    // Detect this by comparing returned season.year to what we asked for.
-    const returnedYear = data.season?.year;
-    if (events.length === 0 || (returnedYear != null && returnedYear !== season)) {
+    // For future seasons ESPN's scoreboard returns 400 or wrong-year data from server-side requests.
+    // Skip it entirely and use the core API which has the actual schedule.
+    if (season > (0, season_1.getCurrentNFLSeason)()) {
         return syncWeekGamesFromCoreApi(week, season, seasonType);
     }
+    const st = SEASON_TYPE_MAP[seasonType] ?? 2;
+    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
+    const { data } = await axios_1.default.get(url, { headers: ESPN_HEADERS });
+    const events = data.events ?? [];
+    if (events.length === 0)
+        return 0;
     // Pre-fetch existing games to detect in→post transitions for notifications
     const existingGames = await db_1.db.query.games.findMany({ where: (0, drizzle_orm_1.eq)(schema_1.games.week, week) });
     const existingByEspnId = new Map(existingGames.map(g => [g.espnId, g]));
@@ -214,7 +220,7 @@ async function updateLiveScores() {
 async function syncWeekScores(week, season, seasonType = 'regular') {
     const st = SEASON_TYPE_MAP[seasonType] ?? 2;
     const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
-    const { data } = await axios_1.default.get(url);
+    const { data } = await axios_1.default.get(url, { headers: ESPN_HEADERS });
     const events = data.events ?? [];
     let updated = 0;
     for (const event of events) {

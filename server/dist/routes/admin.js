@@ -94,17 +94,17 @@ router.post('/games/sync-full-season', async (req, res) => {
     const maxWeek = seasonType === 'preseason' ? 4 : 18;
     let total = 0;
     const results = [];
-    try {
-        for (let week = 1; week <= maxWeek; week++) {
+    for (let week = 1; week <= maxWeek; week++) {
+        try {
             const count = await (0, espnService_1.syncWeekGames)(week, season, seasonType);
             total += count;
             results.push({ week, synced: count });
         }
-    }
-    catch (err) {
-        const msg = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message ?? 'Unknown error');
-        res.status(500).json({ error: `ESPN sync failed: ${msg}` });
-        return;
+        catch (err) {
+            const msg = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message ?? 'Unknown error');
+            results.push({ week, synced: 0 });
+            console.warn(`[sync] week ${week} failed: ${msg}`);
+        }
     }
     await (0, activity_1.logActivity)('admin_sync', `Admin synced full ${seasonType} season ${season}: ${total} games`, 'admin', { metadata: { season, seasonType, total } });
     res.json({ total, season, seasonType, results });
