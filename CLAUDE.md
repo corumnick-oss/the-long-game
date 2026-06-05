@@ -7,15 +7,16 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Fix These 3 Bugs
+## ⚠️ DO THIS FIRST NEXT SESSION
 
-1. **Admin dashboard year selector max is 2025** — can't select 2026 to run Sync Full Season. Fix: change `adminSeason` max to use `new Date().getFullYear()` instead of `currentSeason` in admin.tsx header (same fix applied to leaderboard/picks already).
+After starting, run **Admin → NFL Tools → Sync Full Preseason** and **Sync Full Regular Season** for 2026 to populate game data.
 
-2. **Week Picks tab missing year selector** — needs the same season + Preseason/Regular Season treatment as the Picks tab.
-
-3. **Team Central: 2026 preseason not available** — has a year selector but no preseason toggle. Use the same combined entry approach as the leaderboard (`‹ 2025 Season / 2026 Preseason / 2026 Season ›`).
-
-After fixing bugs, run **Admin → NFL Tools → Sync Full Preseason** and **Sync Full Regular Season** for 2026 to populate game data.
+Previously fixed bugs (done June 4 2026):
+- ✅ Admin year selector now defaults to and allows 2026
+- ✅ Week Picks tab has season selector + preseason/regular toggle
+- ✅ Team Central uses combined entry selector with preseason support
+- ✅ GameCard team names are tappable → Team Detail
+- ✅ Backend picks/week and teams routes support seasonType param
 
 ---
 
@@ -178,9 +179,9 @@ See memory file for exact patch: `eas-cli-windows-fix.md`
 ### Known TODOs (Before Launch)
 - **Preseason handling** ✅ — season flips August 1, preseason games synced separately via seasonType. Picks tab has Preseason/Regular toggle + P1-P4 weeks. Defaults to 2026 Preseason, flips to Regular Season Sept 7.
 - **Past seasons feature** ✅ (partial) — Leaderboard and Picks tab have season selectors. Profile past seasons row still needed.
-- **Week Picks tab** — needs year selector + preseason/regular toggle (next session)
-- **Team Central** — preseason view not yet available; needs combined entry selector like leaderboard (next session)
-- **Admin dashboard** — year selector max is 2025, can't select 2026 (next session fix)
+- **Week Picks tab** ✅ — season selector + preseason/regular toggle added (June 4 2026)
+- **Team Central** ✅ — combined entry selector with preseason support added (June 4 2026)
+- **Admin dashboard** ✅ — year selector max fixed to current year (June 4 2026)
 - **Pre-game team stats on GameCard** — BEFORE LAUNCH. Show PPG, OppPPG, total yards, pass yards/TDs, rush yards/TDs, defensive yards allowed, offensive/defensive rankings for both teams. ESPN `/summary?event={id}` predictor section. DB tables already exist (`team_game_stats`, `player_stats`).
 - **Post-game box scores on Game Detail** — BEFORE LAUNCH. Store team totals + top QB/RB/WR stats permanently after each game. Builds our own proprietary database. Same ESPN endpoint, boxscore section.
 - **Splash/onboarding screen** ✅ — built, embedded in login.tsx. Blocked by OTA issue above.
