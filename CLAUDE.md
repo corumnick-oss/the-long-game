@@ -7,9 +7,47 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION
+## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync (IN PROGRESS, needs fix)
 
-After starting, run **Admin → NFL Tools → Sync Full Preseason** and **Sync Full Regular Season** for 2026 to populate game data.
+**Goal:** Populate the DB with 2026 NFL game schedules so the Picks tab shows games.
+
+**Current state (as of June 4 2026):** The admin sync for 2026 games is partially working but needs more investigation. The latest deployed approach (commit `65307ac`) uses team schedules to collect event IDs, then fetches summaries. Railway has NOT been tested yet after this commit — test it first thing.
+
+**To test:** Admin → NFL Tools → set to 2026 → Regular Season → manually set week to 1 (week defaults to 18 in offseason) → tap "Sync Week 1 from ESPN". If it shows ✓ Synced 16 games, it worked. Then try Full Season sync.
+
+---
+
+### What We Know About the ESPN + Railway Problem
+
+**Root cause:** ESPN's APIs behave differently when called server-side from Railway vs from a browser/mobile app.
+
+| Endpoint | Browser | Railway |
+|---|---|---|
+| `site.api.espn.com/scoreboard?season=2026` | Returns 2025 data (ignores season param) | Returns HTTP 400 |
+| `sports.core.api.espn.com/seasons/2026/...` | Returns 2026 event refs ✓ | Returns HTTP 400 (proxies to internal `.pvt` network) |
+| `site.api.espn.com/summary?event={2025-id}` | Works ✓ | Works ✓ (win probs uses this) |
+| `site.api.espn.com/summary?event={2026-id}` | Works ✓ | Unknown — not yet confirmed |
+| `site.api.espn.com/teams/{id}/schedule?season=2026` | Works, 7 events ✓ | Should work (same domain as summary) — not yet confirmed from Railway |
+
+**What we tried (in order):**
+1. `&dates=2026` on scoreboard → ESPN returns "Failed to get events endpoint" (400) — REMOVED
+2. `season=2026` on scoreboard (no dates) → ESPN silently returns 2025 data from browser, 400 from Railway
+3. ESPN core API (`sports.core.api.espn.com`) → 400 from Railway; ESPN proxies to internal `.pvt` network that's blocked
+4. Detect wrong-season by checking `data.season.year` → correct detection, but still blocked by Railway before reaching that check
+5. Bypass scoreboard entirely for `season > getCurrentNFLSeason()`, go straight to core API → core API is also blocked from Railway
+6. Add browser User-Agent to all requests → didn't fix Railway blocking
+7. **Current approach (not yet tested from Railway):** Fetch all 32 team schedules from `site.api.espn.com/teams/{id}/schedule?season=2026`, collect unique event IDs per week, fetch `summary?event={id}` for each. This stays entirely on `site.api.espn.com` which Railway can reach.
+
+**Known limitation:** ESPN's team schedule only shows the first ~8 weeks of the 2026 season. Weeks 9-18 will sync 0 games until ESPN adds them (probably August). That's acceptable for now.
+
+**If team-schedule approach also fails:**
+- Try fetching `summary?event=401872931` (known 2026 KC week 1 event ID) directly from a Railway test endpoint
+- If that 400s, ESPN is blocking Railway from accessing any 2026 event data
+- If it 200s, the team schedule collection step is failing — debug that specifically
+
+**Admin week default bug:** `getCurrentNFLWeek()` returns 18 in the offseason. The admin NFL Tools week picker defaults to 18. User needs to manually tap `−` to get to week 1. OTA fix pending (admin.tsx change: `useState(() => season > currentSeason ? 1 : getCurrentNFLWeek())`).
+
+---
 
 Previously fixed bugs (done June 4 2026):
 - ✅ Admin year selector now defaults to and allows 2026
