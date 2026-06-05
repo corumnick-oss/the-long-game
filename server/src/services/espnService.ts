@@ -6,6 +6,7 @@ import { getCurrentNFLSeason } from '../utils/season';
 import { notifyGameFinal } from './notificationService';
 
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+const CORE_BASE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
 
 // 1=preseason, 2=regular, 3=postseason
 const SEASON_TYPE_MAP: Record<string, number> = { preseason: 1, regular: 2, postseason: 3 };
@@ -41,12 +42,92 @@ function totalRecord(comp: ESPNCompetitor): string | null {
   return comp.records?.find(r => r.type === 'total')?.summary ?? null;
 }
 
+// Fallback sync for future seasons where ESPN's scoreboard API returns no events.
+// Uses the core API to get event IDs, then fetches each via the summary endpoint.
+async function syncWeekGamesFromCoreApi(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason'): Promise<number> {
+  const st = SEASON_TYPE_MAP[seasonType] ?? 2;
+  const coreUrl = `${CORE_BASE}/seasons/${season}/types/${st}/weeks/${week}/events?limit=100`;
+  const { data: coreData } = await axios.get<{ items: Array<{ $ref: string }> }>(coreUrl);
+  const refs = coreData.items ?? [];
+  if (refs.length === 0) return 0;
+
+  const eventIds = refs
+    .map(r => r.$ref.match(/events\/(\d+)/)?.[1])
+    .filter((id): id is string => !!id);
+
+  let upserted = 0;
+  for (const eventId of eventIds) {
+    try {
+      const { data } = await axios.get(`${BASE}/summary?event=${eventId}`);
+      const comp = data.header?.competitions?.[0];
+      if (!comp) continue;
+
+      const home = comp.competitors?.find((c: any) => c.homeAway === 'home');
+      const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
+      if (!home || !away) continue;
+
+      const pickcenter = Array.isArray(data.pickcenter) ? data.pickcenter[0] : null;
+      const spreadVal = pickcenter?.spread != null ? parseFloat(pickcenter.spread) : null;
+
+      const status = parseStatus(comp.status?.type?.state ?? 'pre');
+      const rawHomeScore = home.score ?? comp.score;
+      const rawAwayScore = away.score;
+      const homeScore = rawHomeScore != null ? parseInt(String(rawHomeScore), 10) : null;
+      const awayScore = rawAwayScore != null ? parseInt(String(rawAwayScore), 10) : null;
+
+      const row = {
+        espnId: String(eventId),
+        week,
+        season,
+        seasonType,
+        sport: 'nfl',
+        homeTeam: home.team?.displayName ?? '',
+        awayTeam: away.team?.displayName ?? '',
+        homeTeamLogo: home.team?.logo ?? null,
+        awayTeamLogo: away.team?.logo ?? null,
+        homeTeamRecord: totalRecord(home),
+        awayTeamRecord: totalRecord(away),
+        spread: spreadVal,
+        favoriteTeam: null as string | null,
+        gameTime: comp.date ? new Date(comp.date) : null,
+        status,
+        homeScore: homeScore != null && !isNaN(homeScore) ? homeScore : null,
+        awayScore: awayScore != null && !isNaN(awayScore) ? awayScore : null,
+        period: comp.status?.period ?? null,
+        displayClock: comp.status?.displayClock ?? null,
+        statusType: comp.status?.type?.name ?? null,
+        isScoreLocked: false,
+      };
+
+      await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
+        target: games.espnId,
+        set: {
+          status: row.status, homeScore: row.homeScore, awayScore: row.awayScore,
+          homeTeamRecord: row.homeTeamRecord, awayTeamRecord: row.awayTeamRecord,
+          period: row.period, displayClock: row.displayClock, statusType: row.statusType,
+          homeTeamLogo: row.homeTeamLogo, awayTeamLogo: row.awayTeamLogo,
+          spread: row.spread, favoriteTeam: row.favoriteTeam, gameTime: row.gameTime,
+        },
+      });
+      upserted++;
+    } catch (err) {
+      console.error(`[ESPN] core-api fallback: failed event ${eventId}:`, err);
+    }
+  }
+  return upserted;
+}
+
 export async function syncWeekGames(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
   const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
 
-  const { data } = await axios.get<{ events: ESPNEvent[] }>(url);
+  const { data } = await axios.get<{ events?: ESPNEvent[] }>(url);
   const events = data.events ?? [];
+
+  // ESPN's scoreboard doesn't serve future-season schedules — fall back to core API
+  if (events.length === 0) {
+    return syncWeekGamesFromCoreApi(week, season, seasonType);
+  }
 
   // Pre-fetch existing games to detect in→post transitions for notifications
   const existingGames = await db.query.games.findMany({ where: eq(games.week, week) });
