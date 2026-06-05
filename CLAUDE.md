@@ -7,13 +7,13 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync (IN PROGRESS, needs fix)
+## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync (IN PROGRESS)
 
 **Goal:** Populate the DB with 2026 NFL game schedules so the Picks tab shows games.
 
-**Current state (as of June 4 2026):** The admin sync for 2026 games is partially working but needs more investigation. The latest deployed approach (commit `65307ac`) uses team schedules to collect event IDs, then fetches summaries. Railway has NOT been tested yet after this commit — test it first thing.
+**Current state (as of June 4 2026 end-of-day):** Latest deployed approach (commit `65307ac`) hard-coded team IDs are NOT yet in place — see fix below. Test first thing next session.
 
-**To test:** Admin → NFL Tools → set to 2026 → Regular Season → manually set week to 1 (week defaults to 18 in offseason) → tap "Sync Week 1 from ESPN". If it shows ✓ Synced 16 games, it worked. Then try Full Season sync.
+**To test:** Admin → NFL Tools → set to 2026 → Regular Season → manually set week to 1 (week defaults to 18 in offseason) → tap "Sync Week 1 from ESPN". If it shows ✓ Synced ~16 games, it worked.
 
 ---
 
@@ -23,29 +23,40 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 | Endpoint | Browser | Railway |
 |---|---|---|
-| `site.api.espn.com/scoreboard?season=2026` | Returns 2025 data (ignores season param) | Returns HTTP 400 |
-| `sports.core.api.espn.com/seasons/2026/...` | Returns 2026 event refs ✓ | Returns HTTP 400 (proxies to internal `.pvt` network) |
+| `site.api.espn.com/scoreboard?season=2026` | Returns 2025 data (ignores season) | HTTP 400 |
+| `sports.core.api.espn.com/seasons/2026/...` | Returns 2026 event refs ✓ | HTTP 400 (proxies to internal `.pvt` network) |
 | `site.api.espn.com/summary?event={2025-id}` | Works ✓ | Works ✓ (win probs uses this) |
-| `site.api.espn.com/summary?event={2026-id}` | Works ✓ | Unknown — not yet confirmed |
-| `site.api.espn.com/teams/{id}/schedule?season=2026` | Works, 7 events ✓ | Should work (same domain as summary) — not yet confirmed from Railway |
+| `site.api.espn.com/summary?event={2026-id}` | Works ✓ | **Unknown** — not yet confirmed |
+| `site.api.espn.com/teams?limit=100` | Works ✓ | HTTP 400 ✗ (confirmed broken) |
+| `site.api.espn.com/teams/{id}/schedule?season=2026` | Works, ~7 events ✓ | **Unknown** — not yet confirmed |
 
 **What we tried (in order):**
-1. `&dates=2026` on scoreboard → ESPN returns "Failed to get events endpoint" (400) — REMOVED
-2. `season=2026` on scoreboard (no dates) → ESPN silently returns 2025 data from browser, 400 from Railway
-3. ESPN core API (`sports.core.api.espn.com`) → 400 from Railway; ESPN proxies to internal `.pvt` network that's blocked
-4. Detect wrong-season by checking `data.season.year` → correct detection, but still blocked by Railway before reaching that check
-5. Bypass scoreboard entirely for `season > getCurrentNFLSeason()`, go straight to core API → core API is also blocked from Railway
-6. Add browser User-Agent to all requests → didn't fix Railway blocking
-7. **Current approach (not yet tested from Railway):** Fetch all 32 team schedules from `site.api.espn.com/teams/{id}/schedule?season=2026`, collect unique event IDs per week, fetch `summary?event={id}` for each. This stays entirely on `site.api.espn.com` which Railway can reach.
+1. `&dates=2026` on scoreboard → ESPN returns "Failed to get events endpoint" (400) — removed
+2. `season=2026` on scoreboard alone → ESPN returns 2025 data from browser, HTTP 400 from Railway
+3. ESPN core API (`sports.core.api.espn.com`) → HTTP 400 from Railway; ESPN proxies to internal `.pvt` network
+4. Detect wrong-season via `data.season.year` → correct detection but blocked before we get there
+5. Bypass scoreboard for future seasons, go straight to core API → core API also blocked
+6. Add browser User-Agent to all requests → no effect on Railway blocking
+7. Fetch 32 team schedules (step 1: get team list from `teams?limit=100`) → **HTTP 400** from Railway
+8. **Next fix to try:** Hard-code the 32 NFL ESPN team IDs — skip the `teams` list call entirely, go straight to per-team schedule calls
 
-**Known limitation:** ESPN's team schedule only shows the first ~8 weeks of the 2026 season. Weeks 9-18 will sync 0 games until ESPN adds them (probably August). That's acceptable for now.
+**Latest test results (June 4 2026):**
+- "Sync Full Regular Season (All Weeks)" → "Synced 0 games across all weeks" (teams list fails per-week, gets swallowed)
+- "Sync Week 1 from ESPN" → "ESPN sync failed: Failed to fetch NFL teams: Request failed with status code 400"
 
-**If team-schedule approach also fails:**
-- Try fetching `summary?event=401872931` (known 2026 KC week 1 event ID) directly from a Railway test endpoint
-- If that 400s, ESPN is blocking Railway from accessing any 2026 event data
-- If it 200s, the team schedule collection step is failing — debug that specifically
+**Next fix to implement:** Hard-code ESPN team IDs (list below) in `syncWeekGamesFromTeamSchedules`. This skips the blocked `teams?limit=100` call. If team schedule calls also return 400, we'll need a different approach entirely (e.g. a proxy, or wait for ESPN's scoreboard to serve 2026 data closer to the season).
 
-**Admin week default bug:** `getCurrentNFLWeek()` returns 18 in the offseason. The admin NFL Tools week picker defaults to 18. User needs to manually tap `−` to get to week 1. OTA fix pending (admin.tsx change: `useState(() => season > currentSeason ? 1 : getCurrentNFLWeek())`).
+**Known 32 ESPN NFL team IDs:**
+```
+1=ATL, 2=BUF, 3=CHI, 4=CIN, 5=CLE, 6=DAL, 7=DEN, 8=DET, 9=GB, 10=TEN,
+11=IND, 12=KC, 13=LV, 14=LAR, 15=MIA, 16=MIN, 17=NE, 18=NO, 19=NYG, 20=NYJ,
+21=PHI, 22=ARI, 23=PIT, 24=LAC, 25=SF, 26=SEA, 27=TB, 28=WSH, 29=CAR, 30=JAX,
+33=BAL, 34=HOU
+```
+
+**Known limitation:** Team schedule only shows first ~8 weeks of 2026. Weeks 9-18 return 0 until ESPN adds them (probably August). Acceptable for now.
+
+**Admin week default bug:** `getCurrentNFLWeek()` returns 18 in offseason. Admin NFL Tools week defaults to 18. User must manually tap `−` to week 1 before syncing. OTA fix already coded in admin.tsx, pending push.
 
 ---
 

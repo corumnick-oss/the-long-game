@@ -8,6 +8,15 @@ import { notifyGameFinal } from './notificationService';
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 const CORE_BASE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
 
+// ESPN's /teams list endpoint returns 400 from Railway (server-side blocked).
+// Hard-code the 32 stable ESPN NFL team IDs so we can skip that call.
+const NFL_TEAM_IDS = [
+  '1','2','3','4','5','6','7','8','9','10',
+  '11','12','13','14','15','16','17','18','19','20',
+  '21','22','23','24','25','26','27','28','29','30',
+  '33','34', // Ravens (33), Texans (34) — IDs 31/32 unused
+];
+
 // ESPN blocks server-side requests without a browser UA on some endpoints
 const ESPN_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -54,16 +63,8 @@ function totalRecord(comp: ESPNCompetitor): string | null {
 async function syncWeekGamesFromTeamSchedules(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason'): Promise<number> {
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
 
-  // Step 1: get all 32 team IDs
-  let teamIds: string[] = [];
-  try {
-    const teamsResp = await axios.get(`${BASE}/teams?limit=100`, { headers: ESPN_HEADERS });
-    const items: any[] = teamsResp.data?.sports?.[0]?.leagues?.[0]?.teams ?? [];
-    teamIds = items.map((t: any) => t.team?.id).filter(Boolean);
-  } catch (err: any) {
-    throw new Error(`Failed to fetch NFL teams: ${err?.message}`);
-  }
-  if (teamIds.length === 0) throw new Error('No NFL teams returned from ESPN');
+  // Step 1: use hard-coded team IDs — ESPN's /teams list returns 400 from Railway
+  const teamIds = NFL_TEAM_IDS;
 
   // Step 2: collect unique event IDs for the requested week from all team schedules
   const eventIds = new Set<string>();
