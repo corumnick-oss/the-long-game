@@ -3,8 +3,20 @@ import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, TextI
 import { useRouter } from 'expo-router';
 import { useTeamList, type TeamSummary } from '@/hooks/useTeams';
 
-const MIN_SEASON = 2025;
-const MAX_SEASON = new Date().getFullYear();
+type SeasonEntry = { year: number; seasonType: 'regular' | 'preseason'; label: string };
+const SEASON_ENTRIES: SeasonEntry[] = [
+  { year: 2025, seasonType: 'regular', label: '2025 Season' },
+  { year: 2026, seasonType: 'preseason', label: '2026 Preseason' },
+  { year: 2026, seasonType: 'regular', label: '2026 Season' },
+];
+function getDefaultEntryIdx(): number {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const afterPreseason = now >= new Date(yr, 8, 7);
+  if (afterPreseason) return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
+  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'preseason');
+}
+const DEFAULT_IDX = Math.max(0, getDefaultEntryIdx());
 
 type SortKey = 'record' | 'pick-accuracy' | 'name';
 
@@ -89,10 +101,11 @@ function SortToggle({ value, onChange }: { value: SortKey; onChange: (k: SortKey
 
 export default function TeamCentralScreen() {
   const router = useRouter();
-  const [season, setSeason] = useState(MAX_SEASON);
+  const [entryIdx, setEntryIdx] = useState(DEFAULT_IDX);
+  const entry = SEASON_ENTRIES[entryIdx]!;
   const [sort, setSort] = useState<SortKey>('record');
   const [search, setSearch] = useState('');
-  const { data = [], isLoading, isError } = useTeamList(season);
+  const { data = [], isLoading, isError } = useTeamList(entry.year, entry.seasonType);
 
   const sorted = useMemo(() => {
     let list = search.trim()
@@ -121,17 +134,17 @@ export default function TeamCentralScreen() {
       {/* Season selector */}
       <View className="flex-row items-center justify-center gap-4 py-3 border-b border-border">
         <TouchableOpacity
-          onPress={() => setSeason(s => Math.max(MIN_SEASON, s - 1))}
-          disabled={season <= MIN_SEASON}
-          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season <= MIN_SEASON ? 'opacity-30' : ''}`}
+          onPress={() => setEntryIdx(i => Math.max(0, i - 1))}
+          disabled={entryIdx <= 0}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${entryIdx <= 0 ? 'opacity-30' : ''}`}
         >
           <Text className="text-white text-base">‹</Text>
         </TouchableOpacity>
-        <Text className="text-white text-base font-bold">{season} Season</Text>
+        <Text className="text-white text-base font-bold">{entry.label}</Text>
         <TouchableOpacity
-          onPress={() => setSeason(s => Math.min(MAX_SEASON, s + 1))}
-          disabled={season >= MAX_SEASON}
-          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= MAX_SEASON ? 'opacity-30' : ''}`}
+          onPress={() => setEntryIdx(i => Math.min(SEASON_ENTRIES.length - 1, i + 1))}
+          disabled={entryIdx >= SEASON_ENTRIES.length - 1}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${entryIdx >= SEASON_ENTRIES.length - 1 ? 'opacity-30' : ''}`}
         >
           <Text className="text-white text-base">›</Text>
         </TouchableOpacity>
@@ -177,7 +190,7 @@ export default function TeamCentralScreen() {
           renderItem={({ item }) => (
             <TeamRow
               item={item}
-              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.name, season: String(season) } })}
+              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.name, season: String(entry.year), seasonType: entry.seasonType } })}
             />
           )}
           showsVerticalScrollIndicator={false}

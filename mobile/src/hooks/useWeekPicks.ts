@@ -28,13 +28,13 @@ export type WeekPicksResponse = {
   picksByUser: Record<string, Record<string, { pick: 'home' | 'away'; isCorrect: boolean | null }>>;
 };
 
-export function useWeekPicks(week: number, season: number) {
+export function useWeekPicks(week: number, season: number, seasonType: 'regular' | 'preseason' = 'regular') {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['week-picks', week, season, user?.uid ?? null],
+    queryKey: ['week-picks', week, season, seasonType, user?.uid ?? null],
     queryFn: () =>
       apiFetch<WeekPicksResponse>(
-        `/api/picks/week?week=${week}&season=${season}`,
+        `/api/picks/week?week=${week}&season=${season}&seasonType=${seasonType}`,
         undefined,
         user,
       ),

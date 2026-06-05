@@ -158,7 +158,7 @@ export default function PicksByTeamScreen() {
           renderItem={({ item }) => (
             <TeamRow
               item={item}
-              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.team } })}
+              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.team, season: String(SEASON), seasonType: 'regular' } })}
             />
           )}
           showsVerticalScrollIndicator={false}

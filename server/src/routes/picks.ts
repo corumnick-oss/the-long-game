@@ -32,13 +32,14 @@ router.get('/', requireAuth, async (req, res) => {
 router.get('/week', requireAuth, async (req, res) => {
   const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
   const week = parseInt(req.query['week'] as string, 10);
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
 
   if (!week) { res.status(400).json({ error: 'week is required' }); return; }
 
   const locked = await isWeekLocked(week, season);
 
   const weekGames = await db.query.games.findMany({
-    where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl')),
+    where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
     orderBy: [asc(schema.games.gameTime)],
   });
 

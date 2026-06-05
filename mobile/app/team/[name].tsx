@@ -3,8 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useTeamDetail, type RecentGame } from '@/hooks/useTeams';
 
-const SEASON = getCurrentNFLSeason();
-
 function StatPill({ label, value }: { label: string; value: string | number | null }) {
   return (
     <View className="flex-1 bg-surface rounded-xl p-3 items-center">
@@ -60,8 +58,10 @@ function GameRow({ game }: { game: RecentGame }) {
 
 export default function TeamDetailScreen() {
   const router = useRouter();
-  const { name } = useLocalSearchParams<{ name: string }>();
-  const { data: team, isLoading, isError } = useTeamDetail(name ?? '', SEASON);
+  const { name, season: seasonParam, seasonType: seasonTypeParam } = useLocalSearchParams<{ name: string; season?: string; seasonType?: string }>();
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentNFLSeason();
+  const seasonType = (seasonTypeParam as 'regular' | 'preseason') ?? 'regular';
+  const { data: team, isLoading, isError } = useTeamDetail(name ?? '', season, seasonType);
 
   if (isLoading) {
     return (
@@ -97,7 +97,7 @@ export default function TeamDetailScreen() {
         </TouchableOpacity>
         <View className="flex-1 items-center">
           <Text className="text-white font-bold text-base" numberOfLines={1}>{team.name}</Text>
-          <Text className="text-muted text-xs">{SEASON} Season</Text>
+          <Text className="text-muted text-xs">{season} {seasonType === 'preseason' ? 'Preseason' : 'Season'}</Text>
         </View>
         <View style={{ width: 56 }} />
       </View>

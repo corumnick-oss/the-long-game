@@ -40,9 +40,9 @@ const drizzle_orm_1 = require("drizzle-orm");
 const auth_1 = require("../middleware/auth");
 const season_1 = require("../utils/season");
 const router = (0, express_1.Router)();
-async function buildTeamStats(season) {
+async function buildTeamStats(season, seasonType = 'regular') {
     const allGames = await db_1.db.query.games.findMany({
-        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
     });
     const teams = {};
     const ensure = (name, logo) => {
@@ -106,16 +106,18 @@ async function buildTeamStats(season) {
 // GET /api/teams?season=X — all teams with stats
 router.get('/', auth_1.optionalAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
-    const teams = await buildTeamStats(season);
+    const seasonType = req.query['seasonType'] ?? 'regular';
+    const teams = await buildTeamStats(season, seasonType);
     teams.sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name));
     res.json(teams);
 });
 // GET /api/teams/:name?season=X — team detail with recent games
 router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.query['seasonType'] ?? 'regular';
     const teamName = decodeURIComponent(req.params['name']);
     const allGames = await db_1.db.query.games.findMany({
-        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
     });
     const teamGames = allGames.filter(g => g.homeTeam === teamName || g.awayTeam === teamName).sort((a, b) => {
         const at = a.gameTime ? new Date(a.gameTime).getTime() : 0;

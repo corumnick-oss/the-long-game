@@ -146,6 +146,10 @@ export default function PicksScreen() {
                 pathname: '/game/[id]' as any,
                 params: { id: item.id, week: String(selectedWeek), season: String(season), seasonType },
               })}
+              onTeamPress={teamName => router.push({
+                pathname: '/team/[name]' as any,
+                params: { name: teamName, season: String(season), seasonType },
+              })}
             />
           )}
           ListHeaderComponent={<View className="h-2" />}

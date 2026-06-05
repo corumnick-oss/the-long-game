@@ -62,13 +62,14 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
 router.get('/week', auth_1.requireAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
     const week = parseInt(req.query['week'], 10);
+    const seasonType = req.query['seasonType'] ?? 'regular';
     if (!week) {
         res.status(400).json({ error: 'week is required' });
         return;
     }
     const locked = await (0, lockTime_1.isWeekLocked)(week, season);
     const weekGames = await db_1.db.query.games.findMany({
-        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
         orderBy: [(0, drizzle_orm_1.asc)(schema.games.gameTime)],
     });
     if (!locked) {

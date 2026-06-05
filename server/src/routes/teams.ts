@@ -7,9 +7,9 @@ import { getCurrentNFLSeason } from '../utils/season';
 
 const router = Router();
 
-async function buildTeamStats(season: number) {
+async function buildTeamStats(season: number, seasonType: string = 'regular') {
   const allGames = await db.query.games.findMany({
-    where: and(eq(schema.games.season, season), eq(schema.games.sport, 'nfl')),
+    where: and(eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
   });
 
   type TeamData = {
@@ -85,7 +85,8 @@ async function buildTeamStats(season: number) {
 // GET /api/teams?season=X — all teams with stats
 router.get('/', optionalAuth, async (req, res) => {
   const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
-  const teams = await buildTeamStats(season);
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
+  const teams = await buildTeamStats(season, seasonType);
   teams.sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name));
   res.json(teams);
 });
@@ -93,10 +94,11 @@ router.get('/', optionalAuth, async (req, res) => {
 // GET /api/teams/:name?season=X — team detail with recent games
 router.get('/:name', optionalAuth, async (req, res) => {
   const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
   const teamName = decodeURIComponent(req.params['name'] as string);
 
   const allGames = await db.query.games.findMany({
-    where: and(eq(schema.games.season, season), eq(schema.games.sport, 'nfl')),
+    where: and(eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
   });
 
   const teamGames = allGames.filter(

@@ -1,14 +1,28 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   ActivityIndicator, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
+import { getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useWeekPicks, type WeekPicksGame, type WeekPicksUser } from '@/hooks/useWeekPicks';
 import { WeekSelector } from '@/components/WeekSelector';
 
-const SEASON = getCurrentNFLSeason();
+type SeasonEntry = { year: number; seasonType: 'regular' | 'preseason'; label: string };
+const SEASON_ENTRIES: SeasonEntry[] = [
+  { year: 2025, seasonType: 'regular', label: '2025 Season' },
+  { year: 2026, seasonType: 'preseason', label: '2026 Preseason' },
+  { year: 2026, seasonType: 'regular', label: '2026 Season' },
+];
+function getDefaultEntryIdx(): number {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const afterPreseason = now >= new Date(yr, 8, 7);
+  if (afterPreseason) return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
+  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'preseason');
+}
+const DEFAULT_IDX = Math.max(0, getDefaultEntryIdx());
+
 const CELL = 52;   // px per game column
 const NAME_W = 88; // px for the fixed name column
 
@@ -97,35 +111,36 @@ function PickCell({
 export default function WeekPicksScreen() {
   const router = useRouter();
   const currentWeek = getCurrentNFLWeek();
+  const [entryIdx, setEntryIdx] = useState(DEFAULT_IDX);
+  const entry = SEASON_ENTRIES[entryIdx]!;
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
-  const { data, isLoading, isError, refetch } = useWeekPicks(selectedWeek, SEASON);
+  const { data, isLoading, isError, refetch } = useWeekPicks(selectedWeek, entry.year, entry.seasonType);
 
-  // Synchronized horizontal scroll across header + all user rows
+  useEffect(() => { setSelectedWeek(1); }, [entryIdx]);
+
+  // Synchronized horizontal scroll across header + all user rows.
+  // isSyncing blocks echo events: scrollTo fires onScroll on the target view,
+  // which would re-trigger syncScroll without the lock. rAF resets the lock
+  // in ~1 frame so every legitimate user scroll event still propagates.
   const headerScrollRef = useRef<ScrollView>(null);
   const rowScrollRefs = useRef<(ScrollView | null)[]>([]);
-  // Track which view the user is actively touching so we only propagate from that source.
-  // programmatic scrollTo on the other views fires onScroll too — those echoes are ignored
-  // because their view ID won't match scrollSource/momentumSource.
-  const scrollSource = useRef<'header' | number | null>(null);
-  const momentumSource = useRef<'header' | number | null>(null);
-
-  const isActiveSource = (id: 'header' | number) =>
-    scrollSource.current === id || momentumSource.current === id;
+  const isSyncing = useRef(false);
 
   const syncScroll = (x: number, skipHeader: boolean, skipRowIdx: number | null) => {
+    if (isSyncing.current) return;
+    isSyncing.current = true;
     if (!skipHeader) headerScrollRef.current?.scrollTo({ x, animated: false });
     rowScrollRefs.current.forEach((ref, i) => {
       if (i !== skipRowIdx) ref?.scrollTo({ x, animated: false });
     });
+    requestAnimationFrame(() => { isSyncing.current = false; });
   };
 
   const onHeaderScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!isActiveSource('header')) return;
     syncScroll(e.nativeEvent.contentOffset.x, true, null);
   };
 
   const onRowScroll = (e: NativeSyntheticEvent<NativeScrollEvent>, rowIdx: number) => {
-    if (!isActiveSource(rowIdx)) return;
     syncScroll(e.nativeEvent.contentOffset.x, false, rowIdx);
   };
 
@@ -155,10 +170,30 @@ export default function WeekPicksScreen() {
 
   return (
     <View className="flex-1 bg-background">
+      {/* Season selector */}
+      <View className="flex-row items-center justify-center gap-4 py-3 border-b border-border">
+        <TouchableOpacity
+          onPress={() => setEntryIdx(i => Math.max(0, i - 1))}
+          disabled={entryIdx <= 0}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${entryIdx <= 0 ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">‹</Text>
+        </TouchableOpacity>
+        <Text className="text-white text-base font-bold">{entry.label}</Text>
+        <TouchableOpacity
+          onPress={() => setEntryIdx(i => Math.min(SEASON_ENTRIES.length - 1, i + 1))}
+          disabled={entryIdx >= SEASON_ENTRIES.length - 1}
+          className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${entryIdx >= SEASON_ENTRIES.length - 1 ? 'opacity-30' : ''}`}
+        >
+          <Text className="text-white text-base">›</Text>
+        </TouchableOpacity>
+      </View>
+
       <WeekSelector
-        currentWeek={currentWeek}
+        currentWeek={entry.year === new Date().getFullYear() ? currentWeek : 0}
         selectedWeek={selectedWeek}
         onSelect={setSelectedWeek}
+        seasonType={entry.seasonType}
       />
 
       {/* Before lock: show message for current week, allow browsing past weeks */}
@@ -169,7 +204,7 @@ export default function WeekPicksScreen() {
             Picks are hidden
           </Text>
           <Text className="text-muted text-sm text-center">
-            Everyone's picks for Week {selectedWeek} will appear here after Wednesday 9 PM lock.
+            Everyone's picks for {entry.seasonType === 'preseason' ? `Pre ${selectedWeek}` : `Week ${selectedWeek}`} will appear here after Wednesday 9 PM lock.
           </Text>
           {selectedWeek > 1 && (
             <Text className="text-muted text-xs text-center mt-4">
@@ -179,7 +214,7 @@ export default function WeekPicksScreen() {
         </View>
       ) : games.length === 0 ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-muted text-sm">No games found for Week {selectedWeek}</Text>
+          <Text className="text-muted text-sm">No games found for {entry.seasonType === 'preseason' ? `Pre ${selectedWeek}` : `Week ${selectedWeek}`}</Text>
         </View>
       ) : (
         <View className="flex-1">
@@ -193,10 +228,6 @@ export default function WeekPicksScreen() {
               horizontal
               onScroll={onHeaderScroll}
               scrollEventThrottle={16}
-              onScrollBeginDrag={() => { scrollSource.current = 'header'; }}
-              onScrollEndDrag={() => { scrollSource.current = null; }}
-              onMomentumScrollBegin={() => { momentumSource.current = 'header'; }}
-              onMomentumScrollEnd={() => { momentumSource.current = null; }}
               bounces={false}
               overScrollMode="never"
               showsHorizontalScrollIndicator={false}
@@ -207,7 +238,7 @@ export default function WeekPicksScreen() {
                   game={game}
                   onPress={() => router.push({
                     pathname: '/game/[id]' as any,
-                    params: { id: game.id, week: String(selectedWeek), season: String(SEASON) },
+                    params: { id: game.id, week: String(selectedWeek), season: String(entry.year), seasonType: entry.seasonType },
                   })}
                 />
               ))}
@@ -251,10 +282,6 @@ export default function WeekPicksScreen() {
                   horizontal
                   onScroll={e => onRowScroll(e, rowIdx)}
                   scrollEventThrottle={16}
-                  onScrollBeginDrag={() => { scrollSource.current = rowIdx; }}
-                  onScrollEndDrag={() => { scrollSource.current = null; }}
-                  onMomentumScrollBegin={() => { momentumSource.current = rowIdx; }}
-                  onMomentumScrollEnd={() => { momentumSource.current = null; }}
                   bounces={false}
                   overScrollMode="never"
                   showsHorizontalScrollIndicator={false}

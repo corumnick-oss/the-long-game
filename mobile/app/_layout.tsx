@@ -31,7 +31,7 @@ function AuthGate() {
     if (isLoading) return;
     const inAuthGroup = segments[0] === '(auth)';
     const inTabsGroup = segments[0] === '(tabs)';
-    const inNamedRoute = segments[0] === 'game' || segments[0] === 'user' || segments[0] === 'admin' || segments[0] === 'picks-by-team' || segments[0] === 'team';
+    const inNamedRoute = segments[0] === 'game' || segments[0] === 'user' || segments[0] === 'admin' || segments[0] === 'picks-by-team' || segments[0] === 'team' || segments[0] === 'team-central';
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {

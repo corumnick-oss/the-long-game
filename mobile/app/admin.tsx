@@ -623,9 +623,10 @@ export default function AdminScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('users');
 
-  // Season selector — defaults to current, allows viewing past seasons
+  // Season selector — defaults to current calendar year so admin can sync 2026 games
   const currentSeason = getCurrentNFLSeason();
-  const [adminSeason, setAdminSeason] = useState(currentSeason);
+  const maxSeason = new Date().getFullYear();
+  const [adminSeason, setAdminSeason] = useState(maxSeason);
   const minSeason = 2025;
 
   return (
@@ -651,7 +652,7 @@ export default function AdminScreen() {
           </Text>
           <TouchableOpacity
             onPress={() => setAdminSeason(s => Math.min(currentSeason, s + 1))}
-            disabled={adminSeason >= currentSeason}
+            disabled={adminSeason >= maxSeason}
             className={`w-7 h-7 bg-surface rounded-full items-center justify-center ${adminSeason >= currentSeason ? 'opacity-30' : ''}`}
           >
             <Text className="text-white text-base leading-5">›</Text>

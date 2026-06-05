@@ -6,6 +6,7 @@ type Props = {
   isLocked: boolean;
   onPick: (pick: 'home' | 'away') => void;
   onPress?: () => void;
+  onTeamPress?: (teamName: string) => void;
 };
 
 function formatGameTime(iso: string): string {
@@ -51,6 +52,7 @@ function TeamRow({
   showPct: boolean;
   pickOutcome: 'correct' | 'wrong' | 'pending' | null;
   onPress: () => void;
+  onTeamPress?: () => void;
   disabled: boolean;
 }) {
   const showScore = isFinal || isLive;
@@ -98,9 +100,11 @@ function TeamRow({
       {/* Team info */}
       <View className="flex-1">
         <View className="flex-row items-center">
-          <Text className={`font-semibold text-base ${winnerBg ? 'text-green-400' : 'text-white'}`} numberOfLines={1}>
-            {team}
-          </Text>
+          <TouchableOpacity onPress={onTeamPress} activeOpacity={onTeamPress ? 0.6 : 1} disabled={!onTeamPress}>
+            <Text className={`font-semibold text-base ${winnerBg ? 'text-green-400' : 'text-white'}`} numberOfLines={1}>
+              {team}
+            </Text>
+          </TouchableOpacity>
           {isPicked && (
             <View className={`ml-2 rounded px-1.5 py-0.5 ${badgeStyle}`}>
               <Text className="text-white text-xs font-bold">{badgeLabel}</Text>
@@ -134,7 +138,7 @@ function TeamRow({
   );
 }
 
-export function GameCard({ game, isLocked, onPick, onPress }: Props) {
+export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props) {
   const isFinal = game.status === 'post';
   const isLive = game.status === 'in';
   const isPre = game.status === 'pre';
@@ -202,6 +206,7 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
         showPct={showPct}
         pickOutcome={awayPickOutcome}
         onPress={() => onPick('away')}
+        onTeamPress={onTeamPress ? () => onTeamPress(game.awayTeam) : undefined}
         disabled={!canPick}
       />
 
@@ -241,6 +246,7 @@ export function GameCard({ game, isLocked, onPick, onPress }: Props) {
         showPct={showPct}
         pickOutcome={homePickOutcome}
         onPress={() => onPick('home')}
+        onTeamPress={onTeamPress ? () => onTeamPress(game.homeTeam) : undefined}
         disabled={!canPick}
       />
 

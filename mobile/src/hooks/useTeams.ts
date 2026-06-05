@@ -32,20 +32,20 @@ export type TeamDetail = TeamSummary & {
   recentGames: RecentGame[];
 };
 
-export function useTeamList(season: number) {
+export function useTeamList(season: number, seasonType: 'regular' | 'preseason' = 'regular') {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['teams', season],
-    queryFn: () => apiFetch<TeamSummary[]>(`/api/teams?season=${season}`, undefined, user),
+    queryKey: ['teams', season, seasonType],
+    queryFn: () => apiFetch<TeamSummary[]>(`/api/teams?season=${season}&seasonType=${seasonType}`, undefined, user),
     staleTime: 300_000,
   });
 }
 
-export function useTeamDetail(name: string, season: number) {
+export function useTeamDetail(name: string, season: number, seasonType: 'regular' | 'preseason' = 'regular') {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['team', name, season],
-    queryFn: () => apiFetch<TeamDetail>(`/api/teams/${encodeURIComponent(name)}?season=${season}`, undefined, user),
+    queryKey: ['team', name, season, seasonType],
+    queryFn: () => apiFetch<TeamDetail>(`/api/teams/${encodeURIComponent(name)}?season=${season}&seasonType=${seasonType}`, undefined, user),
     staleTime: 300_000,
     enabled: !!name,
   });
