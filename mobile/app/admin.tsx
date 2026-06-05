@@ -315,7 +315,7 @@ function ToolsTab({ season }: { season: number }) {
                   onPress: () =>
                     syncFullSeason.mutate({ season, seasonType }, {
                       onSuccess: (r) => setResult('fullsync', `✓ Synced ${r.total} games across all weeks`),
-                      onError: () => setResult('fullsync', '✗ Full sync failed'),
+                      onError: (e: any) => setResult('fullsync', `✗ ${e?.message ?? 'Full sync failed'}`),
                     }),
                 },
               ],
@@ -329,7 +329,7 @@ function ToolsTab({ season }: { season: number }) {
           onPress={() =>
             syncGames.mutate({ week, season, seasonType }, {
               onSuccess: (r) => setResult('sync', `✓ Synced ${r.synced} games`),
-              onError: () => setResult('sync', '✗ Sync failed'),
+              onError: (e: any) => setResult('sync', `✗ ${e?.message ?? 'Sync failed'}`),
             })
           }
         />
