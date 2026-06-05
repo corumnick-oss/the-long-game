@@ -28,7 +28,7 @@ function totalRecord(comp) {
 }
 async function syncWeekGames(week, season, seasonType = 'regular') {
     const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&dates=${season}&limit=50`;
+    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
     const { data } = await axios_1.default.get(url);
     const events = data.events ?? [];
     // Pre-fetch existing games to detect in→post transitions for notifications
@@ -127,7 +127,7 @@ async function updateLiveScores() {
 }
 async function syncWeekScores(week, season, seasonType = 'regular') {
     const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&dates=${season}&limit=50`;
+    const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
     const { data } = await axios_1.default.get(url);
     const events = data.events ?? [];
     let updated = 0;
