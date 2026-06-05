@@ -32,7 +32,16 @@ function totalRecord(comp) {
 async function syncWeekGamesFromCoreApi(week, season, seasonType) {
     const st = SEASON_TYPE_MAP[seasonType] ?? 2;
     const coreUrl = `${CORE_BASE}/seasons/${season}/types/${st}/weeks/${week}/events?limit=100`;
-    const { data: coreData } = await axios_1.default.get(coreUrl);
+    let coreData;
+    try {
+        const resp = await axios_1.default.get(coreUrl);
+        coreData = resp.data;
+    }
+    catch (err) {
+        // Week not available in core API (e.g. preseason schedule not published yet)
+        console.warn(`[ESPN] core API unavailable for ${seasonType} ${season} week ${week}:`, err?.message);
+        return 0;
+    }
     const refs = coreData.items ?? [];
     if (refs.length === 0)
         return 0;
@@ -103,8 +112,10 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
     const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
     const { data } = await axios_1.default.get(url);
     const events = data.events ?? [];
-    // ESPN's scoreboard doesn't serve future-season schedules — fall back to core API
-    if (events.length === 0) {
+    // ESPN ignores future season params and silently returns current-season data.
+    // Detect this by comparing returned season.year to what we asked for.
+    const returnedYear = data.season?.year;
+    if (events.length === 0 || (returnedYear != null && returnedYear !== season)) {
         return syncWeekGamesFromCoreApi(week, season, seasonType);
     }
     // Pre-fetch existing games to detect in→post transitions for notifications

@@ -47,7 +47,17 @@ function totalRecord(comp: ESPNCompetitor): string | null {
 async function syncWeekGamesFromCoreApi(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason'): Promise<number> {
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
   const coreUrl = `${CORE_BASE}/seasons/${season}/types/${st}/weeks/${week}/events?limit=100`;
-  const { data: coreData } = await axios.get<{ items: Array<{ $ref: string }> }>(coreUrl);
+
+  let coreData: { items?: Array<{ $ref: string }> };
+  try {
+    const resp = await axios.get<{ items?: Array<{ $ref: string }> }>(coreUrl);
+    coreData = resp.data;
+  } catch (err: any) {
+    // Week not available in core API (e.g. preseason schedule not published yet)
+    console.warn(`[ESPN] core API unavailable for ${seasonType} ${season} week ${week}:`, err?.message);
+    return 0;
+  }
+
   const refs = coreData.items ?? [];
   if (refs.length === 0) return 0;
 
@@ -121,11 +131,13 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
   const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
 
-  const { data } = await axios.get<{ events?: ESPNEvent[] }>(url);
+  const { data } = await axios.get<{ events?: ESPNEvent[]; season?: { year?: number } }>(url);
   const events = data.events ?? [];
 
-  // ESPN's scoreboard doesn't serve future-season schedules — fall back to core API
-  if (events.length === 0) {
+  // ESPN ignores future season params and silently returns current-season data.
+  // Detect this by comparing returned season.year to what we asked for.
+  const returnedYear = data.season?.year;
+  if (events.length === 0 || (returnedYear != null && returnedYear !== season)) {
     return syncWeekGamesFromCoreApi(week, season, seasonType);
   }
 
