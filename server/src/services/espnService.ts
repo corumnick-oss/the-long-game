@@ -65,64 +65,60 @@ async function syncWeekGamesFromCoreApi(week: number, season: number, seasonType
     .map(r => r.$ref.match(/events\/(\d+)/)?.[1])
     .filter((id): id is string => !!id);
 
+  // Process first event without try-catch so any error surfaces to the caller
+  // with a useful message rather than silently returning 0.
   let upserted = 0;
   for (const eventId of eventIds) {
-    try {
-      const { data } = await axios.get(`${BASE}/summary?event=${eventId}`);
-      const comp = data.header?.competitions?.[0];
-      if (!comp) continue;
+    const { data } = await axios.get(`${BASE}/summary?event=${eventId}`);
+    const comp = data.header?.competitions?.[0];
+    if (!comp) { console.warn(`[ESPN] no competition in summary for event ${eventId}`); continue; }
 
-      const home = comp.competitors?.find((c: any) => c.homeAway === 'home');
-      const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
-      if (!home || !away) continue;
+    const home = comp.competitors?.find((c: any) => c.homeAway === 'home');
+    const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
+    if (!home || !away) { console.warn(`[ESPN] missing competitors for event ${eventId}`); continue; }
 
-      const pickcenter = Array.isArray(data.pickcenter) ? data.pickcenter[0] : null;
-      const spreadVal = pickcenter?.spread != null ? parseFloat(pickcenter.spread) : null;
+    const pickcenter = Array.isArray(data.pickcenter) ? data.pickcenter[0] : null;
+    const spreadVal = pickcenter?.spread != null ? parseFloat(pickcenter.spread) : null;
 
-      const status = parseStatus(comp.status?.type?.state ?? 'pre');
-      const rawHomeScore = home.score ?? comp.score;
-      const rawAwayScore = away.score;
-      const homeScore = rawHomeScore != null ? parseInt(String(rawHomeScore), 10) : null;
-      const awayScore = rawAwayScore != null ? parseInt(String(rawAwayScore), 10) : null;
+    const status = parseStatus(comp.status?.type?.state ?? 'pre');
+    const homeScore = home.score != null ? parseInt(String(home.score), 10) : null;
+    const awayScore = away.score != null ? parseInt(String(away.score), 10) : null;
 
-      const row = {
-        espnId: String(eventId),
-        week,
-        season,
-        seasonType,
-        sport: 'nfl',
-        homeTeam: home.team?.displayName ?? '',
-        awayTeam: away.team?.displayName ?? '',
-        homeTeamLogo: home.team?.logo ?? null,
-        awayTeamLogo: away.team?.logo ?? null,
-        homeTeamRecord: totalRecord(home),
-        awayTeamRecord: totalRecord(away),
-        spread: spreadVal,
-        favoriteTeam: null as string | null,
-        gameTime: comp.date ? new Date(comp.date) : null,
-        status,
-        homeScore: homeScore != null && !isNaN(homeScore) ? homeScore : null,
-        awayScore: awayScore != null && !isNaN(awayScore) ? awayScore : null,
-        period: comp.status?.period ?? null,
-        displayClock: comp.status?.displayClock ?? null,
-        statusType: comp.status?.type?.name ?? null,
-        isScoreLocked: false,
-      };
+    const row = {
+      espnId: String(eventId),
+      week,
+      season,
+      seasonType,
+      sport: 'nfl',
+      homeTeam: home.team?.displayName ?? '',
+      awayTeam: away.team?.displayName ?? '',
+      homeTeamLogo: home.team?.logo ?? null,
+      awayTeamLogo: away.team?.logo ?? null,
+      homeTeamRecord: totalRecord(home),
+      awayTeamRecord: totalRecord(away),
+      spread: spreadVal,
+      favoriteTeam: null as string | null,
+      gameTime: comp.date ? new Date(comp.date) : null,
+      status,
+      homeScore: homeScore != null && !isNaN(homeScore) ? homeScore : null,
+      awayScore: awayScore != null && !isNaN(awayScore) ? awayScore : null,
+      period: comp.status?.period ?? null,
+      displayClock: comp.status?.displayClock ?? null,
+      statusType: comp.status?.type?.name ?? null,
+      isScoreLocked: false,
+    };
 
-      await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
-        target: games.espnId,
-        set: {
-          status: row.status, homeScore: row.homeScore, awayScore: row.awayScore,
-          homeTeamRecord: row.homeTeamRecord, awayTeamRecord: row.awayTeamRecord,
-          period: row.period, displayClock: row.displayClock, statusType: row.statusType,
-          homeTeamLogo: row.homeTeamLogo, awayTeamLogo: row.awayTeamLogo,
-          spread: row.spread, favoriteTeam: row.favoriteTeam, gameTime: row.gameTime,
-        },
-      });
-      upserted++;
-    } catch (err) {
-      console.error(`[ESPN] core-api fallback: failed event ${eventId}:`, err);
-    }
+    await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
+      target: games.espnId,
+      set: {
+        status: row.status, homeScore: row.homeScore, awayScore: row.awayScore,
+        homeTeamRecord: row.homeTeamRecord, awayTeamRecord: row.awayTeamRecord,
+        period: row.period, displayClock: row.displayClock, statusType: row.statusType,
+        homeTeamLogo: row.homeTeamLogo, awayTeamLogo: row.awayTeamLogo,
+        spread: row.spread, favoriteTeam: row.favoriteTeam, gameTime: row.gameTime,
+      },
+    });
+    upserted++;
   }
   return upserted;
 }
