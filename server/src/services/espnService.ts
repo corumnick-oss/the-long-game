@@ -102,60 +102,72 @@ async function syncWeekGamesFromTeamSchedules(week: number, season: number, seas
   }
 
   // Step 3: fetch summary + upsert for each unique event
-  const allEventIds = [...eventIds];
+  return syncGamesByEventIds([...eventIds], week, season, seasonType);
+}
 
+// Sync games from a known list of ESPN event IDs via /summary (works from Railway).
+// Used by both the server-side team-schedule path and the mobile-assisted path for future seasons.
+export async function syncGamesByEventIds(
+  eventIds: string[],
+  week: number,
+  season: number,
+  seasonType: 'regular' | 'preseason' | 'postseason',
+): Promise<number> {
   let upserted = 0;
-  for (const eventId of allEventIds) {
-    const { data } = await axios.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
-    const comp = data.header?.competitions?.[0];
-    if (!comp) { console.warn(`[ESPN] no competition in summary for event ${eventId}`); continue; }
+  for (const eventId of eventIds) {
+    try {
+      const { data } = await axios.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
+      const comp = data.header?.competitions?.[0];
+      if (!comp) { console.warn(`[ESPN] no competition in summary for event ${eventId}`); continue; }
 
-    const home = comp.competitors?.find((c: any) => c.homeAway === 'home');
-    const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
-    if (!home || !away) { console.warn(`[ESPN] missing competitors for event ${eventId}`); continue; }
+      const home = comp.competitors?.find((c: any) => c.homeAway === 'home');
+      const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
+      if (!home || !away) { console.warn(`[ESPN] missing competitors for event ${eventId}`); continue; }
 
-    const pickcenter = Array.isArray(data.pickcenter) ? data.pickcenter[0] : null;
-    const spreadVal = pickcenter?.spread != null ? parseFloat(pickcenter.spread) : null;
+      const pickcenter = Array.isArray(data.pickcenter) ? data.pickcenter[0] : null;
+      const spreadVal = pickcenter?.spread != null ? parseFloat(pickcenter.spread) : null;
+      const status = parseStatus(comp.status?.type?.state ?? 'pre');
+      const homeScore = home.score != null ? parseInt(String(home.score), 10) : null;
+      const awayScore = away.score != null ? parseInt(String(away.score), 10) : null;
 
-    const status = parseStatus(comp.status?.type?.state ?? 'pre');
-    const homeScore = home.score != null ? parseInt(String(home.score), 10) : null;
-    const awayScore = away.score != null ? parseInt(String(away.score), 10) : null;
+      const row = {
+        espnId: String(eventId),
+        week,
+        season,
+        seasonType,
+        sport: 'nfl',
+        homeTeam: home.team?.displayName ?? '',
+        awayTeam: away.team?.displayName ?? '',
+        homeTeamLogo: home.team?.logo ?? null,
+        awayTeamLogo: away.team?.logo ?? null,
+        homeTeamRecord: totalRecord(home),
+        awayTeamRecord: totalRecord(away),
+        spread: spreadVal,
+        favoriteTeam: null as string | null,
+        gameTime: comp.date ? new Date(comp.date) : null,
+        status,
+        homeScore: homeScore != null && !isNaN(homeScore) ? homeScore : null,
+        awayScore: awayScore != null && !isNaN(awayScore) ? awayScore : null,
+        period: comp.status?.period ?? null,
+        displayClock: comp.status?.displayClock ?? null,
+        statusType: comp.status?.type?.name ?? null,
+        isScoreLocked: false,
+      };
 
-    const row = {
-      espnId: String(eventId),
-      week,
-      season,
-      seasonType,
-      sport: 'nfl',
-      homeTeam: home.team?.displayName ?? '',
-      awayTeam: away.team?.displayName ?? '',
-      homeTeamLogo: home.team?.logo ?? null,
-      awayTeamLogo: away.team?.logo ?? null,
-      homeTeamRecord: totalRecord(home),
-      awayTeamRecord: totalRecord(away),
-      spread: spreadVal,
-      favoriteTeam: null as string | null,
-      gameTime: comp.date ? new Date(comp.date) : null,
-      status,
-      homeScore: homeScore != null && !isNaN(homeScore) ? homeScore : null,
-      awayScore: awayScore != null && !isNaN(awayScore) ? awayScore : null,
-      period: comp.status?.period ?? null,
-      displayClock: comp.status?.displayClock ?? null,
-      statusType: comp.status?.type?.name ?? null,
-      isScoreLocked: false,
-    };
-
-    await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
-      target: games.espnId,
-      set: {
-        status: row.status, homeScore: row.homeScore, awayScore: row.awayScore,
-        homeTeamRecord: row.homeTeamRecord, awayTeamRecord: row.awayTeamRecord,
-        period: row.period, displayClock: row.displayClock, statusType: row.statusType,
-        homeTeamLogo: row.homeTeamLogo, awayTeamLogo: row.awayTeamLogo,
-        spread: row.spread, favoriteTeam: row.favoriteTeam, gameTime: row.gameTime,
-      },
-    });
-    upserted++;
+      await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
+        target: games.espnId,
+        set: {
+          status: row.status, homeScore: row.homeScore, awayScore: row.awayScore,
+          homeTeamRecord: row.homeTeamRecord, awayTeamRecord: row.awayTeamRecord,
+          period: row.period, displayClock: row.displayClock, statusType: row.statusType,
+          homeTeamLogo: row.homeTeamLogo, awayTeamLogo: row.awayTeamLogo,
+          spread: row.spread, favoriteTeam: row.favoriteTeam, gameTime: row.gameTime,
+        },
+      });
+      upserted++;
+    } catch (err: any) {
+      console.warn(`[ESPN] failed to sync event ${eventId}: ${err?.message}`);
+    }
   }
   return upserted;
 }

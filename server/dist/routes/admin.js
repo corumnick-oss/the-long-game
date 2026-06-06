@@ -109,6 +109,47 @@ router.post('/games/sync-full-season', async (req, res) => {
     await (0, activity_1.logActivity)('admin_sync', `Admin synced full ${seasonType} season ${season}: ${total} games`, 'admin', { metadata: { season, seasonType, total } });
     res.json({ total, season, seasonType, results });
 });
+// Mobile-assisted sync: mobile collects ESPN event IDs (bypassing Railway block),
+// backend fetches /summary for each (which works from Railway) and upserts.
+router.post('/games/sync-by-ids', async (req, res) => {
+    const { eventIds, week, season, seasonType = 'regular' } = req.body;
+    if (!Array.isArray(eventIds) || eventIds.length === 0) {
+        res.status(400).json({ error: 'eventIds array required' });
+        return;
+    }
+    try {
+        const synced = await (0, espnService_1.syncGamesByEventIds)(eventIds, Number(week), Number(season), seasonType);
+        await (0, activity_1.logActivity)('admin_sync', `Admin synced ${synced} games for Week ${week} ${season}`, 'admin', { metadata: { week, season, seasonType } });
+        res.json({ synced, week, season });
+    }
+    catch (err) {
+        res.status(500).json({ error: err?.message ?? 'Sync failed' });
+    }
+});
+router.post('/games/sync-full-season-by-ids', async (req, res) => {
+    const { weekEvents, season, seasonType = 'regular' } = req.body;
+    if (!Array.isArray(weekEvents) || weekEvents.length === 0) {
+        res.status(400).json({ error: 'weekEvents array required' });
+        return;
+    }
+    let total = 0;
+    const results = [];
+    for (const { week, eventIds } of weekEvents) {
+        if (!Array.isArray(eventIds) || eventIds.length === 0)
+            continue;
+        try {
+            const synced = await (0, espnService_1.syncGamesByEventIds)(eventIds, Number(week), Number(season), seasonType);
+            total += synced;
+            results.push({ week, synced });
+        }
+        catch (err) {
+            console.warn(`[sync] week ${week} failed: ${err?.message}`);
+            results.push({ week, synced: 0 });
+        }
+    }
+    await (0, activity_1.logActivity)('admin_sync', `Admin synced full ${seasonType} ${season}: ${total} games`, 'admin', { metadata: { season, seasonType, total } });
+    res.json({ total, season, seasonType, results });
+});
 router.patch('/games/:id', async (req, res) => {
     const { homeScore, awayScore, status, isScoreLocked } = req.body;
     const updates = {};

@@ -9,6 +9,7 @@ import { useGames } from '@/hooks/usePicksData';
 import {
   useAdminUsers, useUpdateUser,
   useSyncGames, useSyncScores, useSyncProbs, useSyncFullSeason,
+  useSyncGamesForFutureSeason, useSyncFullSeasonForFutureSeason,
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
@@ -243,10 +244,15 @@ function ToolsTab({ season }: { season: number }) {
   const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
   const maxWeek = seasonType === 'preseason' ? 4 : 22;
 
+  const isFutureSeason = season > currentSeason;
   const syncGames = useSyncGames();
+  const syncGamesFuture = useSyncGamesForFutureSeason();
   const syncScores = useSyncScores();
   const syncProbs = useSyncProbs();
   const syncFullSeason = useSyncFullSeason();
+  const syncFullSeasonFuture = useSyncFullSeasonForFutureSeason();
+  const activeSyncGames = isFutureSeason ? syncGamesFuture : syncGames;
+  const activeFullSync = isFutureSeason ? syncFullSeasonFuture : syncFullSeason;
   const awardTrophies = useAwardTrophies();
   const unlockWeek = useUnlockWeek();
   const sendTest = useSendTestNotification();
@@ -303,7 +309,7 @@ function ToolsTab({ season }: { season: number }) {
 
         <ActionBtn
           label={`Sync Full ${seasonType === 'preseason' ? 'Preseason' : 'Regular Season'} (All Weeks)`}
-          loading={syncFullSeason.isPending}
+          loading={activeFullSync.isPending}
           result={results['fullsync']}
           onPress={() =>
             Alert.alert(
@@ -314,7 +320,7 @@ function ToolsTab({ season }: { season: number }) {
                 {
                   text: 'Sync All',
                   onPress: () =>
-                    syncFullSeason.mutate({ season, seasonType }, {
+                    activeFullSync.mutate({ season, seasonType }, {
                       onSuccess: (r) => setResult('fullsync', `✓ Synced ${r.total} games across all weeks`),
                       onError: (e: any) => setResult('fullsync', `✗ ${e?.message ?? 'Full sync failed'}`),
                     }),
@@ -325,10 +331,10 @@ function ToolsTab({ season }: { season: number }) {
         />
         <ActionBtn
           label={`Sync ${seasonType === 'preseason' ? `Pre ${week}` : `Week ${week}`} from ESPN`}
-          loading={syncGames.isPending}
+          loading={activeSyncGames.isPending}
           result={results['sync']}
           onPress={() =>
-            syncGames.mutate({ week, season, seasonType }, {
+            activeSyncGames.mutate({ week, season, seasonType }, {
               onSuccess: (r) => setResult('sync', `✓ Synced ${r.synced} games`),
               onError: (e: any) => setResult('sync', `✗ ${e?.message ?? 'Sync failed'}`),
             })

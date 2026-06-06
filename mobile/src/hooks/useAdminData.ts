@@ -45,6 +45,87 @@ export function useSyncGames() {
   });
 }
 
+// ESPN team schedule fetching runs on the mobile device (not Railway) to bypass
+// Railway's block on site.api.espn.com/teams/* for future seasons.
+const ESPN_NFL_BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+const NFL_TEAM_IDS = [
+  '1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17',
+  '18','19','20','21','22','23','24','25','26','27','28','29','30','33','34',
+];
+
+async function fetchWeekEventIds(week: number, season: number, seasonType: string): Promise<string[]> {
+  const st = seasonType === 'preseason' ? 1 : 2;
+  const eventIds = new Set<string>();
+  await Promise.all(NFL_TEAM_IDS.map(async (teamId) => {
+    try {
+      const resp = await fetch(`${ESPN_NFL_BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      for (const ev of (data.events ?? [])) {
+        if (ev.week?.number === week && ev.id) eventIds.add(String(ev.id));
+      }
+    } catch { /* skip */ }
+  }));
+  return [...eventIds];
+}
+
+async function fetchAllWeekEventIds(
+  season: number,
+  seasonType: string,
+  maxWeek: number,
+): Promise<{ week: number; eventIds: string[] }[]> {
+  const st = seasonType === 'preseason' ? 1 : 2;
+  const byWeek = new Map<number, Set<string>>();
+  await Promise.all(NFL_TEAM_IDS.map(async (teamId) => {
+    try {
+      const resp = await fetch(`${ESPN_NFL_BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      for (const ev of (data.events ?? [])) {
+        const weekNum: number = ev.week?.number;
+        if (weekNum && weekNum <= maxWeek && ev.id) {
+          if (!byWeek.has(weekNum)) byWeek.set(weekNum, new Set());
+          byWeek.get(weekNum)!.add(String(ev.id));
+        }
+      }
+    } catch { /* skip */ }
+  }));
+  return [...byWeek.entries()].map(([week, ids]) => ({ week, eventIds: [...ids] }));
+}
+
+// Used for future seasons where Railway can't reach ESPN team schedule endpoints.
+// Mobile fetches event IDs directly, backend syncs via /summary (which works from Railway).
+export function useSyncGamesForFutureSeason() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ week, season, seasonType = 'regular' }: { week: number; season: number; seasonType?: string }) => {
+      const eventIds = await fetchWeekEventIds(week, season, seasonType);
+      if (eventIds.length === 0) throw new Error(`No games found on ESPN for ${seasonType} week ${week}`);
+      return apiFetch<{ synced: number; week: number; season: number }>(
+        '/api/admin/games/sync-by-ids',
+        { method: 'POST', body: JSON.stringify({ eventIds, week, season, seasonType }) },
+        user,
+      );
+    },
+  });
+}
+
+export function useSyncFullSeasonForFutureSeason() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ season, seasonType = 'regular' }: { season: number; seasonType?: string }) => {
+      const maxWeek = seasonType === 'preseason' ? 4 : 18;
+      const weekEvents = await fetchAllWeekEventIds(season, seasonType, maxWeek);
+      if (weekEvents.length === 0) throw new Error(`No games found on ESPN for ${season} ${seasonType}`);
+      return apiFetch<{ total: number; season: number; seasonType: string; results: { week: number; synced: number }[] }>(
+        '/api/admin/games/sync-full-season-by-ids',
+        { method: 'POST', body: JSON.stringify({ weekEvents, season, seasonType }) },
+        user,
+      );
+    },
+  });
+}
+
 export function useSyncProbs() {
   const { user } = useAuth();
   return useMutation({
