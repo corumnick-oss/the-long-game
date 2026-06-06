@@ -7,33 +7,44 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync
+## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync (STILL BROKEN)
 
 **Goal:** Populate the DB with 2026 NFL game schedules so the Picks tab shows games.
 
-**Current state (as of June 5 2026):** Fix deployed and OTA pushed. Test it.
+**Current state (June 5 2026 end-of-day):** Still returning "Synced 0 games" after multiple OTA pushes and force-closes. The critical unknown is whether Railway can reach `summary?event={2026-id}`.
 
-**To test:** Close + reopen the app → Admin → NFL Tools → set to 2026 → Regular Season → Week 1 (should default to 1 now) → tap "Sync Week 1 from ESPN". Should show ✓ Synced ~16 games.
+---
 
-**If it works:** tap "Sync Full Regular Season (All Weeks)" — this syncs all weeks ESPN has for 2026 at once.
+### What We Know For Certain
 
-### How the 2026 Sync Works (Permanent Architecture)
+| Fact | How confirmed |
+|---|---|
+| `teams/{id}/schedule?season=2026` works from browser/mobile | Tested locally — 17 games for ATL, full schedule |
+| `summary?event={2026-id}` works from local machine | Tested event `401872658` (ATL@PIT wk1) — valid response, correct structure |
+| `summary?event={2025-id}` works from Railway | Used by win probability sync, confirmed working |
+| `summary?event={2026-id}` from Railway | **UNKNOWN — never confirmed. This is the likely failure point.** |
+| `/teams/*` returns 400 from Railway | Confirmed broken |
 
-**Root cause of the problem:** ESPN blocks Railway server-side requests on `/teams/*` and `/scoreboard?season=2026`. The `/summary?event={id}` endpoint works from Railway.
+---
 
-**Solution (implemented June 5 2026, commit `2f0ae0c`):**
-- Mobile app fetches team schedules from ESPN directly (no Railway involved — mobile IP is not blocked)
-- All 32 team fetches run in parallel (`Promise.all`) — takes ~1-2 seconds
-- Mobile extracts event IDs, POSTs them to Railway
-- Railway calls `/summary?event={id}` for each event ID (works!) and upserts game data
+### Architecture Built (commit `2f0ae0c`) — May Already Be Working, Need to Diagnose
 
-**Two new backend endpoints:**
-- `POST /api/admin/games/sync-by-ids` — single week: `{ eventIds, week, season, seasonType }`
-- `POST /api/admin/games/sync-full-season-by-ids` — all weeks: `{ weekEvents: [{ week, eventIds }], season, seasonType }`
+Mobile-assisted sync bypasses Railway ESPN blocks:
+- Admin sync buttons detect `season > getCurrentNFLSeason()` → use new path automatically
+- Mobile fetches 32 team schedules from ESPN in parallel (phone not blocked)
+- Mobile extracts event IDs → POSTs to Railway
+- Railway calls `summary?event={id}` for each (this step is the unknown)
 
-**The admin sync buttons automatically pick the right path** — when `season > getCurrentNFLSeason()`, they use the mobile-assisted route. For current/past seasons, they use the normal Railway scoreboard route.
+**New backend endpoints:**
+- `POST /api/admin/games/sync-by-ids` — `{ eventIds, week, season, seasonType }`
+- `POST /api/admin/games/sync-full-season-by-ids` — `{ weekEvents: [{week, eventIds}], season, seasonType }`
 
-**Known ESPN team IDs (hard-coded in both `espnService.ts` and `useAdminData.ts`):**
+**Code locations:**
+- `mobile/src/hooks/useAdminData.ts` → `useSyncGamesForFutureSeason`, `useSyncFullSeasonForFutureSeason`, `fetchWeekEventIds`
+- `server/src/services/espnService.ts` → `syncGamesByEventIds` (exported)
+- `server/src/routes/admin.ts` → two new routes
+
+**Known ESPN team IDs (hard-coded in both files):**
 ```
 1=ATL, 2=BUF, 3=CHI, 4=CIN, 5=CLE, 6=DAL, 7=DEN, 8=DET, 9=GB, 10=TEN,
 11=IND, 12=KC, 13=LV, 14=LAR, 15=MIA, 16=MIN, 17=NE, 18=NO, 19=NYG, 20=NYJ,
@@ -41,9 +52,44 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 33=BAL, 34=HOU
 ```
 
-**Known limitation:** ESPN's team schedule only has the first ~8 weeks of 2026 right now. Weeks 9-18 will return 0 until ESPN adds them (probably August). Run "Sync Full Regular Season" again in August to pick up the rest.
+---
 
-**This workaround applies to every future season** — whenever `season > getCurrentNFLSeason()`, the mobile-assisted path is used automatically. No code changes needed year-to-year.
+### Step 1 — Diagnose: Can Railway reach 2026 summaries?
+
+Add this temporary route to `server/src/routes/admin.ts`, build + deploy:
+
+```typescript
+router.get('/test-espn-2026', async (_req, res) => {
+  try {
+    const { data } = await axios.get(
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658',
+      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
+    );
+    const comp = data.header?.competitions?.[0];
+    const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+    res.json({ ok: true, home: home?.team?.displayName, date: comp?.date });
+  } catch (err: any) {
+    res.json({ ok: false, status: err?.response?.status, message: err?.message });
+  }
+});
+```
+
+Hit `GET https://thelonggame-production.up.railway.app/api/admin/test-espn-2026` (temporarily remove `requireAdmin` or use the auth header from the mobile app).
+
+- **`{ ok: true, home: "Pittsburgh Steelers" }`** → Railway CAN reach 2026 summaries. Bug is in the mobile-assisted flow — investigate OTA loading or add logging to `syncGamesByEventIds`.
+- **`{ ok: false, status: 400 }`** → Railway blocks 2026 summary IDs too. Go to Step 2.
+
+### Step 2 (if Railway blocks 2026 summaries) — Local script fallback
+
+Write `server/src/scripts/sync-2026-local.ts` that runs from Nick's Windows machine:
+1. Fetches all 32 team schedules locally (confirmed working)
+2. Groups event IDs by week
+3. POSTs directly to `https://thelonggame-production.up.railway.app/api/admin/games/sync-full-season-by-ids` with a hardcoded admin Bearer token from server/.env or Firebase
+
+This bypasses Railway's ESPN block entirely. One command: `npx ts-node src/scripts/sync-2026-local.ts`
+
+### Step 3 — Re-run in August
+ESPN only has weeks 1-8 of 2026 right now regardless of which fix works. Re-run "Sync Full Regular Season" in August to pick up weeks 9-18.
 
 ---
 
