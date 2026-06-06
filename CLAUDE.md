@@ -7,44 +7,33 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync (IN PROGRESS)
+## ⚠️ DO THIS FIRST NEXT SESSION — 2026 Game Sync
 
 **Goal:** Populate the DB with 2026 NFL game schedules so the Picks tab shows games.
 
-**Current state (as of June 4 2026 end-of-day):** Latest deployed approach (commit `65307ac`) hard-coded team IDs are NOT yet in place — see fix below. Test first thing next session.
+**Current state (as of June 5 2026):** Fix deployed and OTA pushed. Test it.
 
-**To test:** Admin → NFL Tools → set to 2026 → Regular Season → manually set week to 1 (week defaults to 18 in offseason) → tap "Sync Week 1 from ESPN". If it shows ✓ Synced ~16 games, it worked.
+**To test:** Close + reopen the app → Admin → NFL Tools → set to 2026 → Regular Season → Week 1 (should default to 1 now) → tap "Sync Week 1 from ESPN". Should show ✓ Synced ~16 games.
 
-### What We Know About the ESPN + Railway Problem
+**If it works:** tap "Sync Full Regular Season (All Weeks)" — this syncs all weeks ESPN has for 2026 at once.
 
-**Root cause:** ESPN's APIs behave differently when called server-side from Railway vs from a browser.
+### How the 2026 Sync Works (Permanent Architecture)
 
-| Endpoint | Browser | Railway |
-|---|---|---|
-| `site.api.espn.com/scoreboard?season=2026` | Returns 2025 data | HTTP 400 |
-| `sports.core.api.espn.com/seasons/2026/...` | Returns 2026 event refs ✓ | HTTP 400 (proxies to internal `.pvt` network) |
-| `site.api.espn.com/summary?event={2025-id}` | Works ✓ | Works ✓ |
-| `site.api.espn.com/summary?event={2026-id}` | Works ✓ | **Unknown** |
-| `site.api.espn.com/teams?limit=100` | Works ✓ | HTTP 400 ✗ (confirmed broken) |
-| `site.api.espn.com/teams/{id}/schedule?season=2026` | Works, ~7 events ✓ | **Unknown** |
+**Root cause of the problem:** ESPN blocks Railway server-side requests on `/teams/*` and `/scoreboard?season=2026`. The `/summary?event={id}` endpoint works from Railway.
 
-**What we tried (in order):**
-1. `&dates=2026` on scoreboard → 400
-2. `season=2026` on scoreboard → 2025 data from browser, 400 from Railway
-3. ESPN core API → HTTP 400 from Railway (proxies to internal `.pvt` network)
-4. Detect wrong-season via `data.season.year` → blocked before we get there
-5. Bypass scoreboard, go straight to core API → also blocked
-6. Add browser User-Agent → no effect on Railway blocking
-7. Fetch 32 team schedules (step 1: team list from `teams?limit=100`) → **HTTP 400**
-8. **Next fix to try:** Hard-code the 32 NFL ESPN team IDs — skip the `teams` list call entirely
+**Solution (implemented June 5 2026, commit `2f0ae0c`):**
+- Mobile app fetches team schedules from ESPN directly (no Railway involved — mobile IP is not blocked)
+- All 32 team fetches run in parallel (`Promise.all`) — takes ~1-2 seconds
+- Mobile extracts event IDs, POSTs them to Railway
+- Railway calls `/summary?event={id}` for each event ID (works!) and upserts game data
 
-**Latest test results (June 4 2026):**
-- "Sync Full Regular Season" → "Synced 0 games across all weeks"
-- "Sync Week 1 from ESPN" → "ESPN sync failed: Failed to fetch NFL teams: Request failed with status code 400"
+**Two new backend endpoints:**
+- `POST /api/admin/games/sync-by-ids` — single week: `{ eventIds, week, season, seasonType }`
+- `POST /api/admin/games/sync-full-season-by-ids` — all weeks: `{ weekEvents: [{ week, eventIds }], season, seasonType }`
 
-**Next fix to implement:** Hard-code ESPN team IDs in `syncWeekGamesFromTeamSchedules`. If team schedule calls also return 400, we'll need a proxy or wait for ESPN's scoreboard to serve 2026 data closer to the season.
+**The admin sync buttons automatically pick the right path** — when `season > getCurrentNFLSeason()`, they use the mobile-assisted route. For current/past seasons, they use the normal Railway scoreboard route.
 
-**Known 32 ESPN NFL team IDs:**
+**Known ESPN team IDs (hard-coded in both `espnService.ts` and `useAdminData.ts`):**
 ```
 1=ATL, 2=BUF, 3=CHI, 4=CIN, 5=CLE, 6=DAL, 7=DEN, 8=DET, 9=GB, 10=TEN,
 11=IND, 12=KC, 13=LV, 14=LAR, 15=MIA, 16=MIN, 17=NE, 18=NO, 19=NYG, 20=NYJ,
@@ -52,9 +41,9 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 33=BAL, 34=HOU
 ```
 
-**Known limitation:** Team schedule only shows first ~8 weeks of 2026. Weeks 9-18 return 0 until ESPN adds them (probably August). Acceptable for now.
+**Known limitation:** ESPN's team schedule only has the first ~8 weeks of 2026 right now. Weeks 9-18 will return 0 until ESPN adds them (probably August). Run "Sync Full Regular Season" again in August to pick up the rest.
 
-**Admin week default bug:** `getCurrentNFLWeek()` returns 18 in offseason. User must manually tap `−` to week 1 before syncing.
+**This workaround applies to every future season** — whenever `season > getCurrentNFLSeason()`, the mobile-assisted path is used automatically. No code changes needed year-to-year.
 
 ---
 
