@@ -49,17 +49,30 @@ async function syncWeekGamesFromTeamSchedules(week, season, seasonType) {
     const teamIds = NFL_TEAM_IDS;
     // Step 2: collect unique event IDs for the requested week from all team schedules
     const eventIds = new Set();
+    let firstTeamDone = false;
     for (const teamId of teamIds) {
         try {
             const schedResp = await axios_1.default.get(`${BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`, { headers: ESPN_HEADERS });
             const events = schedResp.data?.events ?? [];
+            if (!firstTeamDone) {
+                console.log(`[ESPN] team ${teamId} schedule: ${events.length} events, week numbers: ${[...new Set(events.map((e) => e.week?.number))].join(',')}`);
+                firstTeamDone = true;
+            }
             for (const ev of events) {
                 if (ev.week?.number === week && ev.id) {
                     eventIds.add(String(ev.id));
                 }
             }
         }
-        catch { /* skip teams that fail */ }
+        catch (err) {
+            const status = err?.response?.status;
+            const msg = err?.message ?? String(err);
+            if (!firstTeamDone) {
+                console.warn(`[ESPN] team ${teamId} schedule failed: ${status ?? msg}`);
+                firstTeamDone = true;
+            }
+            // skip this team and continue
+        }
     }
     if (eventIds.size === 0) {
         console.warn(`[ESPN] no events found via team schedules for ${seasonType} ${season} week ${week}`);
