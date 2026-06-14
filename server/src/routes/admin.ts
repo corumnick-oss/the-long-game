@@ -11,6 +11,22 @@ import { logActivity } from './activity';
 import { sendPushToUsers } from '../services/notificationService';
 
 const router = Router();
+
+// Temporary diagnostic route — no auth required, remove after confirming 2026 sync works
+router.get('/test-espn-2026', async (_req, res) => {
+  try {
+    const { data } = await axios.get(
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658',
+      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
+    );
+    const comp = data.header?.competitions?.[0];
+    const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+    res.json({ ok: true, home: home?.team?.displayName, date: comp?.date });
+  } catch (err: any) {
+    res.json({ ok: false, status: err?.response?.status, message: err?.message });
+  }
+});
+
 router.use(requireAuth, requireAdmin);
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -35,21 +51,6 @@ router.patch('/users/:id', async (req, res) => {
 });
 
 // ── Games / ESPN Sync ─────────────────────────────────────────────────────────
-
-// Temporary diagnostic: confirms whether Railway can reach 2026 ESPN summaries
-router.get('/test-espn-2026', async (_req, res) => {
-  try {
-    const { data } = await axios.get(
-      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658',
-      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
-    );
-    const comp = data.header?.competitions?.[0];
-    const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
-    res.json({ ok: true, home: home?.team?.displayName, date: comp?.date });
-  } catch (err: any) {
-    res.json({ ok: false, status: err?.response?.status, message: err?.message });
-  }
-});
 
 router.post('/games/sync', async (req, res) => {
   const season = req.body.season ?? getCurrentNFLSeason();

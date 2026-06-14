@@ -48,6 +48,18 @@ const season_1 = require("../utils/season");
 const activity_1 = require("./activity");
 const notificationService_1 = require("../services/notificationService");
 const router = (0, express_1.Router)();
+// Temporary diagnostic route — no auth required, remove after confirming 2026 sync works
+router.get('/test-espn-2026', async (_req, res) => {
+    try {
+        const { data } = await axios_1.default.get('https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658', { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        const comp = data.header?.competitions?.[0];
+        const home = comp?.competitors?.find((c) => c.homeAway === 'home');
+        res.json({ ok: true, home: home?.team?.displayName, date: comp?.date });
+    }
+    catch (err) {
+        res.json({ ok: false, status: err?.response?.status, message: err?.message });
+    }
+});
 router.use(auth_1.requireAuth, auth_1.requireAdmin);
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', async (req, res) => {
@@ -73,18 +85,6 @@ router.patch('/users/:id', async (req, res) => {
     res.json(updated);
 });
 // ── Games / ESPN Sync ─────────────────────────────────────────────────────────
-// Temporary diagnostic: confirms whether Railway can reach 2026 ESPN summaries
-router.get('/test-espn-2026', async (_req, res) => {
-    try {
-        const { data } = await axios_1.default.get('https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658', { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-        const comp = data.header?.competitions?.[0];
-        const home = comp?.competitors?.find((c) => c.homeAway === 'home');
-        res.json({ ok: true, home: home?.team?.displayName, date: comp?.date });
-    }
-    catch (err) {
-        res.json({ ok: false, status: err?.response?.status, message: err?.message });
-    }
-});
 router.post('/games/sync', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
     const week = parseInt(req.body.week, 10);
