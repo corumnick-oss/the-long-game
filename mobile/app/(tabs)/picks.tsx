@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
@@ -26,8 +26,11 @@ export default function PicksScreen() {
   const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>(getDefaultSeasonType);
   const [selectedWeek, setSelectedWeek] = useState(CURRENT_WEEK);
 
-  // Reset to week 1 when switching season type or year
-  useEffect(() => { setSelectedWeek(1); }, [season, seasonType]);
+  // Batch season/type + week changes in one call so React renders
+  // the new season and week=1 together — prevents a brief flash of
+  // week-18 data (from the old season) before the week resets.
+  const changeSeason = (newSeason: number) => { setSeason(newSeason); setSelectedWeek(1); };
+  const changeSeasonType = (newType: 'regular' | 'preseason') => { setSeasonType(newType); setSelectedWeek(1); };
 
   const { data: games, isLoading, isError, refetch, isRefetching } = useGames(selectedWeek, season, seasonType);
   const { data: tiebreaker } = useTiebreaker(selectedWeek, season);
@@ -53,7 +56,7 @@ export default function PicksScreen() {
       {/* Season selector */}
       <View className="flex-row items-center justify-center gap-4 pt-3 pb-1">
         <TouchableOpacity
-          onPress={() => setSeason(s => Math.max(MIN_SEASON, s - 1))}
+          onPress={() => changeSeason(Math.max(MIN_SEASON, season - 1))}
           disabled={season <= MIN_SEASON}
           className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season <= MIN_SEASON ? 'opacity-30' : ''}`}
         >
@@ -61,7 +64,7 @@ export default function PicksScreen() {
         </TouchableOpacity>
         <Text className="text-white text-base font-bold">{season} Season</Text>
         <TouchableOpacity
-          onPress={() => setSeason(s => Math.min(MAX_SEASON, s + 1))}
+          onPress={() => changeSeason(Math.min(MAX_SEASON, season + 1))}
           disabled={season >= MAX_SEASON}
           className={`w-8 h-8 bg-surface rounded-full items-center justify-center ${season >= MAX_SEASON ? 'opacity-30' : ''}`}
         >
@@ -74,7 +77,7 @@ export default function PicksScreen() {
         {(['regular', 'preseason'] as const).map(st => (
           <TouchableOpacity
             key={st}
-            onPress={() => setSeasonType(st)}
+            onPress={() => changeSeasonType(st)}
             className={`flex-1 py-2 rounded-lg items-center ${seasonType === st ? 'bg-primary' : ''}`}
           >
             <Text className={`text-sm font-semibold ${seasonType === st ? 'text-white' : 'text-muted'}`}>
