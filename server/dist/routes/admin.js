@@ -32,8 +32,12 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
@@ -69,6 +73,18 @@ router.patch('/users/:id', async (req, res) => {
     res.json(updated);
 });
 // ── Games / ESPN Sync ─────────────────────────────────────────────────────────
+// Temporary diagnostic: confirms whether Railway can reach 2026 ESPN summaries
+router.get('/test-espn-2026', async (_req, res) => {
+    try {
+        const { data } = await axios_1.default.get('https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658', { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+        const comp = data.header?.competitions?.[0];
+        const home = comp?.competitors?.find((c) => c.homeAway === 'home');
+        res.json({ ok: true, home: home?.team?.displayName, date: comp?.date });
+    }
+    catch (err) {
+        res.json({ ok: false, status: err?.response?.status, message: err?.message });
+    }
+});
 router.post('/games/sync', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
     const week = parseInt(req.body.week, 10);
