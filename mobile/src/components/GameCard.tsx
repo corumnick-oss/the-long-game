@@ -10,6 +10,12 @@ type Props = {
   onTeamPress?: (teamName: string) => void;
 };
 
+function formatPeriodLabel(period: number): string {
+  if (period <= 4) return `Q${period}`;
+  if (period === 5) return 'OT';
+  return `${period - 4}OT`;
+}
+
 function formatGameTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString('en-US', {
@@ -188,7 +194,11 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
       {(isLive || isFinal) && (
         <View className={`px-3 py-1 ${isLive ? 'bg-red-600' : 'bg-zinc-700'}`}>
           <Text className="text-white text-xs font-bold text-center">
-            {isLive ? `${game.displayClock ?? ''} · Q${game.period ?? ''}` : 'FINAL'}
+            {isLive
+            ? game.statusType === 'STATUS_HALFTIME'
+              ? 'HALFTIME'
+              : `${game.displayClock ?? '0:00'} · ${game.period ? formatPeriodLabel(game.period) : '—'}`
+            : 'FINAL'}
           </Text>
         </View>
       )}

@@ -46,6 +46,10 @@ export function useGames(week: number, season: number, seasonType: 'regular' | '
     queryKey: ['games', week, season, seasonType, user?.uid ?? null],
     queryFn: () => apiFetch<Game[]>(`/api/games?week=${week}&season=${season}&seasonType=${seasonType}`, undefined, user),
     staleTime: 30_000,
+    refetchInterval: (query) => {
+      const data = query.state.data as Game[] | undefined;
+      return data?.some(g => g.status === 'in') ? 30_000 : false;
+    },
   });
 }
 

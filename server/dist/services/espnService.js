@@ -243,13 +243,17 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
 }
 async function updateLiveScores() {
     const season = (0, season_1.getCurrentNFLSeason)();
-    // Find weeks with in-progress games
     const liveGames = await db_1.db.query.games.findMany({
         where: (0, drizzle_orm_1.eq)(schema_1.games.status, 'in'),
     });
-    const weeks = [...new Set(liveGames.map(g => g.week))];
-    for (const week of weeks) {
-        await syncWeekGames(week, season, 'regular');
+    // Group by week + seasonType so preseason games hit the right scoreboard endpoint
+    const seen = new Set();
+    for (const game of liveGames) {
+        const key = `${game.week}:${game.seasonType}`;
+        if (seen.has(key))
+            continue;
+        seen.add(key);
+        await syncWeekGames(game.week, season, game.seasonType);
     }
 }
 async function syncWeekScores(week, season, seasonType = 'regular') {
