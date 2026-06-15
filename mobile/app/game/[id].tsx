@@ -67,10 +67,11 @@ function PickRow({ entry }: { entry: PickEntry }) {
 
 export default function GameDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; week: string; season: string }>();
+  const params = useLocalSearchParams<{ id: string; week: string; season: string; seasonType: string }>();
   const gameId = params.id;
   const week = parseInt(params.week ?? '0', 10);
   const season = parseInt(params.season ?? String(getCurrentNFLSeason()), 10);
+  const seasonType = (params.seasonType ?? 'regular') as 'regular' | 'preseason';
 
   const { data: game, isLoading, isError } = useGameDetail(gameId);
   const { data: weekGames } = useGames(week, season);
@@ -168,7 +169,11 @@ export default function GameDetailScreen() {
         {/* ── Score / team info ── */}
         <View className="flex-row items-center px-4 py-6">
           {/* Away */}
-          <View className={`flex-1 items-center rounded-xl py-3 px-2 ${awayWins ? 'bg-success/10' : ''}`}>
+          <TouchableOpacity
+            className={`flex-1 items-center rounded-xl py-3 px-2 ${awayWins ? 'bg-success/10' : ''}`}
+            activeOpacity={0.7}
+            onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: game.awayTeam, season: String(season), seasonType } })}
+          >
             {game.awayTeamLogo ? (
               <Image
                 source={{ uri: game.awayTeamLogo }}
@@ -192,7 +197,7 @@ export default function GameDetailScreen() {
                 </Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
 
           {/* Score or vs */}
           <View className="items-center px-3">
@@ -222,7 +227,11 @@ export default function GameDetailScreen() {
           </View>
 
           {/* Home */}
-          <View className={`flex-1 items-center rounded-xl py-3 px-2 ${homeWins ? 'bg-success/10' : ''}`}>
+          <TouchableOpacity
+            className={`flex-1 items-center rounded-xl py-3 px-2 ${homeWins ? 'bg-success/10' : ''}`}
+            activeOpacity={0.7}
+            onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: game.homeTeam, season: String(season), seasonType } })}
+          >
             {game.homeTeamLogo ? (
               <Image
                 source={{ uri: game.homeTeamLogo }}
@@ -246,7 +255,7 @@ export default function GameDetailScreen() {
                 </Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* ── Team stats ── */}
