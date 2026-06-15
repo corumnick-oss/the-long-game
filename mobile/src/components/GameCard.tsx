@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, Pressable, Image } from 'react-native';
+import { getCurrentNFLSeason } from '../lib/nflSeason';
 import type { Game } from '../hooks/usePicksData';
 
 type Props = {
@@ -164,7 +165,8 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
   const homePct = game.homePickPct ?? 50;
   const awayPct = game.awayPickPct ?? 50;
 
-  const canPick = !isLocked && (isPre || isLive);
+  const picksNotYetOpen = game.season > getCurrentNFLSeason();
+  const canPick = !isLocked && !picksNotYetOpen && (isPre || isLive);
 
   const hasPick = game.myPick !== null;
   const pickedOutcome = homePickOutcome ?? awayPickOutcome;
@@ -251,8 +253,8 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
         disabled={!canPick}
       />
 
-      {/* Locked message if no pick yet */}
-      {isLocked && !hasPick && isPre && (
+      {/* Locked message if no pick yet — only for current season (not future seasons where picks haven't opened) */}
+      {isLocked && !hasPick && isPre && !picksNotYetOpen && (
         <View className="px-4 py-2 bg-zinc-800/60">
           <Text className="text-muted text-xs text-center">Picks locked — you didn't submit</Text>
         </View>
