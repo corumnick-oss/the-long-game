@@ -47,9 +47,12 @@ function totalRecord(comp: any): string | null {
   return comp.records?.find((r: any) => r.type === 'total')?.summary ?? null;
 }
 
-async function fetchEventIdsByWeek(): Promise<Map<number, Set<string>>> {
+type LogoMap = Map<string, { homeLogo: string | null; awayLogo: string | null }>;
+
+async function fetchEventIdsByWeek(): Promise<{ byWeek: Map<number, Set<string>>; logoMap: LogoMap }> {
   console.log(`Fetching schedules for ${NFL_TEAM_IDS.length} teams...`);
   const byWeek = new Map<number, Set<string>>();
+  const logoMap: LogoMap = new Map();
 
   await Promise.all(NFL_TEAM_IDS.map(async (teamId) => {
     try {
@@ -63,6 +66,16 @@ async function fetchEventIdsByWeek(): Promise<Map<number, Set<string>>> {
         if (week && week >= 1 && week <= MAX_WEEK && ev.id) {
           if (!byWeek.has(week)) byWeek.set(week, new Set());
           byWeek.get(week)!.add(String(ev.id));
+          // Collect logos here — summary endpoint returns empty logo for future games
+          if (!logoMap.has(String(ev.id))) {
+            const comp = ev.competitions?.[0];
+            const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+            const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+            logoMap.set(String(ev.id), {
+              homeLogo: home?.team?.logos?.[0]?.href ?? null,
+              awayLogo: away?.team?.logos?.[0]?.href ?? null,
+            });
+          }
         }
       }
     } catch (err: any) {
@@ -70,10 +83,10 @@ async function fetchEventIdsByWeek(): Promise<Map<number, Set<string>>> {
     }
   }));
 
-  return byWeek;
+  return { byWeek, logoMap };
 }
 
-async function syncEvent(eventId: string, week: number): Promise<boolean> {
+async function syncEvent(eventId: string, week: number, logoMap: LogoMap): Promise<boolean> {
   try {
     const { data } = await axios.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
     const comp = data.header?.competitions?.[0];
@@ -83,6 +96,7 @@ async function syncEvent(eventId: string, week: number): Promise<boolean> {
     const away = comp.competitors?.find((c: any) => c.homeAway === 'away');
     if (!home || !away) return false;
 
+    const logos = logoMap.get(String(eventId));
     const pickcenter = Array.isArray(data.pickcenter) ? data.pickcenter[0] : null;
     const spreadVal = pickcenter?.spread != null ? parseFloat(pickcenter.spread) : null;
     const status = parseStatus(comp.status?.type?.state ?? 'pre');
@@ -97,8 +111,8 @@ async function syncEvent(eventId: string, week: number): Promise<boolean> {
       sport: 'nfl' as const,
       homeTeam: home.team?.displayName ?? '',
       awayTeam: away.team?.displayName ?? '',
-      homeTeamLogo: home.team?.logo ?? null,
-      awayTeamLogo: away.team?.logo ?? null,
+      homeTeamLogo: home.team?.logo || logos?.homeLogo || null,
+      awayTeamLogo: away.team?.logo || logos?.awayLogo || null,
       homeTeamRecord: totalRecord(home),
       awayTeamRecord: totalRecord(away),
       spread: spreadVal,
@@ -134,7 +148,7 @@ async function syncEvent(eventId: string, week: number): Promise<boolean> {
 async function main() {
   console.log(`\n=== Syncing ${SEASON} ${SEASON_TYPE} season games ===\n`);
 
-  const byWeek = await fetchEventIdsByWeek();
+  const { byWeek, logoMap } = await fetchEventIdsByWeek();
 
   const weeks = [...byWeek.keys()].sort((a, b) => a - b);
   console.log(`Found ${weeks.length} weeks with games: ${weeks.join(', ')}\n`);
@@ -146,7 +160,7 @@ async function main() {
     process.stdout.write(`Week ${week}: ${eventIds.length} games... `);
     let weekSynced = 0;
     for (const id of eventIds) {
-      if (await syncEvent(id, week)) weekSynced++;
+      if (await syncEvent(id, week, logoMap)) weekSynced++;
     }
     console.log(`${weekSynced}/${eventIds.length} synced`);
     totalSynced += weekSynced;

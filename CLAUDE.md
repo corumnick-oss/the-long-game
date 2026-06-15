@@ -417,20 +417,43 @@ After lock: Week Picks full grid, Game Detail pick list, other profiles H2H for 
 - 6px thick pick % bars — visible after lock only
 - 3 states: pre-game (stats), live (score+clock), final (score+result)
 
-### TO BUILD: Pre-Game Stats on GameCard
-Both teams side by side: PPG / Opp PPG, total YPG / yards allowed, pass yards+TDs, rush yards+TDs, defensive rank, win prob bar, top QB/RB/WR averages. If no current-season stats yet (Week 1 2026 edge case), fall back to prior season stats.
+### TO BUILD: Game Preview Screen (Pre-Game Stats on GameCard)
+
+The locked pre-game GameCard state should show team stats side by side before picks lock. DB tables (`team_game_stats`, `player_stats`) already exist in schema.
+
+**Stats to show (decide with Nick which subset to surface in UI):**
+- PPG / PPG Allowed
+- Total yards/game / yards allowed/game
+- Offensive rank / Defensive rank
+- 3rd down conversion %
+- Red zone efficiency
+- Win probability bar (from ESPN predictor section, already synced as `winningTeamWinProb` on game)
+- Top QB: comp/att, pass yards, TDs, INTs
+- Top RB: carries, rush yards, TDs
+- Top WR: receptions/targets, yards, TDs
+
+**Stats fallback strategy (IMPORTANT — discuss with Nick before building):**
+- Preseason 2026 games: show 2025 season averages (no 2026 data yet)
+- Regular season Week 1 2026: show 2025 season averages (no 2026 games played yet)
+- Regular season Week 2+ 2026: show 2026 running averages (accumulated from played games)
+- Logic: query `team_game_stats` for `season=2026` first; if no rows, fall back to `season=2025`
+
+**Collection:**
+- Pre-game stats: ESPN `/summary?event={id}` predictor section — sync on Tuesday 6AM + Wednesday crons
+- Post-game stats (box score): ESPN `/summary?event={id}` boxscore section — sync when game goes 'post'
 
 ### TO BUILD: Post-Game Box Score on Game Detail
 Visible only on final games: team totals (yards, pass, rush, TDs, turnovers, 3rd-down %, red zone) + top QB (comp/att, pass yards, TDs, INTs), RB (carries, rush yards, TDs), WR (rec/targets, yards, TDs).
 
 ### TO BUILD: Pre/Post Stats Implementation Plan
-1. `espnService.ts`: add `syncTeamStats(game)` — pre-game stats from ESPN predictor section
-2. `espnService.ts`: add `syncBoxScore(game)` — post-game stats from ESPN boxscore section
-3. Wire `syncTeamStats` to Tuesday 6AM + Wednesday crons
-4. Wire `syncBoxScore` to live loop when game status goes 'post'
-5. Update `GET /api/games` and `GET /api/games/:id` to include stats
-6. GameCard pre-game state shows team stats; Game Detail final state shows box score
-7. Add `npm run sync:stats` to backfill 2025 box scores
+1. Explore ESPN `/summary?event={id}` predictor + boxscore sections to confirm available fields
+2. `espnService.ts`: add `syncTeamStats(game)` — pre-game stats from ESPN predictor section
+3. `espnService.ts`: add `syncBoxScore(game)` — post-game stats from ESPN boxscore section
+4. Wire `syncTeamStats` to Tuesday 6AM + Wednesday crons
+5. Wire `syncBoxScore` to live loop when game status goes 'post'
+6. Update `GET /api/games` and `GET /api/games/:id` to include stats with 2025 fallback when no 2026 rows
+7. GameCard pre-game state shows team stats; Game Detail final state shows box score
+8. Add `npm run sync:stats` to backfill 2025 box scores
 
 ### TO BUILD: Leaderboard Season Selector (all users)
 Same +/− control the admin has, lets any user view 2025 final standings.
