@@ -32,12 +32,8 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
@@ -48,37 +44,6 @@ const season_1 = require("../utils/season");
 const activity_1 = require("./activity");
 const notificationService_1 = require("../services/notificationService");
 const router = (0, express_1.Router)();
-// Temporary diagnostics — no auth required, remove after 2026 sync is confirmed working
-const ESPN_TEST_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
-router.get('/test-espn-2026', async (_req, res) => {
-    try {
-        const { data } = await axios_1.default.get('https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658', { headers: ESPN_TEST_HEADERS });
-        const comp = data.header?.competitions?.[0];
-        const home = comp?.competitors?.find((c) => c.homeAway === 'home');
-        res.json({ ok: true, endpoint: 'summary', home: home?.team?.displayName, date: comp?.date });
-    }
-    catch (err) {
-        res.json({ ok: false, endpoint: 'summary', status: err?.response?.status, message: err?.message });
-    }
-});
-// Tests whether Railway can reach the 2026 scoreboard endpoint directly.
-// If ok:true + games >= 16, we can simplify syncWeekGames to use scoreboard for all seasons.
-router.get('/test-espn-scoreboard-2026', async (_req, res) => {
-    try {
-        const { data } = await axios_1.default.get('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2&season=2026&limit=50', { headers: ESPN_TEST_HEADERS });
-        const events = data.events ?? [];
-        const games = events.map((e) => ({
-            id: e.id,
-            name: e.name,
-            date: e.date,
-            week: e.week?.number,
-        }));
-        res.json({ ok: true, season: data.season?.year, week: data.week?.number, gameCount: games.length, games });
-    }
-    catch (err) {
-        res.json({ ok: false, status: err?.response?.status, message: err?.message });
-    }
-});
 router.use(auth_1.requireAuth, auth_1.requireAdmin);
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users', async (req, res) => {

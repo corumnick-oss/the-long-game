@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import axios from 'axios';
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { sql, eq, and, desc, asc } from 'drizzle-orm';
@@ -11,44 +10,6 @@ import { logActivity } from './activity';
 import { sendPushToUsers } from '../services/notificationService';
 
 const router = Router();
-
-// Temporary diagnostics — no auth required, remove after 2026 sync is confirmed working
-const ESPN_TEST_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
-
-router.get('/test-espn-2026', async (_req, res) => {
-  try {
-    const { data } = await axios.get(
-      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658',
-      { headers: ESPN_TEST_HEADERS },
-    );
-    const comp = data.header?.competitions?.[0];
-    const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
-    res.json({ ok: true, endpoint: 'summary', home: home?.team?.displayName, date: comp?.date });
-  } catch (err: any) {
-    res.json({ ok: false, endpoint: 'summary', status: err?.response?.status, message: err?.message });
-  }
-});
-
-// Tests whether Railway can reach the 2026 scoreboard endpoint directly.
-// If ok:true + games >= 16, we can simplify syncWeekGames to use scoreboard for all seasons.
-router.get('/test-espn-scoreboard-2026', async (_req, res) => {
-  try {
-    const { data } = await axios.get(
-      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=2&season=2026&limit=50',
-      { headers: ESPN_TEST_HEADERS },
-    );
-    const events: any[] = data.events ?? [];
-    const games = events.map((e: any) => ({
-      id: e.id,
-      name: e.name,
-      date: e.date,
-      week: e.week?.number,
-    }));
-    res.json({ ok: true, season: data.season?.year, week: data.week?.number, gameCount: games.length, games });
-  } catch (err: any) {
-    res.json({ ok: false, status: err?.response?.status, message: err?.message });
-  }
-});
 
 router.use(requireAuth, requireAdmin);
 
