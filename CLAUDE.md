@@ -3,23 +3,20 @@
 ## IMPORTANT: Read This First
 This document contains everything you need to know about this project. Read it completely before writing any code or making any suggestions. Every decision in here has been carefully discussed and agreed upon with Nick (the owner). Do not deviate from these decisions without explicitly asking first. When in doubt, ask Nick.
 
+**ALWAYS confirm your implementation plan with Nick BEFORE writing any code.** List the files you intend to change and what you'll do to each. Wait for Nick to say "go ahead" or "yes" before making edits. This prevents wasted work if Nick's priorities have changed.
+
 When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Remove Diagnostic Routes
+## ⚠️ DO THIS FIRST NEXT SESSION — Pre-Game Team Stats
 
-Remove these no-auth routes from `server/src/routes/admin.ts` (lines ~15–51), then rebuild and push:
-- `GET /api/admin/test-espn-2026`
-- `GET /api/admin/test-espn-scoreboard-2026`
+Read `memory/session-2026-06-15.md` for the complete agreed implementation plan.
+Then confirm with Nick which files you'll touch before writing any code.
 
-```
-npm run build   # in server/
-git add -f server/dist/routes/admin.js server/dist/routes/admin.js.map server/src/routes/admin.ts
-git commit && git push
-```
+**Note: `server/src/services/espnService.ts` has a 2-line edit (added `teamGameStats` import + `and`) that was NOT committed — verify this before building.**
 
-### COMPLETED SESSION June 14–15 2026
+### COMPLETED SESSION June 15 2026
 - **Picks tab crash** — `onTeamPress` in `TeamRow` type but missing from destructuring → ReferenceError. Fixed. Error boundary removed.
 - **Admin/Data tab week default** — `getCurrentNFLWeek()` returned 18 in offseason. Fixed: return 1 when week > 18.
 - **2026 regular season synced** — 272/272 games (all with logos). ESPN scoreboard blocked for future seasons; team-schedule approach works.
@@ -28,6 +25,10 @@ git commit && git push
 - **"Picks locked" message** — hidden for future season games (`game.season > getCurrentNFLSeason()`).
 - **Team tap in game detail** — tapping team logo/name in `game/[id].tsx` navigates to Team Central.
 - **`sync:2026:preseason` npm script** — `--preseason` flag added to local sync script.
+- **Diagnostic no-auth routes removed** — `GET /api/admin/test-espn-2026` and `test-espn-scoreboard-2026` removed from `admin.ts`. Built and pushed.
+- **Live score fixes** — `updateLiveScores()` seasonType bug fixed; OT/HALFTIME display added; client polls every 30s during live games. Committed.
+- **Win probability `*100` bug identified** — `winningTeamWinProb` stored as 0-100 integer but GameCard + WinProbBar multiply by 100 again → shows "6500%". NOT YET FIXED.
+- **Pre-game team stats** — full architecture agreed on (ESPN boxscore → `team_game_stats` table). NOT YET IMPLEMENTED. See `memory/session-2026-06-15.md`.
 
 ---
 
@@ -521,7 +522,7 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 5. Full team names always. Never abbreviations.
 6. Top/bottom game card layout. Never left/right.
 7. Friend group = "Longies". isLongie boolean.
-8. isPremium = future paid only. Not building yet.
+8. isPremium = future paid tier, ~$10/season. Free tier: Picks tab, Leaderboard, own Profile only. Premium tier: full access (Team Central, GameCards with stats, other players' profiles, Game Detail, etc.). All 2026 users get full access. `isPremium` field already on users table. Stripe web-only (no in-app purchase). Do NOT build premium gating yet — plan and confirm with Nick first.
 9. Never hardcode a year. Always getCurrentNFLSeason().
 10. Lock times admin-configurable per week.
 11. Preseason picks and leaderboard are FUNCTIONAL. Preseason stats kept separate from regular season via `seasonType` field. Preseason leaderboard is its own view, not mixed into regular season standings.
