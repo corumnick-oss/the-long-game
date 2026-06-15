@@ -36,6 +36,7 @@ function TeamRow({
   showPct,
   pickOutcome,
   onPress,
+  onTeamPress,
   disabled,
 }: {
   team: string;

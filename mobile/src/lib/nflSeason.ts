@@ -16,7 +16,8 @@ export function getCurrentNFLWeek(): number {
 
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   const week = Math.floor((now.getTime() - seasonStart.getTime()) / msPerWeek) + 1;
-  return Math.min(Math.max(week, 1), 18);
+  if (week > 18) return 1; // offseason — next season hasn't started yet
+  return Math.max(week, 1);
 }
 
 function getNFLSeasonStart(season: number): Date {

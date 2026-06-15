@@ -1,27 +1,7 @@
-import { useState, useCallback, Component } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 
-class GameListErrorBoundary extends Component<{ children: React.ReactNode }, { error: string | null }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { error: null };
-  }
-  static getDerivedStateFromError(e: any) {
-    return { error: e?.message ?? String(e) };
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <Text style={{ color: '#ef4444', fontWeight: 'bold', marginBottom: 8 }}>Render error — please share this with Nick:</Text>
-          <Text style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center' }}>{this.state.error}</Text>
-        </View>
-      );
-    }
-    return this.props.children;
-  }
-}
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker } from '@/hooks/usePicksData';
 import { WeekSelector } from '@/components/WeekSelector';
@@ -141,7 +121,6 @@ export default function PicksScreen() {
         </View>
       )}
 
-      <GameListErrorBoundary>
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#3b82f6" size="large" />
@@ -199,7 +178,6 @@ export default function PicksScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-      </GameListErrorBoundary>
     </View>
   );
 }

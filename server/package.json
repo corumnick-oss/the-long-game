@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --require dotenv/config src/scripts/migrate-2025.ts",
-    "seed:nick": "tsx --require dotenv/config src/scripts/seed-nick-picks.ts"
+    "seed:nick": "tsx --require dotenv/config src/scripts/seed-nick-picks.ts",
+    "sync:2026": "tsx --require dotenv/config src/scripts/sync-2026-local.ts"
   },
   "keywords": [],
   "author": "",
