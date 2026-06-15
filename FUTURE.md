@@ -40,6 +40,17 @@ This is NOT just a friend group app:
 
 ---
 
+## Known Infrastructure Fixes (Next Season Prep)
+
+### Future Season Game Sync — ESPN Scoreboard Limitation
+ESPN's scoreboard endpoint (`/scoreboard?season=2026`) silently returns the current season's data when the requested season doesn't exist yet. Confirmed June 2026: `season=2026` returned 2025 Week 1 games.
+
+**Current workaround:** `server/src/scripts/sync-2026-local.ts` — run locally via `npm run sync:2026`. Fetches all 32 team schedules (which DO expose future season data — confirmed all 18 weeks available as of June 2026), collects event IDs, then upserts via `/summary?event={id}`. Nick runs this manually with `DATABASE_URL` in `server/.env`.
+
+**Proper fix before 2027 season:** Build an admin "Sync Future Season" button that triggers the team-schedule approach (`syncWeekGamesFromTeamSchedules`) from Railway rather than requiring a local script run. The team schedule endpoint works server-side; the scoreboard endpoint doesn't for future seasons. Route already exists in `espnService.ts` — just needs an admin UI trigger and a cron/button to call it each week once the schedule is published (ESPN typically adds weeks 9–18 in August).
+
+---
+
 ## Post-Launch Features
 
 ### Team History Screen

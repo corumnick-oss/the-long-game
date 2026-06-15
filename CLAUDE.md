@@ -7,29 +7,27 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Sync 2026 Games
+## ⚠️ DO THIS FIRST NEXT SESSION — 1 Missing Game + Remove Diagnostic Routes
 
-### Sync 2026 Games
+### 1. Retry Missing Week 10 Game (ESPN event 401873064)
+ESPN returned 500 for this game during the June 14 sync. Script is idempotent — just re-run from server/:
+```
+npm run sync:2026
+```
+This will skip all 271 already-synced games and only insert the missing one once ESPN's data is ready. Verify with `Done. Total synced: 272 games.`
 
-**Status (June 14 2026):** Railway CAN reach 2026 ESPN summary endpoint (confirmed via `/api/admin/test-espn-2026` → `{"ok":true,"home":"Pittsburgh Steelers"}`). Two paths forward:
+### 2. Remove Temporary Diagnostic Routes
+Once sync is confirmed complete, remove these no-auth routes from `server/src/routes/admin.ts` (lines ~15–51):
+- `GET /api/admin/test-espn-2026`
+- `GET /api/admin/test-espn-scoreboard-2026`
 
-**Path A — Run local script (immediate):**
-- `server/src/scripts/sync-2026-local.ts` is written and ready (`npm run sync:2026` from server/)
-- Fetches team schedules locally, upserts directly to Railway DB via DATABASE_URL
-- Nick must run this himself (requires server/.env with DATABASE_URL)
+Then rebuild (`npm run build` in server/) and push.
 
-**Path B — Fix Railway scoreboard for automation:**
-- `GET https://thelonggame-production.up.railway.app/api/admin/test-espn-scoreboard-2026` — test if Railway can reach scoreboard for 2026 directly
-- If `ok: true` with 16 games → update `syncWeekGames` to use scoreboard for all seasons (remove the `if (season > getCurrentNFLSeason())` guard)
-- This makes the regular admin "Sync Week" button work for any future season automatically
-
-**Temporary diagnostic routes in `server/src/routes/admin.ts` (no auth, remove after sync confirmed):**
-- `GET /api/admin/test-espn-2026` — tests summary endpoint (confirmed ok)
-- `GET /api/admin/test-espn-scoreboard-2026` — tests scoreboard endpoint (not yet tested)
-
-### FIXED THIS SESSION (June 14 2026)
-- **Picks tab crash** — `onTeamPress` was in `TeamRow` type but missing from its destructuring, causing ReferenceError at runtime. Added to destructure. Error boundary + `Component` import removed from `picks.tsx`.
-- **Admin/Data tab week default** — `getCurrentNFLWeek()` returned 18 in offseason (week calc ran past 18 for 2025 season). Fixed: return 1 when week > 18.
+### COMPLETED THIS SESSION (June 14 2026)
+- **Picks tab crash** — `onTeamPress` was in `TeamRow` type but missing from its destructuring, causing ReferenceError. Fixed + error boundary removed.
+- **Admin/Data tab week default** — `getCurrentNFLWeek()` returned 18 in offseason. Fixed: return 1 when week > 18.
+- **2026 regular season synced** — 271/272 games (one ESPN 500 on event 401873064, Week 10). Re-run script to get the last one.
+- **2026 preseason synced** — 49 games (weeks 1–4). Week 1 = Hall of Fame game (1 game), weeks 2–4 = 16 games each.
 
 ---
 
