@@ -14,9 +14,9 @@ import * as schema from '../db/schema.js';
 import { games } from '../db/schema.js';
 
 const SEASON = 2026;
-const SEASON_TYPE: 'regular' | 'preseason' = 'regular';
-const SEASON_TYPE_NUM = 2; // 1=preseason, 2=regular
-const MAX_WEEK = 18;
+const SEASON_TYPE: 'regular' | 'preseason' = process.argv.includes('--preseason') ? 'preseason' : 'regular';
+const SEASON_TYPE_NUM = SEASON_TYPE === 'preseason' ? 1 : 2;
+const MAX_WEEK = SEASON_TYPE === 'preseason' ? 4 : 18;
 
 const NFL_TEAM_IDS = [
   '1','2','3','4','5','6','7','8','9','10',
