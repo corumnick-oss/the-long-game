@@ -311,8 +311,8 @@ export default function GameDetailScreen() {
             {game.statsSeasonUsed !== null && game.statsSeasonUsed < game.season && (
               <Text className="text-muted text-xs mb-2 text-center">Using {game.statsSeasonUsed} season averages</Text>
             )}
-            <View className="flex-row justify-between mb-3">
-              <Text className="text-muted text-xs font-semibold uppercase">Stat</Text>
+            <View className="flex-row mb-3">
+              <Text className="text-muted text-xs font-semibold uppercase flex-1">Stat</Text>
               <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.awayTeam.split(' ').pop()}</Text>
               <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.homeTeam.split(' ').pop()}</Text>
             </View>
@@ -359,8 +359,8 @@ export default function GameDetailScreen() {
         {isFinal && (game.homeBoxScore !== null || game.awayBoxScore !== null) && (
           <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
             <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Box Score</Text>
-            <View className="flex-row justify-between mb-3">
-              <Text className="text-muted text-xs font-semibold uppercase">Stat</Text>
+            <View className="flex-row mb-3">
+              <Text className="text-muted text-xs font-semibold uppercase flex-1">Stat</Text>
               <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.awayTeam.split(' ').pop()}</Text>
               <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.homeTeam.split(' ').pop()}</Text>
             </View>
