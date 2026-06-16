@@ -13,6 +13,7 @@ import {
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
+  useSyncTeamStats,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
@@ -253,6 +254,7 @@ function ToolsTab({ season }: { season: number }) {
   const syncFullSeasonFuture = useSyncFullSeasonForFutureSeason();
   const activeSyncGames = isFutureSeason ? syncGamesFuture : syncGames;
   const activeFullSync = isFutureSeason ? syncFullSeasonFuture : syncFullSeason;
+  const syncTeamStats = useSyncTeamStats();
   const awardTrophies = useAwardTrophies();
   const unlockWeek = useUnlockWeek();
   const sendTest = useSendTestNotification();
@@ -360,6 +362,28 @@ function ToolsTab({ season }: { season: number }) {
               onSuccess: () => setResult('probs', `✓ Win probs updated`),
               onError: () => setResult('probs', '✗ Sync failed'),
             })
+          }
+        />
+        <ActionBtn
+          label={`Sync Team Stats (${season} ${seasonType === 'preseason' ? 'Preseason' : 'Regular'})`}
+          loading={syncTeamStats.isPending}
+          result={results['teamstats']}
+          onPress={() =>
+            Alert.alert(
+              'Sync Team Stats',
+              `Backfill box score stats for all completed ${season} ${seasonType} games? This may take a minute.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Sync',
+                  onPress: () =>
+                    syncTeamStats.mutate({ season, seasonType }, {
+                      onSuccess: (r) => setResult('teamstats', `✓ Synced stats for ${r.synced} games`),
+                      onError: (e: any) => setResult('teamstats', `✗ ${e?.message ?? 'Sync failed'}`),
+                    }),
+                },
+              ],
+            )
           }
         />
 

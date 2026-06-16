@@ -77,13 +77,13 @@ export function usePicksByTeam(season: number) {
   });
 }
 
-export function useMyAchievements() {
+export function useMyAchievements(season?: number) {
   const { user } = useAuth();
-  const season = getCurrentNFLSeason();
+  const effectiveSeason = season ?? getCurrentNFLSeason();
   return useQuery({
-    queryKey: ['trophies', 'me', season, user?.uid ?? null],
+    queryKey: ['trophies', 'me', effectiveSeason, user?.uid ?? null],
     queryFn: () =>
-      apiFetch<Achievement[]>(`/api/trophies?userId=${user!.uid}&season=${season}`, undefined, user),
+      apiFetch<Achievement[]>(`/api/trophies?userId=${user!.uid}&season=${effectiveSeason}`, undefined, user),
     enabled: !!user,
     staleTime: 120_000,
   });

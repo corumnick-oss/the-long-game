@@ -1,9 +1,12 @@
 import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useMyProfile, useMyAchievements, type H2HEntry, type WeekRecord, type Achievement } from '@/hooks/useProfile';
+
+const FIRST_SEASON = 2025;
 
 // ── Achievement metadata ──────────────────────────────────────────────────────
 
@@ -153,8 +156,10 @@ function AchievementCard({ trophy }: { trophy: Achievement }) {
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
-  const { data: profile, isLoading } = useMyProfile();
-  const { data: trophies = [] } = useMyAchievements();
+  const [season, setSeason] = useState(getCurrentNFLSeason());
+  const currentSeason = getCurrentNFLSeason();
+  const { data: profile, isLoading } = useMyProfile(season);
+  const { data: trophies = [] } = useMyAchievements(season);
 
   if (isLoading) {
     return (
@@ -222,7 +227,25 @@ export default function ProfileScreen() {
       </View>
 
       {/* ── Season stats ── */}
-      <Section title={`${getCurrentNFLSeason()} Season`}>
+      {/* ── Season stats ── */}
+      <View className="mx-4 mb-5">
+        <View className="flex-row items-center justify-between mb-3">
+          <TouchableOpacity
+            onPress={() => setSeason(s => Math.max(FIRST_SEASON, s - 1))}
+            disabled={season <= FIRST_SEASON}
+            className="w-8 h-8 items-center justify-center"
+          >
+            <Text className={`text-2xl leading-7 ${season <= FIRST_SEASON ? 'text-surface' : 'text-white'}`}>−</Text>
+          </TouchableOpacity>
+          <Text className="text-muted text-xs font-semibold uppercase tracking-widest">{season} Season</Text>
+          <TouchableOpacity
+            onPress={() => setSeason(s => Math.min(currentSeason, s + 1))}
+            disabled={season >= currentSeason}
+            className="w-8 h-8 items-center justify-center"
+          >
+            <Text className={`text-2xl leading-7 ${season >= currentSeason ? 'text-surface' : 'text-white'}`}>+</Text>
+          </TouchableOpacity>
+        </View>
         <View className="flex-row gap-2 mb-2">
           <StatBox
             label="Record"
@@ -244,7 +267,7 @@ export default function ProfileScreen() {
             value={String(profile.trophyCount)}
           />
         </View>
-      </Section>
+      </View>
 
       {/* ── Weekly history ── */}
       <Section title="Week by Week">

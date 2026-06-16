@@ -1,7 +1,10 @@
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useTeamDetail, type RecentGame } from '@/hooks/useTeams';
+
+const FIRST_SEASON = 2025;
 
 function StatPill({ label, value }: { label: string; value: string | number | null }) {
   return (
@@ -59,7 +62,8 @@ function GameRow({ game }: { game: RecentGame }) {
 export default function TeamDetailScreen() {
   const router = useRouter();
   const { name, season: seasonParam, seasonType: seasonTypeParam } = useLocalSearchParams<{ name: string; season?: string; seasonType?: string }>();
-  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentNFLSeason();
+  const currentSeason = getCurrentNFLSeason();
+  const [season, setSeason] = useState(seasonParam ? parseInt(seasonParam, 10) : currentSeason);
   const seasonType = (seasonTypeParam as 'regular' | 'preseason') ?? 'regular';
   const { data: team, isLoading, isError } = useTeamDetail(name ?? '', season, seasonType);
 
@@ -97,7 +101,23 @@ export default function TeamDetailScreen() {
         </TouchableOpacity>
         <View className="flex-1 items-center">
           <Text className="text-white font-bold text-base" numberOfLines={1}>{team.name}</Text>
-          <Text className="text-muted text-xs">{season} {seasonType === 'preseason' ? 'Preseason' : 'Season'}</Text>
+          <View className="flex-row items-center gap-3 mt-0.5">
+            <TouchableOpacity
+              onPress={() => setSeason(s => Math.max(FIRST_SEASON, s - 1))}
+              disabled={season <= FIRST_SEASON}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+            >
+              <Text className={`text-base leading-5 ${season <= FIRST_SEASON ? 'text-surface' : 'text-muted'}`}>−</Text>
+            </TouchableOpacity>
+            <Text className="text-muted text-xs">{season} {seasonType === 'preseason' ? 'Preseason' : 'Season'}</Text>
+            <TouchableOpacity
+              onPress={() => setSeason(s => Math.min(currentSeason, s + 1))}
+              disabled={season >= currentSeason}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+            >
+              <Text className={`text-base leading-5 ${season >= currentSeason ? 'text-surface' : 'text-muted'}`}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={{ width: 56 }} />
       </View>
