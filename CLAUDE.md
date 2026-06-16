@@ -11,12 +11,34 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION — Test Game Detail + Fix Season Selectors
 
-### Verify: Game detail crash fix (push OTA first)
-Root cause found at end of June 17 session: `isPre` was referenced on line 305 of `game/[id].tsx` but never declared — `ReferenceError` on every render for all game states. Fixed by adding `const isPre = game.status === 'pre';` alongside `isFinal`/`isLive`.  
-**Action before anything else:** commit + push OTA (`eas update --branch preview`), then test:
-1. Open a completed 2025 game → should see Box Score section (yards, 3rd down as ratio, red zone, sacks, turnovers, 1st downs)
-2. Open a future 2026 game → should see season averages table (PPG, YPG, 3rd Down %, etc.) and win probability bar
-3. If either still crashes, check Railway logs for 500 errors on `GET /api/games/:id`
+### DONE: Game detail crash fix ✓
+`isPre` was undeclared → ReferenceError on every render. Fixed June 17 session. OTA pushed. Post-game 2025 box score now works.
+
+### STILL BROKEN: Pre-game stats not showing on 2026 games
+2026 game detail opens fine but the stats section (PPG, YPG, 3rd Down %, etc.) is blank — only the spread and pick message show.
+
+**What was tried (June 17 session):**
+1. Fixed `isPre` declaration → game detail loads now
+2. Changed `fetchTeamStatsMap` to query by game IDs from the `games` table instead of filtering by `additionalStats.seasonType` — still not showing
+
+**Most likely remaining cause: `team_game_stats` is empty or team names don't match**  
+The backfill ran locally (`npm run backfill:stats`) and reported "272 processed", but the backend may not be finding rows. To diagnose, start next session by verifying the DB directly:
+
+1. **Check Railway Postgres** — go to Railway → your DB service → "Data" tab (or connect via `psql`) and run:
+   ```sql
+   SELECT COUNT(*), season, team_name FROM team_game_stats GROUP BY season, team_name ORDER BY season LIMIT 20;
+   ```
+   If count is 0 or rows are missing, the backfill data isn't in the DB.
+
+2. **Check team name mismatch** — if rows exist, compare a `team_name` from `team_game_stats` with `home_team` from the `games` table for a 2026 game. They must match exactly.
+   ```sql
+   SELECT DISTINCT team_name FROM team_game_stats LIMIT 10;
+   SELECT home_team, away_team FROM games WHERE season = 2026 LIMIT 5;
+   ```
+
+3. **If DB is empty** — re-run `npm run backfill:stats` in `server/` (reads Railway DB URL from `.env`). Check for errors in output. If ESPN returns 400s again, the Railway IP block may now affect more endpoints.
+
+4. **If names mismatch** — the fix is to update the `teamName` stored in `syncBoxScoreStats` to use a normalized form, or to change the fallback query to use a case-insensitive/fuzzy match.
 
 ### Fix 1: Profile season selector layout (`profile.tsx`) — STILL NEEDED
 The +/- buttons sit at the far left and right edges of the screen. They should be compact and centered inline with the year label, matching the style of other selectors in the app (e.g., the admin week picker: `−  Week X  +` centered together). Redesign so the three elements (−, label, +) are grouped tightly in the center, not spread across the full width.
