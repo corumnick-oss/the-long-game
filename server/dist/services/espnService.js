@@ -316,7 +316,7 @@ async function syncWinProbabilities(week, season) {
 // Sync box score stats for a completed game into team_game_stats (idempotent — delete + insert).
 async function syncBoxScoreStats(game) {
     try {
-        const { data } = await axios_1.default.get(`${BASE}/summary?event=${game.espnId}`, { headers: ESPN_HEADERS });
+        const { data } = await axios_1.default.get(`${BASE}/summary?event=${game.espnId}`);
         const teams = data.boxscore?.teams ?? [];
         if (teams.length === 0) {
             console.warn(`[ESPN] No boxscore teams for event ${game.espnId}`);

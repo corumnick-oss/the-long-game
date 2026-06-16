@@ -369,7 +369,7 @@ export async function syncBoxScoreStats(game: {
   awayScore: number | null;
 }): Promise<void> {
   try {
-    const { data } = await axios.get(`${BASE}/summary?event=${game.espnId}`, { headers: ESPN_HEADERS });
+    const { data } = await axios.get(`${BASE}/summary?event=${game.espnId}`);
 
     const teams: any[] = data.boxscore?.teams ?? [];
     if (teams.length === 0) {
