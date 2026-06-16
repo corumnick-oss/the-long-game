@@ -34,30 +34,40 @@ async function fetchTeamStatsMap(
 ): Promise<{ map: Record<string, TeamStats>; seasonUsed: number | null }> {
   if (teamNames.length === 0) return { map: {}, seasonUsed: null };
 
-  const query = (s: number) =>
-    db.query.teamGameStats.findMany({
+  // Get completed game IDs for a given season+type, then pull stats for our teams.
+  // Joining through games avoids relying on additionalStats.seasonType being set correctly.
+  const getRows = async (s: number, st: string) => {
+    const completedGames = await db.query.games.findMany({
+      where: and(
+        eq(schema.games.season, s),
+        eq(schema.games.seasonType, st),
+        eq(schema.games.sport, 'nfl'),
+        eq(schema.games.status, 'post'),
+      ),
+      columns: { id: true },
+    });
+    if (completedGames.length === 0) return [];
+    const gameIds = completedGames.map(g => g.id);
+    return db.query.teamGameStats.findMany({
       where: and(
         inArray(schema.teamGameStats.teamName, teamNames),
-        eq(schema.teamGameStats.season, s),
+        inArray(schema.teamGameStats.gameId, gameIds),
         eq(schema.teamGameStats.sport, 'nfl'),
       ),
     });
+  };
 
-  let rows = await query(season);
-  let filtered = rows.filter(r => (r.additionalStats as any)?.seasonType === seasonType);
+  let rows = await getRows(season, seasonType);
+  let seasonUsed: number | null = rows.length > 0 ? season : null;
 
-  let seasonUsed: number | null = null;
-  if (filtered.length === 0 && season > 2025) {
-    rows = await query(2025);
-    filtered = rows.filter(r => (r.additionalStats as any)?.seasonType === 'regular');
-    if (filtered.length > 0) seasonUsed = 2025;
-  } else if (filtered.length > 0) {
-    seasonUsed = season;
+  if (rows.length === 0 && season > 2025) {
+    rows = await getRows(2025, 'regular');
+    if (rows.length > 0) seasonUsed = 2025;
   }
 
   const map: Record<string, TeamStats> = {};
   for (const name of teamNames) {
-    const tr = filtered.filter(r => r.teamName === name);
+    const tr = rows.filter(r => r.teamName === name);
     map[name] = {
       ppg:          avgOf(tr.map(r => r.pointsPerGame)),
       ppga:         avgOf(tr.map(r => r.pointsAllowedPerGame)),
