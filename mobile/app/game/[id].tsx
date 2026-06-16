@@ -149,6 +149,7 @@ export default function GameDetailScreen() {
 
   const isFinal = game.status === 'post';
   const isLive = game.status === 'in';
+  const isPre = game.status === 'pre';
 
   const homeWins = isFinal && (game.homeScore ?? 0) > (game.awayScore ?? 0);
   const awayWins = isFinal && (game.awayScore ?? 0) > (game.homeScore ?? 0);

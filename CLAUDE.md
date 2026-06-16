@@ -9,14 +9,14 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Test Stats + Fix Season Selectors
+## ⚠️ DO THIS FIRST NEXT SESSION — Test Game Detail + Fix Season Selectors
 
-### Test Before Continuing (OTA b5f72782 deployed, Railway commit 444048a)
-Open the app and verify these things are working:
-1. **Game Detail — completed 2025 game**: tap any final game → should see "Box Score" section with Total Yards, Pass Yards, Rush Yards, 3rd Down (e.g. "6/14"), Red Zone (e.g. "3/4"), Sacks, Turnovers, 1st Downs for both teams
-2. **Game Detail — pre-game 2026 game**: tap any upcoming game → should see averages table with PPG, Opp PPG, YPG, Yds Allowed/G, Pass YPG, Rush YPG, **3rd Down %**, **Red Zone %**, **Sacks/G**, **Turnovers/G** + Win Probability bar + Spread
-3. **Team Detail**: tap any team → Yards section + new **Efficiency section** (3rd Down %, Red Zone %, Sacks/G, Turnovers/G)
-4. **Pre-game averages on 2026 game**: should show 2025 season averages (backend fallback already built) — verify at least PPG/YPG appear
+### Verify: Game detail crash fix (push OTA first)
+Root cause found at end of June 17 session: `isPre` was referenced on line 305 of `game/[id].tsx` but never declared — `ReferenceError` on every render for all game states. Fixed by adding `const isPre = game.status === 'pre';` alongside `isFinal`/`isLive`.  
+**Action before anything else:** commit + push OTA (`eas update --branch preview`), then test:
+1. Open a completed 2025 game → should see Box Score section (yards, 3rd down as ratio, red zone, sacks, turnovers, 1st downs)
+2. Open a future 2026 game → should see season averages table (PPG, YPG, 3rd Down %, etc.) and win probability bar
+3. If either still crashes, check Railway logs for 500 errors on `GET /api/games/:id`
 
 ### Fix 1: Profile season selector layout (`profile.tsx`) — STILL NEEDED
 The +/- buttons sit at the far left and right edges of the screen. They should be compact and centered inline with the year label, matching the style of other selectors in the app (e.g., the admin week picker: `−  Week X  +` centered together). Redesign so the three elements (−, label, +) are grouped tightly in the center, not spread across the full width.
