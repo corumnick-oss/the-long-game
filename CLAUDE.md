@@ -9,15 +9,22 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — ESPN Stats Sync
+## ⚠️ DO THIS FIRST NEXT SESSION — Fix Season Selectors + ESPN Sync
 
+### Fix 1: Profile season selector layout (`profile.tsx`)
+The +/- buttons sit at the far left and right edges of the screen. They should be compact and centered inline with the year label, matching the style of other selectors in the app (e.g., the admin week picker: `−  Week X  +` centered together). Redesign so the three elements (−, label, +) are grouped tightly in the center, not spread across the full width.
+
+### Fix 2: Team Detail season selector layout + bug (`team/[name].tsx`)
+Same visual problem as profile — buttons look different from other selectors. Additionally, changing the season causes a **"Team not found" error**. Likely cause: when the season changes, `seasonType` is still read from the original URL param (e.g., 'preseason' from a 2026 navigation), but the new season has no games for that type (no 2025 preseason in DB). Fix: either reset `seasonType` to 'regular' when season changes, or add a seasonType toggle alongside the season selector. Also fix the visual style to match the admin/picks selector pattern.
+
+### Fix 3: ESPN Stats Sync (check Railway logs first)
 Check Railway logs for `[ESPN] No boxscore teams for event` warnings after the June 16 admin sync. This will tell us if ESPN is returning historical boxscore data for 2025 games. Read `memory/session-2026-06-16.md` for full context.
 
 ### COMPLETED SESSION June 16 2026
 - **Pre-game team stats** — full implementation shipped (backend + mobile). See session-2026-06-16.md for complete file list.
 - **Win probability `*100` bug** — FIXED in GameCard.tsx and game/[id].tsx WinProbBar.
 - **Startup crash (ypg)** — `ypg` added to TeamRow type but missing from destructuring → ReferenceError crash on every render. FIXED.
-- **Season selectors** — +/- on Profile tab and Team Detail screen. Upper bound uses `new Date().getFullYear()` (not `getCurrentNFLSeason()`) so buttons are visible in offseason.
+- **Season selectors** — +/- on Profile tab and Team Detail screen. Buttons visible now but layout wrong (see fixes above). Upper bound uses `new Date().getFullYear()`.
 - **Team detail Yards section** — YPG/YAPG/Pass YPG/Rush YPG display added below Scoring section.
 - **Admin Sync Team Stats button** — in NFL Tools tab, triggers backfill of all completed games for selected season/type.
 - **ESPN stats sync — UNRESOLVED** — Admin button says "Synced 272 games" but stats don't appear in app. `backfillTeamStats` counts games *processed* not *inserted*. ESPN /summary may not return boxscore data for historical 2025 games from Railway server. Check Railway logs.
