@@ -21,6 +21,10 @@ type TeamStats = {
   yapg: number | null;
   passYpg: number | null;
   rushYpg: number | null;
+  thirdDownPct: number | null;
+  redZonePct: number | null;
+  sacksPG: number | null;
+  turnoversPG: number | null;
 };
 
 async function fetchTeamStatsMap(
@@ -55,12 +59,16 @@ async function fetchTeamStatsMap(
   for (const name of teamNames) {
     const tr = filtered.filter(r => r.teamName === name);
     map[name] = {
-      ppg:      avgOf(tr.map(r => r.pointsPerGame)),
-      ppga:     avgOf(tr.map(r => r.pointsAllowedPerGame)),
-      ypg:      avgOf(tr.map(r => r.yardsPerGame)),
-      yapg:     avgOf(tr.map(r => r.yardsAllowedPerGame)),
-      passYpg:  avgOf(tr.map(r => (r.additionalStats as any)?.passingYards)),
-      rushYpg:  avgOf(tr.map(r => (r.additionalStats as any)?.rushingYards)),
+      ppg:          avgOf(tr.map(r => r.pointsPerGame)),
+      ppga:         avgOf(tr.map(r => r.pointsAllowedPerGame)),
+      ypg:          avgOf(tr.map(r => r.yardsPerGame)),
+      yapg:         avgOf(tr.map(r => r.yardsAllowedPerGame)),
+      passYpg:      avgOf(tr.map(r => (r.additionalStats as any)?.passingYards)),
+      rushYpg:      avgOf(tr.map(r => (r.additionalStats as any)?.rushingYards)),
+      thirdDownPct: avgOf(tr.map(r => r.thirdDownConversion)),
+      redZonePct:   avgOf(tr.map(r => r.redZoneEfficiency)),
+      sacksPG:      avgOf(tr.map(r => r.sackRate)),
+      turnoversPG:  avgOf(tr.map(r => (r.additionalStats as any)?.turnovers)),
     };
   }
   return { map, seasonUsed };
@@ -127,18 +135,26 @@ router.get('/', optionalAuth, async (req, res) => {
     myPick: myPicksMap[game.id] ?? null,
     homePickPct: pickPctMap[game.id]?.homePickPct ?? null,
     awayPickPct: pickPctMap[game.id]?.awayPickPct ?? null,
-    homePPG:      statsMap[game.homeTeam]?.ppg ?? null,
-    homePPGA:     statsMap[game.homeTeam]?.ppga ?? null,
-    homeYPG:      statsMap[game.homeTeam]?.ypg ?? null,
-    homeYAPG:     statsMap[game.homeTeam]?.yapg ?? null,
-    homePassYPG:  statsMap[game.homeTeam]?.passYpg ?? null,
-    homeRushYPG:  statsMap[game.homeTeam]?.rushYpg ?? null,
-    awayPPG:      statsMap[game.awayTeam]?.ppg ?? null,
-    awayPPGA:     statsMap[game.awayTeam]?.ppga ?? null,
-    awayYPG:      statsMap[game.awayTeam]?.ypg ?? null,
-    awayYAPG:     statsMap[game.awayTeam]?.yapg ?? null,
-    awayPassYPG:  statsMap[game.awayTeam]?.passYpg ?? null,
-    awayRushYPG:  statsMap[game.awayTeam]?.rushYpg ?? null,
+    homePPG:           statsMap[game.homeTeam]?.ppg ?? null,
+    homePPGA:          statsMap[game.homeTeam]?.ppga ?? null,
+    homeYPG:           statsMap[game.homeTeam]?.ypg ?? null,
+    homeYAPG:          statsMap[game.homeTeam]?.yapg ?? null,
+    homePassYPG:       statsMap[game.homeTeam]?.passYpg ?? null,
+    homeRushYPG:       statsMap[game.homeTeam]?.rushYpg ?? null,
+    homeThirdDownPct:  statsMap[game.homeTeam]?.thirdDownPct ?? null,
+    homeRedZonePct:    statsMap[game.homeTeam]?.redZonePct ?? null,
+    homeSacksPG:       statsMap[game.homeTeam]?.sacksPG ?? null,
+    homeTurnoversPG:   statsMap[game.homeTeam]?.turnoversPG ?? null,
+    awayPPG:           statsMap[game.awayTeam]?.ppg ?? null,
+    awayPPGA:          statsMap[game.awayTeam]?.ppga ?? null,
+    awayYPG:           statsMap[game.awayTeam]?.ypg ?? null,
+    awayYAPG:          statsMap[game.awayTeam]?.yapg ?? null,
+    awayPassYPG:       statsMap[game.awayTeam]?.passYpg ?? null,
+    awayRushYPG:       statsMap[game.awayTeam]?.rushYpg ?? null,
+    awayThirdDownPct:  statsMap[game.awayTeam]?.thirdDownPct ?? null,
+    awayRedZonePct:    statsMap[game.awayTeam]?.redZonePct ?? null,
+    awaySacksPG:       statsMap[game.awayTeam]?.sacksPG ?? null,
+    awayTurnoversPG:   statsMap[game.awayTeam]?.turnoversPG ?? null,
     statsSeasonUsed,
   })));
 });
@@ -193,12 +209,40 @@ router.get('/:id', optionalAuth, async (req, res) => {
     myPick = myPickRecord?.pick ?? null;
   }
 
-  // Team stats for this game
+  // Team stats averages (pre-game context)
   const { map: statsMap, seasonUsed: statsSeasonUsed } = await fetchTeamStatsMap(
     [game.homeTeam, game.awayTeam],
     game.season,
     game.seasonType,
   );
+
+  // Actual box score for completed games
+  const buildBoxScore = (row: typeof import('../db/schema').teamGameStats.$inferSelect | undefined) => {
+    if (!row) return null;
+    const a = row.additionalStats as any;
+    return {
+      totalYards:    row.yardsPerGame,
+      passYards:     a?.passingYards ?? null,
+      rushYards:     a?.rushingYards ?? null,
+      thirdDown:     row.thirdDownConversion,
+      thirdDownRaw:  a?.thirdDownRaw ?? null,
+      redZone:       row.redZoneEfficiency,
+      redZoneRaw:    a?.redZoneRaw ?? null,
+      sacks:         row.sackRate,
+      turnovers:     a?.turnovers ?? null,
+      firstDowns:    a?.firstDowns ?? null,
+    };
+  };
+
+  let homeBoxScore = null;
+  let awayBoxScore = null;
+  if (game.status === 'post') {
+    const boxRows = await db.query.teamGameStats.findMany({
+      where: eq(schema.teamGameStats.gameId, game.id),
+    });
+    homeBoxScore = buildBoxScore(boxRows.find(r => r.isHomeTeam));
+    awayBoxScore = buildBoxScore(boxRows.find(r => !r.isHomeTeam));
+  }
 
   // Last 5 completed games for each team this season
   const seasonGames = await db.query.games.findMany({
@@ -238,19 +282,29 @@ router.get('/:id', optionalAuth, async (req, res) => {
     pickBreakdown,
     myPick,
     isLocked: locked,
-    homePPG:      statsMap[game.homeTeam]?.ppg ?? null,
-    homePPGA:     statsMap[game.homeTeam]?.ppga ?? null,
-    homeYPG:      statsMap[game.homeTeam]?.ypg ?? null,
-    homeYAPG:     statsMap[game.homeTeam]?.yapg ?? null,
-    homePassYPG:  statsMap[game.homeTeam]?.passYpg ?? null,
-    homeRushYPG:  statsMap[game.homeTeam]?.rushYpg ?? null,
-    awayPPG:      statsMap[game.awayTeam]?.ppg ?? null,
-    awayPPGA:     statsMap[game.awayTeam]?.ppga ?? null,
-    awayYPG:      statsMap[game.awayTeam]?.ypg ?? null,
-    awayYAPG:     statsMap[game.awayTeam]?.yapg ?? null,
-    awayPassYPG:  statsMap[game.awayTeam]?.passYpg ?? null,
-    awayRushYPG:  statsMap[game.awayTeam]?.rushYpg ?? null,
+    homePPG:          statsMap[game.homeTeam]?.ppg ?? null,
+    homePPGA:         statsMap[game.homeTeam]?.ppga ?? null,
+    homeYPG:          statsMap[game.homeTeam]?.ypg ?? null,
+    homeYAPG:         statsMap[game.homeTeam]?.yapg ?? null,
+    homePassYPG:      statsMap[game.homeTeam]?.passYpg ?? null,
+    homeRushYPG:      statsMap[game.homeTeam]?.rushYpg ?? null,
+    homeThirdDownPct: statsMap[game.homeTeam]?.thirdDownPct ?? null,
+    homeRedZonePct:   statsMap[game.homeTeam]?.redZonePct ?? null,
+    homeSacksPG:      statsMap[game.homeTeam]?.sacksPG ?? null,
+    homeTurnoversPG:  statsMap[game.homeTeam]?.turnoversPG ?? null,
+    awayPPG:          statsMap[game.awayTeam]?.ppg ?? null,
+    awayPPGA:         statsMap[game.awayTeam]?.ppga ?? null,
+    awayYPG:          statsMap[game.awayTeam]?.ypg ?? null,
+    awayYAPG:         statsMap[game.awayTeam]?.yapg ?? null,
+    awayPassYPG:      statsMap[game.awayTeam]?.passYpg ?? null,
+    awayRushYPG:      statsMap[game.awayTeam]?.rushYpg ?? null,
+    awayThirdDownPct: statsMap[game.awayTeam]?.thirdDownPct ?? null,
+    awayRedZonePct:   statsMap[game.awayTeam]?.redZonePct ?? null,
+    awaySacksPG:      statsMap[game.awayTeam]?.sacksPG ?? null,
+    awayTurnoversPG:  statsMap[game.awayTeam]?.turnoversPG ?? null,
     statsSeasonUsed,
+    homeBoxScore,
+    awayBoxScore,
     homeTeamRecentGames: makeRecentGames(game.homeTeam),
     awayTeamRecentGames: makeRecentGames(game.awayTeam),
   });

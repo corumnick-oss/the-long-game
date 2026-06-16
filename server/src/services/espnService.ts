@@ -401,17 +401,34 @@ export async function syncBoxScoreStats(game: {
       return Math.round((parts[0] / parts[1]) * 1000) / 10;
     };
 
-    const homeTotalYards  = parseYards(getStat(home, 'totalYards'));
-    const homePassYards   = parseYards(getStat(home, 'netPassingYards'));
-    const homeRushYards   = parseYards(getStat(home, 'rushingYards'));
-    const homeThirdDown   = parseRatio(getStat(home, 'thirdDownEff'));
-    const homeRedZone     = parseRatio(getStat(home, 'redZoneAttempts'));
+    const homeTotalYards   = parseYards(getStat(home, 'totalYards'));
+    const homePassYards    = parseYards(getStat(home, 'netPassingYards'));
+    const homeRushYards    = parseYards(getStat(home, 'rushingYards'));
+    const homeThirdDownRaw = getStat(home, 'thirdDownEff');
+    const homeRedZoneRaw   = getStat(home, 'redZoneAttempts');
+    const homeThirdDown    = parseRatio(homeThirdDownRaw);
+    const homeRedZone      = parseRatio(homeRedZoneRaw);
+    const homeSacksRaw     = getStat(home, 'sacksYardsLost');   // "2-15"
+    const homeTurnovers    = parseYards(getStat(home, 'turnovers'));
+    const homeFirstDowns   = parseYards(getStat(home, 'firstDowns'));
 
-    const awayTotalYards  = parseYards(getStat(away, 'totalYards'));
-    const awayPassYards   = parseYards(getStat(away, 'netPassingYards'));
-    const awayRushYards   = parseYards(getStat(away, 'rushingYards'));
-    const awayThirdDown   = parseRatio(getStat(away, 'thirdDownEff'));
-    const awayRedZone     = parseRatio(getStat(away, 'redZoneAttempts'));
+    const awayTotalYards   = parseYards(getStat(away, 'totalYards'));
+    const awayPassYards    = parseYards(getStat(away, 'netPassingYards'));
+    const awayRushYards    = parseYards(getStat(away, 'rushingYards'));
+    const awayThirdDownRaw = getStat(away, 'thirdDownEff');
+    const awayRedZoneRaw   = getStat(away, 'redZoneAttempts');
+    const awayThirdDown    = parseRatio(awayThirdDownRaw);
+    const awayRedZone      = parseRatio(awayRedZoneRaw);
+    const awaySacksRaw     = getStat(away, 'sacksYardsLost');
+    const awayTurnovers    = parseYards(getStat(away, 'turnovers'));
+    const awayFirstDowns   = parseYards(getStat(away, 'firstDowns'));
+
+    // Defensive sacks = how many times this team's defense sacked the opponent
+    const homeDefSacks = awaySacksRaw ? (parseInt(awaySacksRaw.split('-')[0], 10) || null) : null;
+    const awayDefSacks = homeSacksRaw ? (parseInt(homeSacksRaw.split('-')[0], 10) || null) : null;
+    // QB sacked (offensive stat — how many times this team's own QB was sacked)
+    const homeOffSacks = homeSacksRaw ? (parseInt(homeSacksRaw.split('-')[0], 10) || null) : null;
+    const awayOffSacks = awaySacksRaw ? (parseInt(awaySacksRaw.split('-')[0], 10) || null) : null;
 
     // Idempotent — delete existing rows for this game before reinserting
     await db.delete(teamGameStats).where(eq(teamGameStats.gameId, game.id));
@@ -430,7 +447,17 @@ export async function syncBoxScoreStats(game: {
         pointsAllowedPerGame: game.awayScore,
         thirdDownConversion: homeThirdDown,
         redZoneEfficiency: homeRedZone,
-        additionalStats: { passingYards: homePassYards, rushingYards: homeRushYards, seasonType: game.seasonType },
+        sackRate: homeDefSacks,
+        additionalStats: {
+          passingYards: homePassYards,
+          rushingYards: homeRushYards,
+          seasonType: game.seasonType,
+          turnovers: homeTurnovers,
+          firstDowns: homeFirstDowns,
+          sacksAllowed: homeOffSacks,
+          thirdDownRaw: homeThirdDownRaw,
+          redZoneRaw: homeRedZoneRaw,
+        },
       },
       {
         gameId: game.id,
@@ -445,7 +472,17 @@ export async function syncBoxScoreStats(game: {
         pointsAllowedPerGame: game.homeScore,
         thirdDownConversion: awayThirdDown,
         redZoneEfficiency: awayRedZone,
-        additionalStats: { passingYards: awayPassYards, rushingYards: awayRushYards, seasonType: game.seasonType },
+        sackRate: awayDefSacks,
+        additionalStats: {
+          passingYards: awayPassYards,
+          rushingYards: awayRushYards,
+          seasonType: game.seasonType,
+          turnovers: awayTurnovers,
+          firstDowns: awayFirstDowns,
+          sacksAllowed: awayOffSacks,
+          thirdDownRaw: awayThirdDownRaw,
+          redZoneRaw: awayRedZoneRaw,
+        },
       },
     ]);
 

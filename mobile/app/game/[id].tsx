@@ -1,10 +1,25 @@
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useGameDetail, type PickEntry, type RecentGameEntry } from '@/hooks/useGameDetail';
+import { useGameDetail, type PickEntry, type RecentGameEntry, type BoxScore } from '@/hooks/useGameDetail';
 import { useGames } from '@/hooks/usePicksData';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatRatio(raw: string | null | undefined): string {
+  if (!raw) return '—';
+  return raw.replace('-', '/');
+}
+
+function StatRow({ label, away, home }: { label: string; away: string; home: string }) {
+  return (
+    <View className="flex-row justify-between py-2 border-b border-border">
+      <Text className="text-muted text-sm flex-1">{label}</Text>
+      <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{away}</Text>
+      <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{home}</Text>
+    </View>
+  );
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -286,75 +301,119 @@ export default function GameDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── Team stats ── */}
-        {(game.awayPPG !== null || game.homeYPG !== null || game.winningTeamWinProb !== null) && (
+        {/* ── Pre-game stats (season averages) ── */}
+        {isPre && (game.awayPPG !== null || game.homeYPG !== null || game.winningTeamWinProb !== null) && (
           <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
-            {game.statsSeasonUsed !== null && game.statsSeasonUsed < season && (
+            {game.statsSeasonUsed !== null && game.statsSeasonUsed < game.season && (
               <Text className="text-muted text-xs mb-2 text-center">Using {game.statsSeasonUsed} season averages</Text>
             )}
             <View className="flex-row justify-between mb-3">
               <Text className="text-muted text-xs font-semibold uppercase">Stat</Text>
-              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>
-                {game.awayTeam.split(' ').pop()}
-              </Text>
-              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>
-                {game.homeTeam.split(' ').pop()}
-              </Text>
+              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.awayTeam.split(' ').pop()}</Text>
+              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.homeTeam.split(' ').pop()}</Text>
             </View>
             {game.awayPPG !== null && game.homePPG !== null && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">PPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayPPG.toFixed(1)}</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homePPG.toFixed(1)}</Text>
-              </View>
+              <StatRow label="PPG" away={game.awayPPG.toFixed(1)} home={game.homePPG.toFixed(1)} />
             )}
             {game.awayPPGA !== null && game.homePPGA !== null && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">Opp PPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayPPGA.toFixed(1)}</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homePPGA.toFixed(1)}</Text>
-              </View>
+              <StatRow label="Opp PPG" away={game.awayPPGA.toFixed(1)} home={game.homePPGA.toFixed(1)} />
             )}
             {game.awayYPG !== null && game.homeYPG !== null && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">YPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayYPG}</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homeYPG}</Text>
-              </View>
+              <StatRow label="YPG" away={String(game.awayYPG)} home={String(game.homeYPG)} />
             )}
             {game.awayYAPG !== null && game.homeYAPG !== null && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">Yds Allowed</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayYAPG}</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homeYAPG}</Text>
-              </View>
+              <StatRow label="Yds Allowed/G" away={String(game.awayYAPG)} home={String(game.homeYAPG)} />
             )}
             {game.awayPassYPG !== null && game.homePassYPG !== null && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">Pass YPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayPassYPG}</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homePassYPG}</Text>
-              </View>
+              <StatRow label="Pass YPG" away={String(game.awayPassYPG)} home={String(game.homePassYPG)} />
             )}
             {game.awayRushYPG !== null && game.homeRushYPG !== null && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">Rush YPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayRushYPG}</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homeRushYPG}</Text>
-              </View>
+              <StatRow label="Rush YPG" away={String(game.awayRushYPG)} home={String(game.homeRushYPG)} />
             )}
-            {!isFinal && !isLive && game.spread && (
+            {game.awayThirdDownPct !== null && game.homeThirdDownPct !== null && (
+              <StatRow label="3rd Down %" away={`${game.awayThirdDownPct}%`} home={`${game.homeThirdDownPct}%`} />
+            )}
+            {game.awayRedZonePct !== null && game.homeRedZonePct !== null && (
+              <StatRow label="Red Zone %" away={`${game.awayRedZonePct}%`} home={`${game.homeRedZonePct}%`} />
+            )}
+            {game.awaySacksPG !== null && game.homeSacksPG !== null && (
+              <StatRow label="Sacks/G" away={game.awaySacksPG.toFixed(1)} home={game.homeSacksPG.toFixed(1)} />
+            )}
+            {game.awayTurnoversPG !== null && game.homeTurnoversPG !== null && (
+              <StatRow label="Turnovers/G" away={game.awayTurnoversPG.toFixed(1)} home={game.homeTurnoversPG.toFixed(1)} />
+            )}
+            {game.spread && (
               <View className="flex-row justify-between py-2 border-b border-border">
                 <Text className="text-muted text-sm flex-1">Spread</Text>
                 <Text className="text-white text-sm font-medium text-right" style={{ width: 128 }}>{game.spread}</Text>
               </View>
             )}
-            {!isFinal && !isLive && (
-              <WinProbBar
-                favoriteTeam={game.favoriteTeam}
-                prob={game.winningTeamWinProb}
-                homeTeam={game.homeTeam}
-                awayTeam={game.awayTeam}
+            <WinProbBar
+              favoriteTeam={game.favoriteTeam}
+              prob={game.winningTeamWinProb}
+              homeTeam={game.homeTeam}
+              awayTeam={game.awayTeam}
+            />
+          </View>
+        )}
+
+        {/* ── Post-game box score ── */}
+        {isFinal && (game.homeBoxScore !== null || game.awayBoxScore !== null) && (
+          <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
+            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Box Score</Text>
+            <View className="flex-row justify-between mb-3">
+              <Text className="text-muted text-xs font-semibold uppercase">Stat</Text>
+              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.awayTeam.split(' ').pop()}</Text>
+              <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>{game.homeTeam.split(' ').pop()}</Text>
+            </View>
+            <StatRow
+              label="Total Yards"
+              away={String(game.awayBoxScore?.totalYards ?? '—')}
+              home={String(game.homeBoxScore?.totalYards ?? '—')}
+            />
+            <StatRow
+              label="Pass Yards"
+              away={String(game.awayBoxScore?.passYards ?? '—')}
+              home={String(game.homeBoxScore?.passYards ?? '—')}
+            />
+            <StatRow
+              label="Rush Yards"
+              away={String(game.awayBoxScore?.rushYards ?? '—')}
+              home={String(game.homeBoxScore?.rushYards ?? '—')}
+            />
+            {(game.awayBoxScore?.thirdDownRaw || game.homeBoxScore?.thirdDownRaw) && (
+              <StatRow
+                label="3rd Down"
+                away={formatRatio(game.awayBoxScore?.thirdDownRaw)}
+                home={formatRatio(game.homeBoxScore?.thirdDownRaw)}
+              />
+            )}
+            {(game.awayBoxScore?.redZoneRaw || game.homeBoxScore?.redZoneRaw) && (
+              <StatRow
+                label="Red Zone"
+                away={formatRatio(game.awayBoxScore?.redZoneRaw)}
+                home={formatRatio(game.homeBoxScore?.redZoneRaw)}
+              />
+            )}
+            {(game.awayBoxScore?.sacks !== null || game.homeBoxScore?.sacks !== null) && (
+              <StatRow
+                label="Sacks"
+                away={String(game.awayBoxScore?.sacks ?? '—')}
+                home={String(game.homeBoxScore?.sacks ?? '—')}
+              />
+            )}
+            {(game.awayBoxScore?.turnovers !== null || game.homeBoxScore?.turnovers !== null) && (
+              <StatRow
+                label="Turnovers"
+                away={String(game.awayBoxScore?.turnovers ?? '—')}
+                home={String(game.homeBoxScore?.turnovers ?? '—')}
+              />
+            )}
+            {(game.awayBoxScore?.firstDowns !== null || game.homeBoxScore?.firstDowns !== null) && (
+              <StatRow
+                label="1st Downs"
+                away={String(game.awayBoxScore?.firstDowns ?? '—')}
+                home={String(game.homeBoxScore?.firstDowns ?? '—')}
               />
             )}
           </View>

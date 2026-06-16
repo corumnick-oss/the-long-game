@@ -23,6 +23,19 @@ export type RecentGameEntry = {
   result: 'W' | 'L' | null;
 };
 
+export type BoxScore = {
+  totalYards: number | null;
+  passYards: number | null;
+  rushYards: number | null;
+  thirdDown: number | null;
+  thirdDownRaw: string | null;
+  redZone: number | null;
+  redZoneRaw: string | null;
+  sacks: number | null;
+  turnovers: number | null;
+  firstDowns: number | null;
+};
+
 export type GameDetail = Game & {
   isLocked: boolean;
   pickBreakdown: {
@@ -32,6 +45,8 @@ export type GameDetail = Game & {
   } | null;
   homeTeamRecentGames: RecentGameEntry[];
   awayTeamRecentGames: RecentGameEntry[];
+  homeBoxScore: BoxScore | null;
+  awayBoxScore: BoxScore | null;
 };
 
 export function useGameDetail(gameId: string) {

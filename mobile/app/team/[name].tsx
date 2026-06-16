@@ -172,6 +172,21 @@ export default function TeamDetailScreen() {
           </View>
         )}
 
+        {/* Efficiency stats */}
+        {(team.thirdDownPct !== null || team.redZonePct !== null || team.sacksPG !== null || team.turnoversPG !== null) && (
+          <View className="mx-4 mb-5">
+            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Efficiency</Text>
+            <View className="flex-row gap-2 mb-2">
+              {team.thirdDownPct !== null && <StatPill label="3rd Down %" value={`${team.thirdDownPct}%`} />}
+              {team.redZonePct !== null && <StatPill label="Red Zone %" value={`${team.redZonePct}%`} />}
+            </View>
+            <View className="flex-row gap-2">
+              {team.sacksPG !== null && <StatPill label="Sacks/G" value={team.sacksPG.toFixed(1)} />}
+              {team.turnoversPG !== null && <StatPill label="Turnovers/G" value={team.turnoversPG.toFixed(1)} />}
+            </View>
+          </View>
+        )}
+
         {/* Community picks */}
         {team.pickTotal > 0 && (
           <View className="mx-4 mb-5">

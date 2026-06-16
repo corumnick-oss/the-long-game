@@ -33,6 +33,10 @@ export type TeamDetail = TeamSummary & {
   yapg: number | null;
   passYpg: number | null;
   rushYpg: number | null;
+  thirdDownPct: number | null;
+  redZonePct: number | null;
+  sacksPG: number | null;
+  turnoversPG: number | null;
   statsSeasonUsed: number | null;
   recentGames: RecentGame[];
 };

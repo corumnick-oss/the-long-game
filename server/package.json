@@ -14,7 +14,8 @@
     "db:seed": "tsx --require dotenv/config src/scripts/migrate-2025.ts",
     "seed:nick": "tsx --require dotenv/config src/scripts/seed-nick-picks.ts",
     "sync:2026": "tsx --require dotenv/config src/scripts/sync-2026-local.ts",
-    "sync:2026:preseason": "tsx --require dotenv/config src/scripts/sync-2026-local.ts --preseason"
+    "sync:2026:preseason": "tsx --require dotenv/config src/scripts/sync-2026-local.ts --preseason",
+    "backfill:stats": "tsx --require dotenv/config src/scripts/backfill-stats-local.ts"
   },
   "keywords": [],
   "author": "",

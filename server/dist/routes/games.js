@@ -74,6 +74,10 @@ async function fetchTeamStatsMap(teamNames, season, seasonType) {
             yapg: avgOf(tr.map(r => r.yardsAllowedPerGame)),
             passYpg: avgOf(tr.map(r => r.additionalStats?.passingYards)),
             rushYpg: avgOf(tr.map(r => r.additionalStats?.rushingYards)),
+            thirdDownPct: avgOf(tr.map(r => r.thirdDownConversion)),
+            redZonePct: avgOf(tr.map(r => r.redZoneEfficiency)),
+            sacksPG: avgOf(tr.map(r => r.sackRate)),
+            turnoversPG: avgOf(tr.map(r => r.additionalStats?.turnovers)),
         };
     }
     return { map, seasonUsed };
@@ -141,12 +145,20 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
         homeYAPG: statsMap[game.homeTeam]?.yapg ?? null,
         homePassYPG: statsMap[game.homeTeam]?.passYpg ?? null,
         homeRushYPG: statsMap[game.homeTeam]?.rushYpg ?? null,
+        homeThirdDownPct: statsMap[game.homeTeam]?.thirdDownPct ?? null,
+        homeRedZonePct: statsMap[game.homeTeam]?.redZonePct ?? null,
+        homeSacksPG: statsMap[game.homeTeam]?.sacksPG ?? null,
+        homeTurnoversPG: statsMap[game.homeTeam]?.turnoversPG ?? null,
         awayPPG: statsMap[game.awayTeam]?.ppg ?? null,
         awayPPGA: statsMap[game.awayTeam]?.ppga ?? null,
         awayYPG: statsMap[game.awayTeam]?.ypg ?? null,
         awayYAPG: statsMap[game.awayTeam]?.yapg ?? null,
         awayPassYPG: statsMap[game.awayTeam]?.passYpg ?? null,
         awayRushYPG: statsMap[game.awayTeam]?.rushYpg ?? null,
+        awayThirdDownPct: statsMap[game.awayTeam]?.thirdDownPct ?? null,
+        awayRedZonePct: statsMap[game.awayTeam]?.redZonePct ?? null,
+        awaySacksPG: statsMap[game.awayTeam]?.sacksPG ?? null,
+        awayTurnoversPG: statsMap[game.awayTeam]?.turnoversPG ?? null,
         statsSeasonUsed,
     })));
 });
@@ -195,8 +207,35 @@ router.get('/:id', auth_1.optionalAuth, async (req, res) => {
         });
         myPick = myPickRecord?.pick ?? null;
     }
-    // Team stats for this game
+    // Team stats averages (pre-game context)
     const { map: statsMap, seasonUsed: statsSeasonUsed } = await fetchTeamStatsMap([game.homeTeam, game.awayTeam], game.season, game.seasonType);
+    // Actual box score for completed games
+    const buildBoxScore = (row) => {
+        if (!row)
+            return null;
+        const a = row.additionalStats;
+        return {
+            totalYards: row.yardsPerGame,
+            passYards: a?.passingYards ?? null,
+            rushYards: a?.rushingYards ?? null,
+            thirdDown: row.thirdDownConversion,
+            thirdDownRaw: a?.thirdDownRaw ?? null,
+            redZone: row.redZoneEfficiency,
+            redZoneRaw: a?.redZoneRaw ?? null,
+            sacks: row.sackRate,
+            turnovers: a?.turnovers ?? null,
+            firstDowns: a?.firstDowns ?? null,
+        };
+    };
+    let homeBoxScore = null;
+    let awayBoxScore = null;
+    if (game.status === 'post') {
+        const boxRows = await db_1.db.query.teamGameStats.findMany({
+            where: (0, drizzle_orm_1.eq)(schema.teamGameStats.gameId, game.id),
+        });
+        homeBoxScore = buildBoxScore(boxRows.find(r => r.isHomeTeam));
+        awayBoxScore = buildBoxScore(boxRows.find(r => !r.isHomeTeam));
+    }
     // Last 5 completed games for each team this season
     const seasonGames = await db_1.db.query.games.findMany({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.season, game.season), (0, drizzle_orm_1.eq)(schema.games.seasonType, game.seasonType), (0, drizzle_orm_1.eq)(schema.games.status, 'post')),
@@ -233,13 +272,23 @@ router.get('/:id', auth_1.optionalAuth, async (req, res) => {
         homeYAPG: statsMap[game.homeTeam]?.yapg ?? null,
         homePassYPG: statsMap[game.homeTeam]?.passYpg ?? null,
         homeRushYPG: statsMap[game.homeTeam]?.rushYpg ?? null,
+        homeThirdDownPct: statsMap[game.homeTeam]?.thirdDownPct ?? null,
+        homeRedZonePct: statsMap[game.homeTeam]?.redZonePct ?? null,
+        homeSacksPG: statsMap[game.homeTeam]?.sacksPG ?? null,
+        homeTurnoversPG: statsMap[game.homeTeam]?.turnoversPG ?? null,
         awayPPG: statsMap[game.awayTeam]?.ppg ?? null,
         awayPPGA: statsMap[game.awayTeam]?.ppga ?? null,
         awayYPG: statsMap[game.awayTeam]?.ypg ?? null,
         awayYAPG: statsMap[game.awayTeam]?.yapg ?? null,
         awayPassYPG: statsMap[game.awayTeam]?.passYpg ?? null,
         awayRushYPG: statsMap[game.awayTeam]?.rushYpg ?? null,
+        awayThirdDownPct: statsMap[game.awayTeam]?.thirdDownPct ?? null,
+        awayRedZonePct: statsMap[game.awayTeam]?.redZonePct ?? null,
+        awaySacksPG: statsMap[game.awayTeam]?.sacksPG ?? null,
+        awayTurnoversPG: statsMap[game.awayTeam]?.turnoversPG ?? null,
         statsSeasonUsed,
+        homeBoxScore,
+        awayBoxScore,
         homeTeamRecentGames: makeRecentGames(game.homeTeam),
         awayTeamRecentGames: makeRecentGames(game.awayTeam),
     });
