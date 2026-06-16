@@ -62,8 +62,8 @@ function GameRow({ game }: { game: RecentGame }) {
 export default function TeamDetailScreen() {
   const router = useRouter();
   const { name, season: seasonParam, seasonType: seasonTypeParam } = useLocalSearchParams<{ name: string; season?: string; seasonType?: string }>();
-  const currentSeason = getCurrentNFLSeason();
-  const [season, setSeason] = useState(seasonParam ? parseInt(seasonParam, 10) : currentSeason);
+  const currentSeason = new Date().getFullYear();
+  const [season, setSeason] = useState(seasonParam ? parseInt(seasonParam, 10) : getCurrentNFLSeason());
   const seasonType = (seasonTypeParam as 'regular' | 'preseason') ?? 'regular';
   const { data: team, isLoading, isError } = useTeamDetail(name ?? '', season, seasonType);
 
@@ -153,6 +153,22 @@ export default function TeamDetailScreen() {
                 />
               )}
             </View>
+          </View>
+        )}
+
+        {/* Yards stats */}
+        {(team.ypg !== null || team.yapg !== null) && (
+          <View className="mx-4 mb-5">
+            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Yards</Text>
+            <View className="flex-row gap-2">
+              {team.ypg !== null && <StatPill label="YPG" value={team.ypg} />}
+              {team.yapg !== null && <StatPill label="YPG Allowed" value={team.yapg} />}
+              {team.passYpg !== null && <StatPill label="Pass YPG" value={team.passYpg} />}
+              {team.rushYpg !== null && <StatPill label="Rush YPG" value={team.rushYpg} />}
+            </View>
+            {team.statsSeasonUsed !== null && team.statsSeasonUsed < season && (
+              <Text className="text-muted text-xs mt-2 text-center">Using {team.statsSeasonUsed} season averages</Text>
+            )}
           </View>
         )}
 

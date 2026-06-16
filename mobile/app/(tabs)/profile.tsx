@@ -157,7 +157,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const [season, setSeason] = useState(getCurrentNFLSeason());
-  const currentSeason = getCurrentNFLSeason();
+  const currentSeason = new Date().getFullYear();
   const { data: profile, isLoading } = useMyProfile(season);
   const { data: trophies = [] } = useMyAchievements(season);
 
