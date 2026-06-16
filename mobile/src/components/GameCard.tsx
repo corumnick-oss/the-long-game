@@ -35,6 +35,7 @@ function TeamRow({
   score,
   ppg,
   ppgAllowed,
+  ypg,
   isPicked,
   isWinner,
   isFinal,
