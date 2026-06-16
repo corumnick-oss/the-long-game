@@ -9,16 +9,31 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Fix Season Selectors + ESPN Sync
+## ⚠️ DO THIS FIRST NEXT SESSION — Test Stats + Fix Season Selectors
 
-### Fix 1: Profile season selector layout (`profile.tsx`)
+### Test Before Continuing (OTA b5f72782 deployed, Railway commit 444048a)
+Open the app and verify these things are working:
+1. **Game Detail — completed 2025 game**: tap any final game → should see "Box Score" section with Total Yards, Pass Yards, Rush Yards, 3rd Down (e.g. "6/14"), Red Zone (e.g. "3/4"), Sacks, Turnovers, 1st Downs for both teams
+2. **Game Detail — pre-game 2026 game**: tap any upcoming game → should see averages table with PPG, Opp PPG, YPG, Yds Allowed/G, Pass YPG, Rush YPG, **3rd Down %**, **Red Zone %**, **Sacks/G**, **Turnovers/G** + Win Probability bar + Spread
+3. **Team Detail**: tap any team → Yards section + new **Efficiency section** (3rd Down %, Red Zone %, Sacks/G, Turnovers/G)
+4. **Pre-game averages on 2026 game**: should show 2025 season averages (backend fallback already built) — verify at least PPG/YPG appear
+
+### Fix 1: Profile season selector layout (`profile.tsx`) — STILL NEEDED
 The +/- buttons sit at the far left and right edges of the screen. They should be compact and centered inline with the year label, matching the style of other selectors in the app (e.g., the admin week picker: `−  Week X  +` centered together). Redesign so the three elements (−, label, +) are grouped tightly in the center, not spread across the full width.
 
-### Fix 2: Team Detail season selector layout + bug (`team/[name].tsx`)
+### Fix 2: Team Detail season selector layout + bug (`team/[name].tsx`) — STILL NEEDED
 Same visual problem as profile — buttons look different from other selectors. Additionally, changing the season causes a **"Team not found" error**. Likely cause: when the season changes, `seasonType` is still read from the original URL param (e.g., 'preseason' from a 2026 navigation), but the new season has no games for that type (no 2025 preseason in DB). Fix: either reset `seasonType` to 'regular' when season changes, or add a seasonType toggle alongside the season selector. Also fix the visual style to match the admin/picks selector pattern.
 
-### Fix 3: ESPN Stats Sync (check Railway logs first)
-Check Railway logs for `[ESPN] No boxscore teams for event` warnings after the June 16 admin sync. This will tell us if ESPN is returning historical boxscore data for 2025 games. Read `memory/session-2026-06-16.md` for full context.
+### COMPLETED SESSION June 17 2026
+- **ESPN stats sync root cause** — ESPN returns 400 for historical 2025 game summaries from Railway's server IP (server-side block on bulk historical data). Works fine from local/browser IPs.
+- **`backfill-stats-local.ts` script** — runs ESPN backfill from local machine, bypassing Railway IP block. `npm run backfill:stats` in server/. Re-run after any espnService.ts changes.
+- **Expanded stats** — extracted sacks (defensive), turnovers, first downs, raw ratio strings (e.g. "6-14" for 3rd down) from ESPN boxscore. Added to `team_game_stats` via `sackRate` column + `additionalStats` JSONB fields.
+- **Box score on Game Detail (post-game)** — `game/[id].tsx` now shows actual box score for completed games (Total/Pass/Rush yards, 3rd Down as ratio, Red Zone as ratio, Sacks, Turnovers, 1st Downs). Pre-game still shows season averages. Live shows neither.
+- **Expanded averages on Game Detail (pre-game)** — stats table now includes 3rd Down %, Red Zone %, Sacks/G, Turnovers/G in addition to existing PPG/YPG stats.
+- **Efficiency section on Team Detail** — new section below Yards with 3rd Down %, Red Zone %, Sacks/G, Turnovers/G.
+- **2026 pre-game fallback** — backend already had 2025 fallback logic in `fetchTeamStatsMap`. Now populated with full stats. 2026 games will auto-populate as they complete via live sync.
+- **2025 data fully backfilled** — all 272 regular season games have complete box score stats in `team_game_stats`. Re-ran `npm run backfill:stats` locally after expanding ESPN extraction.
+- **ESPN box score sync (live 2026)** — `syncBoxScoreStats` fires automatically when a game goes `in → post` in the live loop. New fields will populate in real time.
 
 ### COMPLETED SESSION June 16 2026
 - **Pre-game team stats** — full implementation shipped (backend + mobile). See session-2026-06-16.md for complete file list.
@@ -26,8 +41,7 @@ Check Railway logs for `[ESPN] No boxscore teams for event` warnings after the J
 - **Startup crash (ypg)** — `ypg` added to TeamRow type but missing from destructuring → ReferenceError crash on every render. FIXED.
 - **Season selectors** — +/- on Profile tab and Team Detail screen. Buttons visible now but layout wrong (see fixes above). Upper bound uses `new Date().getFullYear()`.
 - **Team detail Yards section** — YPG/YAPG/Pass YPG/Rush YPG display added below Scoring section.
-- **Admin Sync Team Stats button** — in NFL Tools tab, triggers backfill of all completed games for selected season/type.
-- **ESPN stats sync — UNRESOLVED** — Admin button says "Synced 272 games" but stats don't appear in app. `backfillTeamStats` counts games *processed* not *inserted*. ESPN /summary may not return boxscore data for historical 2025 games from Railway server. Check Railway logs.
+- **Admin Sync Team Stats button** — in NFL Tools tab, triggers backfill of all completed games for selected season/type. Note: Admin button still hits Railway (blocked for historical data) — use `npm run backfill:stats` locally instead.
 
 ### COMPLETED SESSION June 15 2026
 - **Picks tab crash** — `onTeamPress` in `TeamRow` type but missing from destructuring → ReferenceError. Fixed. Error boundary removed.
