@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useGameDetail, type PickEntry } from '@/hooks/useGameDetail';
+import { useGameDetail, type PickEntry, type RecentGameEntry } from '@/hooks/useGameDetail';
 import { useGames } from '@/hooks/usePicksData';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 
@@ -15,12 +15,12 @@ function formatDate(iso: string) {
 
 function WinProbBar({ favoriteTeam, prob, homeTeam, awayTeam }: {
   favoriteTeam: string | null;
-  prob: string | null;
+  prob: number | null;
   homeTeam: string;
   awayTeam: string;
 }) {
   if (!prob || !favoriteTeam) return null;
-  const favPct = Math.round(parseFloat(prob) * 100);
+  const favPct = Math.round(Number(prob));
   const undPct = 100 - favPct;
   const favIsHome = favoriteTeam === homeTeam;
   const homePct = favIsHome ? favPct : undPct;
@@ -37,6 +37,34 @@ function WinProbBar({ favoriteTeam, prob, homeTeam, awayTeam }: {
         <Text className="text-muted text-xs">{awayPct}%</Text>
         <Text className="text-muted text-xs">{homePct}%</Text>
       </View>
+    </View>
+  );
+}
+
+// ── Recent game row ───────────────────────────────────────────────────────────
+
+function RecentGameRow({ g }: { g: RecentGameEntry }) {
+  const color = g.result === 'W' ? '#22c55e' : g.result === 'L' ? '#ef4444' : '#6b7280';
+  const atLabel = g.isHome ? 'vs' : '@';
+  const dateStr = g.gameTime
+    ? new Date(g.gameTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '';
+  return (
+    <View className="flex-row items-center px-4 py-2.5 border-b border-border">
+      <View style={{ width: 24, height: 24, borderRadius: 5, backgroundColor: g.result ? `${color}25` : '#1f2937' }}
+        className="items-center justify-center mr-3">
+        <Text style={{ color, fontWeight: 'bold', fontSize: 11 }}>{g.result ?? 'Wk'}</Text>
+      </View>
+      {g.opponentLogo ? (
+        <Image source={{ uri: g.opponentLogo }} style={{ width: 22, height: 22, marginRight: 6 }} resizeMode="contain" />
+      ) : <View style={{ width: 22, marginRight: 6 }} />}
+      <Text className="flex-1 text-white text-sm" numberOfLines={1}>{atLabel} {g.opponent}</Text>
+      {g.teamScore !== null && g.oppScore !== null ? (
+        <Text style={{ color, fontWeight: 'bold', fontSize: 13 }}>{g.teamScore}–{g.oppScore}</Text>
+      ) : (
+        <Text className="text-muted text-xs">{dateStr}</Text>
+      )}
+      <Text className="text-muted text-xs ml-2 w-8 text-right">W{g.week}</Text>
     </View>
   );
 }
@@ -259,8 +287,11 @@ export default function GameDetailScreen() {
         </View>
 
         {/* ── Team stats ── */}
-        {(game.awayTeamPPG || game.homeTeamPPG || game.winningTeamWinProb) && (
+        {(game.awayPPG !== null || game.homeYPG !== null || game.winningTeamWinProb !== null) && (
           <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
+            {game.statsSeasonUsed !== null && game.statsSeasonUsed < season && (
+              <Text className="text-muted text-xs mb-2 text-center">Using {game.statsSeasonUsed} season averages</Text>
+            )}
             <View className="flex-row justify-between mb-3">
               <Text className="text-muted text-xs font-semibold uppercase">Stat</Text>
               <Text className="text-muted text-xs font-semibold text-right" style={{ width: 64 }}>
@@ -270,34 +301,52 @@ export default function GameDetailScreen() {
                 {game.homeTeam.split(' ').pop()}
               </Text>
             </View>
-            {game.awayTeamPPG && game.homeTeamPPG && (
+            {game.awayPPG !== null && game.homePPG !== null && (
               <View className="flex-row justify-between py-2 border-b border-border">
                 <Text className="text-muted text-sm flex-1">PPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
-                  {parseFloat(game.awayTeamPPG).toFixed(1)}
-                </Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
-                  {parseFloat(game.homeTeamPPG).toFixed(1)}
-                </Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayPPG.toFixed(1)}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homePPG.toFixed(1)}</Text>
               </View>
             )}
-            {game.awayTeamPPGAllowed && game.homeTeamPPGAllowed && (
+            {game.awayPPGA !== null && game.homePPGA !== null && (
               <View className="flex-row justify-between py-2 border-b border-border">
                 <Text className="text-muted text-sm flex-1">Opp PPG</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
-                  {parseFloat(game.awayTeamPPGAllowed).toFixed(1)}
-                </Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>
-                  {parseFloat(game.homeTeamPPGAllowed).toFixed(1)}
-                </Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayPPGA.toFixed(1)}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homePPGA.toFixed(1)}</Text>
+              </View>
+            )}
+            {game.awayYPG !== null && game.homeYPG !== null && (
+              <View className="flex-row justify-between py-2 border-b border-border">
+                <Text className="text-muted text-sm flex-1">YPG</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayYPG}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homeYPG}</Text>
+              </View>
+            )}
+            {game.awayYAPG !== null && game.homeYAPG !== null && (
+              <View className="flex-row justify-between py-2 border-b border-border">
+                <Text className="text-muted text-sm flex-1">Yds Allowed</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayYAPG}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homeYAPG}</Text>
+              </View>
+            )}
+            {game.awayPassYPG !== null && game.homePassYPG !== null && (
+              <View className="flex-row justify-between py-2 border-b border-border">
+                <Text className="text-muted text-sm flex-1">Pass YPG</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayPassYPG}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homePassYPG}</Text>
+              </View>
+            )}
+            {game.awayRushYPG !== null && game.homeRushYPG !== null && (
+              <View className="flex-row justify-between py-2 border-b border-border">
+                <Text className="text-muted text-sm flex-1">Rush YPG</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.awayRushYPG}</Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 64 }}>{game.homeRushYPG}</Text>
               </View>
             )}
             {!isFinal && !isLive && game.spread && (
               <View className="flex-row justify-between py-2 border-b border-border">
                 <Text className="text-muted text-sm flex-1">Spread</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 128 }}>
-                  {game.spread}
-                </Text>
+                <Text className="text-white text-sm font-medium text-right" style={{ width: 128 }}>{game.spread}</Text>
               </View>
             )}
             {!isFinal && !isLive && (
@@ -307,6 +356,24 @@ export default function GameDetailScreen() {
                 homeTeam={game.homeTeam}
                 awayTeam={game.awayTeam}
               />
+            )}
+          </View>
+        )}
+
+        {/* ── Recent games ── */}
+        {(game.awayTeamRecentGames?.length > 0 || game.homeTeamRecentGames?.length > 0) && (
+          <View className="mx-4 mb-4 flex-row gap-3">
+            {[{ label: game.awayTeam, games: game.awayTeamRecentGames }, { label: game.homeTeam, games: game.homeTeamRecentGames }].map(({ label, games: rg }) =>
+              rg?.length > 0 ? (
+                <View key={label} className="flex-1">
+                  <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-2" numberOfLines={1}>
+                    {label.split(' ').slice(-1)[0]} Last {rg.length}
+                  </Text>
+                  <View className="bg-surface rounded-xl overflow-hidden">
+                    {rg.map(g => <RecentGameRow key={g.gameId} g={g} />)}
+                  </View>
+                </View>
+              ) : null
             )}
           </View>
         )}

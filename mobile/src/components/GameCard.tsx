@@ -50,8 +50,9 @@ function TeamRow({
   logo: string | null;
   record: string | null;
   score: number | null;
-  ppg: string | null;
-  ppgAllowed: string | null;
+  ppg: number | null;
+  ppgAllowed: number | null;
+  ypg: number | null;
   isPicked: boolean;
   isWinner: boolean;
   isFinal: boolean;
@@ -122,8 +123,11 @@ function TeamRow({
         {record && !showScore && (
           <Text className="text-muted text-xs mt-0.5">{record}</Text>
         )}
-        {!showScore && ppg && (
-          <Text className="text-muted text-xs">{ppg} PPG · {ppgAllowed} allowed</Text>
+        {!showScore && ppg !== null && (
+          <Text className="text-muted text-xs">{ppg.toFixed(1)} PPG · {ppgAllowed?.toFixed(1) ?? '—'} PPGA</Text>
+        )}
+        {!showScore && ypg !== null && (
+          <Text className="text-muted text-xs">{ypg} YPG</Text>
         )}
         {/* Pick % bar */}
         {showPct && (
@@ -209,8 +213,9 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
         logo={game.awayTeamLogo}
         record={game.awayTeamRecord}
         score={game.awayScore}
-        ppg={game.awayTeamPPG}
-        ppgAllowed={game.awayTeamPPGAllowed}
+        ppg={game.awayPPG}
+        ppgAllowed={game.awayPPGA}
+        ypg={game.awayYPG}
         isPicked={awayPicked}
         isWinner={awayWins}
         isFinal={isFinal}
@@ -234,9 +239,9 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
           {isPre ? formatGameTime(game.gameTime) : isLive ? 'LIVE' : 'Final'}
         </Text>
         <View className="flex-1 items-end flex-row justify-end gap-2">
-          {isPre && game.winningTeamWinProb && (
+          {isPre && game.winningTeamWinProb && game.favoriteTeam && (
             <Text className="text-muted text-xs">
-              {game.favoriteTeam ? `${Math.round(parseFloat(game.winningTeamWinProb) * 100)}% fav` : ''}
+              {Math.round(Number(game.winningTeamWinProb))}% fav
             </Text>
           )}
           {onPress && <Text className="text-muted text-xs">›</Text>}
@@ -249,8 +254,9 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
         logo={game.homeTeamLogo}
         record={game.homeTeamRecord}
         score={game.homeScore}
-        ppg={game.homeTeamPPG}
-        ppgAllowed={game.homeTeamPPGAllowed}
+        ppg={game.homePPG}
+        ppgAllowed={game.homePPGA}
+        ypg={game.homeYPG}
         isPicked={homePicked}
         isWinner={homeWins}
         isFinal={isFinal}

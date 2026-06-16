@@ -48,11 +48,11 @@ export type Achievement = {
   earnedAt: string;
 };
 
-export function useMyProfile() {
+export function useMyProfile(season?: number) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['profile', 'me', user?.uid ?? null],
-    queryFn: () => apiFetch<MyProfile>('/api/users/me', undefined, user),
+    queryKey: ['profile', 'me', season ?? null, user?.uid ?? null],
+    queryFn: () => apiFetch<MyProfile>(`/api/users/me${season ? `?season=${season}` : ''}`, undefined, user),
     enabled: !!user,
     staleTime: 60_000,
   });

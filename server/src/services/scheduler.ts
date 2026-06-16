@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { syncWeekGames, updateLiveScores, syncWinProbabilities } from './espnService';
+import { syncWeekGames, updateLiveScores, syncWinProbabilities, backfillTeamStats } from './espnService';
 import { awardWeeklyTrophies } from './trophyService';
 import { notifyWeekUnlocked, notifyDeadlineApproaching, notifyPicksLocked } from './notificationService';
 import { getCurrentNFLSeason, getCurrentNFLWeek, isPreseasonMode } from '../utils/season';
@@ -37,6 +37,9 @@ cron.schedule('0 6 * * 2', async () => {
 
     // Sync new week's games from ESPN
     await syncWeekGames(week, season, 'regular');
+
+    // Backfill box score stats for all completed games in the prior week
+    await backfillTeamStats(season, 'regular');
 
     // Notify users week is open
     await notifyWeekUnlocked(week);

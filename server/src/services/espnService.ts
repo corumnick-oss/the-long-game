@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { db } from '../db';
-import { games, picks } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { games, picks, teamGameStats } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
 import { getCurrentNFLSeason } from '../utils/season';
 import { notifyGameFinal } from './notificationService';
 
@@ -191,7 +191,7 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
   const existingGames = await db.query.games.findMany({ where: eq(games.week, week) });
   const existingByEspnId = new Map(existingGames.map(g => [g.espnId, g]));
 
-  type JustFinished = { id: string; homeTeam: string; awayTeam: string; homeScore: number; awayScore: number };
+  type JustFinished = { id: string; espnId: string; homeTeam: string; awayTeam: string; homeScore: number; awayScore: number };
   const justFinished: JustFinished[] = [];
 
   let upserted = 0;
@@ -237,7 +237,7 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
     // Detect in→post transition for game-final notifications
     const existing = existingByEspnId.get(event.id);
     if (existing?.status === 'in' && status === 'post' && homeScore != null && awayScore != null) {
-      justFinished.push({ id: existing.id, homeTeam: row.homeTeam, awayTeam: row.awayTeam, homeScore, awayScore });
+      justFinished.push({ id: existing.id, espnId: event.id, homeTeam: row.homeTeam, awayTeam: row.awayTeam, homeScore, awayScore });
     }
 
     await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
@@ -261,7 +261,7 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
     upserted++;
   }
 
-  // Fire game-final notifications for any games that just finished
+  // Fire game-final notifications and sync box score stats for just-finished games
   for (const game of justFinished) {
     try {
       const gamePicks = await db.query.picks.findMany({ where: eq(picks.gameId, game.id) });
@@ -275,6 +275,9 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
     } catch (err) {
       console.error('[ESPN] Game final notification batch failed for game', game.id, err);
     }
+    // Sync box score stats asynchronously — don't block the live update loop
+    syncBoxScoreStats({ id: game.id, espnId: game.espnId, week, season, seasonType, homeTeam: game.homeTeam, awayTeam: game.awayTeam, homeScore: game.homeScore, awayScore: game.awayScore })
+      .catch(err => console.error('[ESPN] syncBoxScoreStats failed for game', game.id, err));
   }
 
   return upserted;
@@ -341,14 +344,145 @@ export async function syncWinProbabilities(week: number, season: number): Promis
       const homeWinProb = Math.round(last.homeWinPercentage * 100);
       const awayWinProb = 100 - homeWinProb;
 
-      // Determine which team won (for post-game), or current leader (for pre/live)
       const homeIsLeading = homeWinProb >= awayWinProb;
       await db.update(games).set({
         winningTeamWinProb: homeIsLeading ? homeWinProb : awayWinProb,
         losingTeamWinProb: homeIsLeading ? awayWinProb : homeWinProb,
+        favoriteTeam: homeIsLeading ? game.homeTeam : game.awayTeam,
       }).where(eq(games.id, game.id));
     } catch {
       // Individual game failure shouldn't stop the whole sync
     }
   }
+}
+
+// Sync box score stats for a completed game into team_game_stats (idempotent — delete + insert).
+export async function syncBoxScoreStats(game: {
+  id: string;
+  espnId: string;
+  week: number;
+  season: number;
+  seasonType: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number | null;
+  awayScore: number | null;
+}): Promise<void> {
+  try {
+    const { data } = await axios.get(`${BASE}/summary?event=${game.espnId}`, { headers: ESPN_HEADERS });
+
+    const teams: any[] = data.boxscore?.teams ?? [];
+    if (teams.length === 0) {
+      console.warn(`[ESPN] No boxscore teams for event ${game.espnId}`);
+      return;
+    }
+
+    const home = teams.find((t: any) => t.homeAway === 'home');
+    const away = teams.find((t: any) => t.homeAway === 'away');
+    if (!home || !away) {
+      console.warn(`[ESPN] Missing home/away boxscore for event ${game.espnId}`);
+      return;
+    }
+
+    const getStat = (team: any, name: string): string | null =>
+      team.statistics?.find((s: any) => s.name === name)?.displayValue ?? null;
+
+    const parseYards = (val: string | null): number | null => {
+      if (!val) return null;
+      const n = parseInt(val, 10);
+      return isNaN(n) ? null : n;
+    };
+
+    const parseRatio = (val: string | null): number | null => {
+      // "6-14" → 42.9%
+      if (!val) return null;
+      const parts = val.split('-').map(Number);
+      if (parts.length !== 2 || !parts[1]) return null;
+      return Math.round((parts[0] / parts[1]) * 1000) / 10;
+    };
+
+    const homeTotalYards  = parseYards(getStat(home, 'totalYards'));
+    const homePassYards   = parseYards(getStat(home, 'netPassingYards'));
+    const homeRushYards   = parseYards(getStat(home, 'rushingYards'));
+    const homeThirdDown   = parseRatio(getStat(home, 'thirdDownEff'));
+    const homeRedZone     = parseRatio(getStat(home, 'redZoneAttempts'));
+
+    const awayTotalYards  = parseYards(getStat(away, 'totalYards'));
+    const awayPassYards   = parseYards(getStat(away, 'netPassingYards'));
+    const awayRushYards   = parseYards(getStat(away, 'rushingYards'));
+    const awayThirdDown   = parseRatio(getStat(away, 'thirdDownEff'));
+    const awayRedZone     = parseRatio(getStat(away, 'redZoneAttempts'));
+
+    // Idempotent — delete existing rows for this game before reinserting
+    await db.delete(teamGameStats).where(eq(teamGameStats.gameId, game.id));
+
+    await db.insert(teamGameStats).values([
+      {
+        gameId: game.id,
+        season: game.season,
+        week: game.week,
+        sport: 'nfl',
+        teamName: game.homeTeam,
+        isHomeTeam: true,
+        yardsPerGame: homeTotalYards,
+        yardsAllowedPerGame: awayTotalYards,
+        pointsPerGame: game.homeScore,
+        pointsAllowedPerGame: game.awayScore,
+        thirdDownConversion: homeThirdDown,
+        redZoneEfficiency: homeRedZone,
+        additionalStats: { passingYards: homePassYards, rushingYards: homeRushYards, seasonType: game.seasonType },
+      },
+      {
+        gameId: game.id,
+        season: game.season,
+        week: game.week,
+        sport: 'nfl',
+        teamName: game.awayTeam,
+        isHomeTeam: false,
+        yardsPerGame: awayTotalYards,
+        yardsAllowedPerGame: homeTotalYards,
+        pointsPerGame: game.awayScore,
+        pointsAllowedPerGame: game.homeScore,
+        thirdDownConversion: awayThirdDown,
+        redZoneEfficiency: awayRedZone,
+        additionalStats: { passingYards: awayPassYards, rushingYards: awayRushYards, seasonType: game.seasonType },
+      },
+    ]);
+
+    console.log(`[ESPN] Box score synced: ${game.awayTeam} @ ${game.homeTeam} W${game.week}`);
+  } catch (err: any) {
+    console.warn(`[ESPN] Box score sync failed for event ${game.espnId}: ${err?.message}`);
+  }
+}
+
+// Backfill team_game_stats for all completed games in a season+type. Safe to re-run.
+export async function backfillTeamStats(season: number, seasonType: string = 'regular'): Promise<number> {
+  const completedGames = await db.query.games.findMany({
+    where: and(
+      eq(games.season, season),
+      eq(games.status, 'post'),
+      eq(games.seasonType, seasonType),
+      eq(games.sport, 'nfl'),
+    ),
+  });
+
+  console.log(`[ESPN] Backfilling stats: ${completedGames.length} ${seasonType} games for ${season}`);
+
+  let synced = 0;
+  for (const game of completedGames) {
+    await syncBoxScoreStats({
+      id: game.id,
+      espnId: game.espnId,
+      week: game.week,
+      season: game.season,
+      seasonType: game.seasonType,
+      homeTeam: game.homeTeam,
+      awayTeam: game.awayTeam,
+      homeScore: game.homeScore,
+      awayScore: game.awayScore,
+    });
+    synced++;
+  }
+
+  return synced;
 }

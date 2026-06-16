@@ -41,6 +41,43 @@ const auth_1 = require("../middleware/auth");
 const lockTime_1 = require("../utils/lockTime");
 const season_1 = require("../utils/season");
 const router = (0, express_1.Router)();
+// Average over nullable numbers
+const avgOf = (nums) => {
+    const valid = nums.filter((v) => v != null && typeof v === 'number' && !isNaN(v));
+    return valid.length ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
+};
+async function fetchTeamStatsMap(teamNames, season, seasonType) {
+    if (teamNames.length === 0)
+        return { map: {}, seasonUsed: null };
+    const query = (s) => db_1.db.query.teamGameStats.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.inArray)(schema.teamGameStats.teamName, teamNames), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, s), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
+    });
+    let rows = await query(season);
+    let filtered = rows.filter(r => r.additionalStats?.seasonType === seasonType);
+    let seasonUsed = null;
+    if (filtered.length === 0 && season > 2025) {
+        rows = await query(2025);
+        filtered = rows.filter(r => r.additionalStats?.seasonType === 'regular');
+        if (filtered.length > 0)
+            seasonUsed = 2025;
+    }
+    else if (filtered.length > 0) {
+        seasonUsed = season;
+    }
+    const map = {};
+    for (const name of teamNames) {
+        const tr = filtered.filter(r => r.teamName === name);
+        map[name] = {
+            ppg: avgOf(tr.map(r => r.pointsPerGame)),
+            ppga: avgOf(tr.map(r => r.pointsAllowedPerGame)),
+            ypg: avgOf(tr.map(r => r.yardsPerGame)),
+            yapg: avgOf(tr.map(r => r.yardsAllowedPerGame)),
+            passYpg: avgOf(tr.map(r => r.additionalStats?.passingYards)),
+            rushYpg: avgOf(tr.map(r => r.additionalStats?.rushingYards)),
+        };
+    }
+    return { map, seasonUsed };
+}
 // GET /api/games?week=X&season=Y
 router.get('/', auth_1.optionalAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
@@ -90,11 +127,27 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
             }
         }
     }
+    // Attach team stats averages
+    const allTeamNames = [...new Set(gameList.flatMap(g => [g.homeTeam, g.awayTeam]))];
+    const { map: statsMap, seasonUsed: statsSeasonUsed } = await fetchTeamStatsMap(allTeamNames, season, seasonType);
     res.json(gameList.map(game => ({
         ...game,
         myPick: myPicksMap[game.id] ?? null,
         homePickPct: pickPctMap[game.id]?.homePickPct ?? null,
         awayPickPct: pickPctMap[game.id]?.awayPickPct ?? null,
+        homePPG: statsMap[game.homeTeam]?.ppg ?? null,
+        homePPGA: statsMap[game.homeTeam]?.ppga ?? null,
+        homeYPG: statsMap[game.homeTeam]?.ypg ?? null,
+        homeYAPG: statsMap[game.homeTeam]?.yapg ?? null,
+        homePassYPG: statsMap[game.homeTeam]?.passYpg ?? null,
+        homeRushYPG: statsMap[game.homeTeam]?.rushYpg ?? null,
+        awayPPG: statsMap[game.awayTeam]?.ppg ?? null,
+        awayPPGA: statsMap[game.awayTeam]?.ppga ?? null,
+        awayYPG: statsMap[game.awayTeam]?.ypg ?? null,
+        awayYAPG: statsMap[game.awayTeam]?.yapg ?? null,
+        awayPassYPG: statsMap[game.awayTeam]?.passYpg ?? null,
+        awayRushYPG: statsMap[game.awayTeam]?.rushYpg ?? null,
+        statsSeasonUsed,
     })));
 });
 // GET /api/games/:id
@@ -142,7 +195,54 @@ router.get('/:id', auth_1.optionalAuth, async (req, res) => {
         });
         myPick = myPickRecord?.pick ?? null;
     }
-    res.json({ ...game, pickBreakdown, myPick, isLocked: locked });
+    // Team stats for this game
+    const { map: statsMap, seasonUsed: statsSeasonUsed } = await fetchTeamStatsMap([game.homeTeam, game.awayTeam], game.season, game.seasonType);
+    // Last 5 completed games for each team this season
+    const seasonGames = await db_1.db.query.games.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.season, game.season), (0, drizzle_orm_1.eq)(schema.games.seasonType, game.seasonType), (0, drizzle_orm_1.eq)(schema.games.status, 'post')),
+        orderBy: [(0, drizzle_orm_1.asc)(schema.games.gameTime)],
+    });
+    const makeRecentGames = (teamName) => seasonGames
+        .filter(g => (g.homeTeam === teamName || g.awayTeam === teamName) && g.id !== game.id)
+        .sort((a, b) => new Date(b.gameTime).getTime() - new Date(a.gameTime).getTime())
+        .slice(0, 5)
+        .map(g => {
+        const isHome = g.homeTeam === teamName;
+        const teamScore = isHome ? g.homeScore : g.awayScore;
+        const oppScore = isHome ? g.awayScore : g.homeScore;
+        return {
+            gameId: g.id,
+            week: g.week,
+            gameTime: g.gameTime,
+            isHome,
+            opponent: isHome ? g.awayTeam : g.homeTeam,
+            opponentLogo: isHome ? g.awayTeamLogo : g.homeTeamLogo,
+            teamScore,
+            oppScore,
+            result: teamScore !== null && oppScore !== null ? (teamScore > oppScore ? 'W' : 'L') : null,
+        };
+    });
+    res.json({
+        ...game,
+        pickBreakdown,
+        myPick,
+        isLocked: locked,
+        homePPG: statsMap[game.homeTeam]?.ppg ?? null,
+        homePPGA: statsMap[game.homeTeam]?.ppga ?? null,
+        homeYPG: statsMap[game.homeTeam]?.ypg ?? null,
+        homeYAPG: statsMap[game.homeTeam]?.yapg ?? null,
+        homePassYPG: statsMap[game.homeTeam]?.passYpg ?? null,
+        homeRushYPG: statsMap[game.homeTeam]?.rushYpg ?? null,
+        awayPPG: statsMap[game.awayTeam]?.ppg ?? null,
+        awayPPGA: statsMap[game.awayTeam]?.ppga ?? null,
+        awayYPG: statsMap[game.awayTeam]?.ypg ?? null,
+        awayYAPG: statsMap[game.awayTeam]?.yapg ?? null,
+        awayPassYPG: statsMap[game.awayTeam]?.passYpg ?? null,
+        awayRushYPG: statsMap[game.awayTeam]?.rushYpg ?? null,
+        statsSeasonUsed,
+        homeTeamRecentGames: makeRecentGames(game.homeTeam),
+        awayTeamRecentGames: makeRecentGames(game.awayTeam),
+    });
 });
 exports.default = router;
 //# sourceMappingURL=games.js.map

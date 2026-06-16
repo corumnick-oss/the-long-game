@@ -41,10 +41,10 @@ const auth_1 = require("../middleware/auth");
 const season_1 = require("../utils/season");
 const lockTime_1 = require("../utils/lockTime");
 const router = (0, express_1.Router)();
-// GET /api/users/me
+// GET /api/users/me?season=X
 router.get('/me', auth_1.requireAuth, async (req, res) => {
     const user = req.currentUser;
-    const season = (0, season_1.getCurrentNFLSeason)();
+    const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
     const stats = await getUserStats(user.id, season);
     res.json({ ...user, ...stats });
 });

@@ -29,6 +29,11 @@ export type RecentGame = {
 };
 
 export type TeamDetail = TeamSummary & {
+  ypg: number | null;
+  yapg: number | null;
+  passYpg: number | null;
+  rushYpg: number | null;
+  statsSeasonUsed: number | null;
   recentGames: RecentGame[];
 };
 

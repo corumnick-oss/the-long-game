@@ -11,6 +11,18 @@ export type PickEntry = {
   isCorrect: boolean | null;
 };
 
+export type RecentGameEntry = {
+  gameId: string;
+  week: number;
+  gameTime: string | null;
+  isHome: boolean;
+  opponent: string;
+  opponentLogo: string | null;
+  teamScore: number | null;
+  oppScore: number | null;
+  result: 'W' | 'L' | null;
+};
+
 export type GameDetail = Game & {
   isLocked: boolean;
   pickBreakdown: {
@@ -18,6 +30,8 @@ export type GameDetail = Game & {
     awayPct: number;
     picks: PickEntry[];
   } | null;
+  homeTeamRecentGames: RecentGameEntry[];
+  awayTeamRecentGames: RecentGameEntry[];
 };
 
 export function useGameDetail(gameId: string) {

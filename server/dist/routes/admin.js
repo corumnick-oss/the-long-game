@@ -180,6 +180,18 @@ router.post('/games/sync-scores', async (req, res) => {
     const count = await (0, espnService_1.syncWeekScores)(week, season, seasonType);
     res.json({ updated: count, week, season });
 });
+// ── Team Stats Backfill ───────────────────────────────────────────────────────
+router.post('/sync-team-stats', async (req, res) => {
+    const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.body.seasonType ?? 'regular';
+    try {
+        const synced = await (0, espnService_1.backfillTeamStats)(season, seasonType);
+        res.json({ synced, season, seasonType });
+    }
+    catch (err) {
+        res.status(500).json({ error: err?.message ?? 'Stats sync failed' });
+    }
+});
 // ── Win Probabilities ─────────────────────────────────────────────────────────
 router.post('/games/sync-probs', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();

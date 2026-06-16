@@ -8,10 +8,10 @@ import { isWeekLocked } from '../utils/lockTime';
 
 const router = Router();
 
-// GET /api/users/me
+// GET /api/users/me?season=X
 router.get('/me', requireAuth, async (req, res) => {
   const user = req.currentUser!;
-  const season = getCurrentNFLSeason();
+  const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
 
   const stats = await getUserStats(user.id, season);
   res.json({ ...user, ...stats });

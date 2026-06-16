@@ -3,7 +3,7 @@ import { db } from '../db';
 import * as schema from '../db/schema';
 import { sql, eq, and, desc, asc } from 'drizzle-orm';
 import { requireAuth, requireAdmin } from '../middleware/auth';
-import { syncWeekGames, syncWeekScores, syncWinProbabilities, syncGamesByEventIds } from '../services/espnService';
+import { syncWeekGames, syncWeekScores, syncWinProbabilities, syncGamesByEventIds, backfillTeamStats } from '../services/espnService';
 import { awardWeeklyTrophies } from '../services/trophyService';
 import { getCurrentNFLSeason } from '../utils/season';
 import { logActivity } from './activity';
@@ -140,6 +140,20 @@ router.post('/games/sync-scores', async (req, res) => {
 
   const count = await syncWeekScores(week, season, seasonType);
   res.json({ updated: count, week, season });
+});
+
+// ── Team Stats Backfill ───────────────────────────────────────────────────────
+
+router.post('/sync-team-stats', async (req, res) => {
+  const season = req.body.season ?? getCurrentNFLSeason();
+  const seasonType = req.body.seasonType ?? 'regular';
+
+  try {
+    const synced = await backfillTeamStats(season, seasonType);
+    res.json({ synced, season, seasonType });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? 'Stats sync failed' });
+  }
 });
 
 // ── Win Probabilities ─────────────────────────────────────────────────────────

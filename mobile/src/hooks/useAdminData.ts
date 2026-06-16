@@ -126,6 +126,20 @@ export function useSyncFullSeasonForFutureSeason() {
   });
 }
 
+export function useSyncTeamStats() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ season, seasonType }: { season: number; seasonType: string }) =>
+      apiFetch<{ synced: number; season: number; seasonType: string }>(
+        '/api/admin/sync-team-stats',
+        { method: 'POST', body: JSON.stringify({ season, seasonType }) },
+        user,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['games'] }),
+  });
+}
+
 export function useSyncProbs() {
   const { user } = useAuth();
   return useMutation({

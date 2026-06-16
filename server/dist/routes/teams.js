@@ -39,6 +39,10 @@ const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
 const auth_1 = require("../middleware/auth");
 const season_1 = require("../utils/season");
+const avgOf = (nums) => {
+    const valid = nums.filter((v) => v != null && typeof v === 'number' && !isNaN(v));
+    return valid.length ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
+};
 const router = (0, express_1.Router)();
 async function buildTeamStats(season, seasonType = 'regular') {
     const allGames = await db_1.db.query.games.findMany({
@@ -131,7 +135,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     let wins = 0, losses = 0;
     const pointsScored = [];
     const pointsAllowed = [];
-    const recentGames = teamGames.slice(0, 10).map(game => {
+    const recentGames = teamGames.filter(g => g.status === 'post').slice(0, 5).map(game => {
         const isHome = game.homeTeam === teamName;
         const opponent = isHome ? game.awayTeam : game.homeTeam;
         const opponentLogo = isHome ? game.awayTeamLogo : game.homeTeamLogo;
@@ -192,6 +196,23 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     }
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
     const logo = teamGames[0]?.homeTeam === teamName ? teamGames[0].homeTeamLogo : teamGames[0]?.awayTeamLogo;
+    // Team stats from team_game_stats (yards, passing, rushing)
+    let statsRows = await db_1.db.query.teamGameStats.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, teamName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, season), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
+    });
+    let statsSeasonUsed = null;
+    let filteredStats = statsRows.filter(r => r.additionalStats?.seasonType === seasonType);
+    if (filteredStats.length === 0 && season > 2025) {
+        statsRows = await db_1.db.query.teamGameStats.findMany({
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, teamName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, 2025), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
+        });
+        filteredStats = statsRows.filter(r => r.additionalStats?.seasonType === 'regular');
+        if (filteredStats.length > 0)
+            statsSeasonUsed = 2025;
+    }
+    else if (filteredStats.length > 0) {
+        statsSeasonUsed = season;
+    }
     res.json({
         name: teamName,
         logo: logo ?? null,
@@ -199,6 +220,11 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
         losses,
         ppg: avg(pointsScored),
         ppgAllowed: avg(pointsAllowed),
+        ypg: avgOf(filteredStats.map(r => r.yardsPerGame)),
+        yapg: avgOf(filteredStats.map(r => r.yardsAllowedPerGame)),
+        passYpg: avgOf(filteredStats.map(r => r.additionalStats?.passingYards)),
+        rushYpg: avgOf(filteredStats.map(r => r.additionalStats?.rushingYards)),
+        statsSeasonUsed,
         pickWins,
         pickLosses,
         pickTotal: pickWins + pickLosses,
