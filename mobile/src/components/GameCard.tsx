@@ -231,11 +231,7 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
 
       {/* Divider with game info */}
       <View className="flex-row items-center px-4 py-1.5 border-t border-b border-border">
-        <View className="flex-1">
-          {isPre && game.spread && (
-            <Text className="text-muted text-xs">Spread: {game.spread}</Text>
-          )}
-        </View>
+        <View className="flex-1" />
         <Text className="text-muted text-xs text-center flex-1">
           {isPre ? formatGameTime(game.gameTime) : isLive ? 'LIVE' : 'Final'}
         </Text>

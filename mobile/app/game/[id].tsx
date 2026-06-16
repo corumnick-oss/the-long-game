@@ -263,9 +263,12 @@ export default function GameDetailScreen() {
             ) : (
               <>
                 <Text className="text-muted text-base font-bold">vs</Text>
-                {game.spread && (
-                  <Text className="text-muted text-xs mt-1">{game.spread}</Text>
-                )}
+                {game.winningTeamWinProb && game.favoriteTeam && (() => {
+                  const favPct = Math.round(Number(game.winningTeamWinProb));
+                  const awayPct = game.favoriteTeam === game.awayTeam ? favPct : 100 - favPct;
+                  const homePct = game.favoriteTeam === game.homeTeam ? favPct : 100 - favPct;
+                  return <Text className="text-muted text-xs mt-1">{awayPct}% – {homePct}%</Text>;
+                })()}
               </>
             )}
           </View>
@@ -342,12 +345,6 @@ export default function GameDetailScreen() {
             )}
             {game.awayTurnoversPG !== null && game.homeTurnoversPG !== null && (
               <StatRow label="Turnovers/G" away={game.awayTurnoversPG.toFixed(1)} home={game.homeTurnoversPG.toFixed(1)} />
-            )}
-            {game.spread && (
-              <View className="flex-row justify-between py-2 border-b border-border">
-                <Text className="text-muted text-sm flex-1">Spread</Text>
-                <Text className="text-white text-sm font-medium text-right" style={{ width: 128 }}>{game.spread}</Text>
-              </View>
             )}
             <WinProbBar
               favoriteTeam={game.favoriteTeam}
