@@ -46,12 +46,48 @@ const avgOf = (nums) => {
     const valid = nums.filter((v) => v != null && typeof v === 'number' && !isNaN(v));
     return valid.length ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
 };
+// 2025 games stored team names as abbreviations; 2026+ games store full names.
+// Used to translate when falling back to 2025 stats for 2026 pre-game display.
+const NFL_FULL_TO_ABBREV = {
+    'Arizona Cardinals': 'ARI',
+    'Atlanta Falcons': 'ATL',
+    'Baltimore Ravens': 'BAL',
+    'Buffalo Bills': 'BUF',
+    'Carolina Panthers': 'CAR',
+    'Chicago Bears': 'CHI',
+    'Cincinnati Bengals': 'CIN',
+    'Cleveland Browns': 'CLE',
+    'Dallas Cowboys': 'DAL',
+    'Denver Broncos': 'DEN',
+    'Detroit Lions': 'DET',
+    'Green Bay Packers': 'GB',
+    'Houston Texans': 'HOU',
+    'Indianapolis Colts': 'IND',
+    'Jacksonville Jaguars': 'JAX',
+    'Kansas City Chiefs': 'KC',
+    'Las Vegas Raiders': 'LV',
+    'Los Angeles Chargers': 'LAC',
+    'Los Angeles Rams': 'LAR',
+    'Miami Dolphins': 'MIA',
+    'Minnesota Vikings': 'MIN',
+    'New England Patriots': 'NE',
+    'New Orleans Saints': 'NO',
+    'New York Giants': 'NYG',
+    'New York Jets': 'NYJ',
+    'Philadelphia Eagles': 'PHI',
+    'Pittsburgh Steelers': 'PIT',
+    'San Francisco 49ers': 'SF',
+    'Seattle Seahawks': 'SEA',
+    'Tampa Bay Buccaneers': 'TB',
+    'Tennessee Titans': 'TEN',
+    'Washington Commanders': 'WSH',
+};
 async function fetchTeamStatsMap(teamNames, season, seasonType) {
     if (teamNames.length === 0)
         return { map: {}, seasonUsed: null };
     // Get completed game IDs for a given season+type, then pull stats for our teams.
     // Joining through games avoids relying on additionalStats.seasonType being set correctly.
-    const getRows = async (s, st) => {
+    const getRows = async (s, st, queryNames) => {
         const completedGames = await db_1.db.query.games.findMany({
             where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, s), (0, drizzle_orm_1.eq)(schema.games.seasonType, st), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.status, 'post')),
             columns: { id: true },
@@ -60,19 +96,22 @@ async function fetchTeamStatsMap(teamNames, season, seasonType) {
             return [];
         const gameIds = completedGames.map(g => g.id);
         return db_1.db.query.teamGameStats.findMany({
-            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.inArray)(schema.teamGameStats.teamName, teamNames), (0, drizzle_orm_1.inArray)(schema.teamGameStats.gameId, gameIds), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.inArray)(schema.teamGameStats.teamName, queryNames), (0, drizzle_orm_1.inArray)(schema.teamGameStats.gameId, gameIds), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
         });
     };
-    let rows = await getRows(season, seasonType);
+    let rows = await getRows(season, seasonType, teamNames);
     let seasonUsed = rows.length > 0 ? season : null;
     if (rows.length === 0 && season > 2025) {
-        rows = await getRows(2025, 'regular');
+        // 2025 stats were stored with ESPN abbreviations; translate full names before querying.
+        const abbrevNames = teamNames.map(n => NFL_FULL_TO_ABBREV[n] ?? n);
+        rows = await getRows(2025, 'regular', abbrevNames);
         if (rows.length > 0)
             seasonUsed = 2025;
     }
     const map = {};
     for (const name of teamNames) {
-        const tr = rows.filter(r => r.teamName === name);
+        const abbrev = NFL_FULL_TO_ABBREV[name] ?? name;
+        const tr = rows.filter(r => r.teamName === name || r.teamName === abbrev);
         map[name] = {
             ppg: avgOf(tr.map(r => r.pointsPerGame)),
             ppga: avgOf(tr.map(r => r.pointsAllowedPerGame)),
