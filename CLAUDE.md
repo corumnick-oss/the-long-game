@@ -9,12 +9,18 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Pre-Game Team Stats
+## ⚠️ DO THIS FIRST NEXT SESSION — ESPN Stats Sync
 
-Read `memory/session-2026-06-15.md` for the complete agreed implementation plan.
-Then confirm with Nick which files you'll touch before writing any code.
+Check Railway logs for `[ESPN] No boxscore teams for event` warnings after the June 16 admin sync. This will tell us if ESPN is returning historical boxscore data for 2025 games. Read `memory/session-2026-06-16.md` for full context.
 
-**Note: `server/src/services/espnService.ts` has a 2-line edit (added `teamGameStats` import + `and`) that was NOT committed — verify this before building.**
+### COMPLETED SESSION June 16 2026
+- **Pre-game team stats** — full implementation shipped (backend + mobile). See session-2026-06-16.md for complete file list.
+- **Win probability `*100` bug** — FIXED in GameCard.tsx and game/[id].tsx WinProbBar.
+- **Startup crash (ypg)** — `ypg` added to TeamRow type but missing from destructuring → ReferenceError crash on every render. FIXED.
+- **Season selectors** — +/- on Profile tab and Team Detail screen. Upper bound uses `new Date().getFullYear()` (not `getCurrentNFLSeason()`) so buttons are visible in offseason.
+- **Team detail Yards section** — YPG/YAPG/Pass YPG/Rush YPG display added below Scoring section.
+- **Admin Sync Team Stats button** — in NFL Tools tab, triggers backfill of all completed games for selected season/type.
+- **ESPN stats sync — UNRESOLVED** — Admin button says "Synced 272 games" but stats don't appear in app. `backfillTeamStats` counts games *processed* not *inserted*. ESPN /summary may not return boxscore data for historical 2025 games from Railway server. Check Railway logs.
 
 ### COMPLETED SESSION June 15 2026
 - **Picks tab crash** — `onTeamPress` in `TeamRow` type but missing from destructuring → ReferenceError. Fixed. Error boundary removed.
@@ -27,8 +33,6 @@ Then confirm with Nick which files you'll touch before writing any code.
 - **`sync:2026:preseason` npm script** — `--preseason` flag added to local sync script.
 - **Diagnostic no-auth routes removed** — `GET /api/admin/test-espn-2026` and `test-espn-scoreboard-2026` removed from `admin.ts`. Built and pushed.
 - **Live score fixes** — `updateLiveScores()` seasonType bug fixed; OT/HALFTIME display added; client polls every 30s during live games. Committed.
-- **Win probability `*100` bug identified** — `winningTeamWinProb` stored as 0-100 integer but GameCard + WinProbBar multiply by 100 again → shows "6500%". NOT YET FIXED.
-- **Pre-game team stats** — full architecture agreed on (ESPN boxscore → `team_game_stats` table). NOT YET IMPLEMENTED. See `memory/session-2026-06-15.md`.
 
 ---
 
@@ -130,17 +134,16 @@ export function getCurrentNFLSeason(): number {
 NEVER hardcode 2025 or any year. Lives in `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts`.
 
 ### What's Next — Priority Order
-1. **Fix 2026 sync** — hard-code team IDs in `syncWeekGamesFromTeamSchedules` (see DO THIS FIRST above)
+1. **Investigate ESPN stats sync** — check Railway logs for "No boxscore teams" warnings; determine if ESPN returns historical boxscore data from server; fix if needed
 2. **Wire push notification crons** — call functions from `notificationService.ts` in `scheduler.ts`
-3. **Team Central + Picks by Team real-time cache invalidation**
-4. **Pre-game team stats** — ESPN sync → GameCard display
-5. **Post-game box scores** — ESPN sync after finals → Game Detail display
-6. **Preseason season flip** — `getCurrentNFLSeason()` update for Aug 7
-7. **Past seasons** — Profile past seasons row
-8. **Onboarding polish**
-9. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
-10. **2025 data migration** — when Longies sign up with Google/Apple
-11. **App Store + Google Play submission** — target late July
+3. **Preseason season flip** — `getCurrentNFLSeason()` update for Aug 7 (hard deadline — preseason starts Aug 7)
+4. **Post-game box scores on Game Detail** — `syncBoxScoreStats` is built; add final-game display section on Game Detail
+5. **Team Central + Picks by Team real-time cache invalidation**
+6. **Past seasons** — Profile past seasons row
+7. **Onboarding polish**
+8. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
+9. **2025 data migration** — when Longies sign up with Google/Apple
+10. **App Store + Google Play submission** — target late July
 
 ---
 
