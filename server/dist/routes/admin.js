@@ -271,13 +271,14 @@ router.patch('/picks/:id', async (req, res) => {
 router.post('/unlock-week', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
     const week = parseInt(req.body.week, 10);
+    const seasonType = req.body.seasonType ?? 'regular';
     if (!week) {
         res.status(400).json({ error: 'week required' });
         return;
     }
-    await db_1.db.insert(schema.unlockedWeeks).values({ week, season, unlockedBy: req.currentUser.id }).onConflictDoNothing();
-    await (0, activity_1.logActivity)('week_unlocked', `Week ${week} picks are now open!`, 'global', { metadata: { week, season } });
-    res.json({ ok: true, week, season });
+    await db_1.db.insert(schema.unlockedWeeks).values({ week, season, seasonType, unlockedBy: req.currentUser.id }).onConflictDoNothing();
+    await (0, activity_1.logActivity)('week_unlocked', `Week ${week} picks are now open!`, 'global', { metadata: { week, season, seasonType } });
+    res.json({ ok: true, week, season, seasonType });
 });
 // ── Week Settings ─────────────────────────────────────────────────────────────
 router.get('/week-settings', async (req, res) => {

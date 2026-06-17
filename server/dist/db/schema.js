@@ -169,6 +169,7 @@ exports.unlockedWeeks = (0, pg_core_1.pgTable)('unlocked_weeks', {
     id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
     week: (0, pg_core_1.integer)('week').notNull(),
     season: (0, pg_core_1.integer)('season').notNull(),
+    seasonType: (0, pg_core_1.text)('season_type').notNull().default('regular'),
     unlockedAt: (0, pg_core_1.timestamp)('unlocked_at').notNull().defaultNow(),
     unlockedBy: (0, pg_core_1.text)('unlocked_by').notNull(),
 });

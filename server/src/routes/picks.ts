@@ -151,6 +151,15 @@ router.post('/', requireAuth, async (req, res) => {
   const locked = await isWeekLocked(game.week, game.season);
   if (locked) { res.status(403).json({ error: 'Picks are locked for this week' }); return; }
 
+  const unlocked = await db.query.unlockedWeeks.findFirst({
+    where: and(
+      eq(schema.unlockedWeeks.week, game.week),
+      eq(schema.unlockedWeeks.season, game.season),
+      eq(schema.unlockedWeeks.seasonType, game.seasonType),
+    ),
+  });
+  if (!unlocked) { res.status(403).json({ error: 'Picks not yet open for this week' }); return; }
+
   // Upsert — user can change pick before lock
   const existing = await db.query.picks.findFirst({
     where: and(eq(schema.picks.userId, req.currentUser!.id), eq(schema.picks.gameId, gameId)),

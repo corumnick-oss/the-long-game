@@ -52,6 +52,7 @@ export type Game = {
   myPick: 'home' | 'away' | null;
   homePickPct: number | null;
   awayPickPct: number | null;
+  isPicksOpen: boolean;
 };
 
 export type TiebreakerData = {

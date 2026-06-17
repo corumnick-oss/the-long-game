@@ -159,8 +159,8 @@ export function useAwardTrophies() {
 export function useUnlockWeek() {
   const { user } = useAuth();
   return useMutation({
-    mutationFn: ({ week, season }: { week: number; season: number }) =>
-      apiFetch('/api/admin/unlock-week', { method: 'POST', body: JSON.stringify({ week, season }) }, user),
+    mutationFn: ({ week, season, seasonType }: { week: number; season: number; seasonType: string }) =>
+      apiFetch('/api/admin/unlock-week', { method: 'POST', body: JSON.stringify({ week, season, seasonType }) }, user),
   });
 }
 

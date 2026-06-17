@@ -179,8 +179,14 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
     // Attach team stats averages
     const allTeamNames = [...new Set(gameList.flatMap(g => [g.homeTeam, g.awayTeam]))];
     const { map: statsMap, seasonUsed: statsSeasonUsed } = await fetchTeamStatsMap(allTeamNames, season, seasonType);
+    // Determine which weeks have picks open for this season+type
+    const unlockedRows = await db_1.db.query.unlockedWeeks.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, season), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.seasonType, seasonType)),
+    });
+    const unlockedWeekNums = new Set(unlockedRows.map(r => r.week));
     res.json(gameList.map(game => ({
         ...game,
+        isPicksOpen: unlockedWeekNums.has(game.week),
         myPick: myPicksMap[game.id] ?? null,
         homePickPct: pickPctMap[game.id]?.homePickPct ?? null,
         awayPickPct: pickPctMap[game.id]?.awayPickPct ?? null,

@@ -413,13 +413,13 @@ function ToolsTab({ season }: { season: number }) {
           loading={unlockWeek.isPending}
           result={results['unlock']}
           onPress={() =>
-            Alert.alert('Unlock Week', `Unlock Week ${week} picks?`, [
+            Alert.alert('Unlock Week', `Unlock Week ${week} ${seasonType === 'preseason' ? 'preseason' : 'regular season'} picks?`, [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Unlock',
                 onPress: () =>
-                  unlockWeek.mutate({ week, season }, {
-                    onSuccess: () => setResult('unlock', `✓ Week ${week} picks unlocked`),
+                  unlockWeek.mutate({ week, season, seasonType }, {
+                    onSuccess: () => setResult('unlock', `✓ Week ${week} ${seasonType} picks unlocked`),
                     onError: () => setResult('unlock', '✗ Failed'),
                   }),
               },

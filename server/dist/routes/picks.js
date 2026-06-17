@@ -176,6 +176,13 @@ router.post('/', auth_1.requireAuth, async (req, res) => {
         res.status(403).json({ error: 'Picks are locked for this week' });
         return;
     }
+    const unlocked = await db_1.db.query.unlockedWeeks.findFirst({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.week, game.week), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, game.season), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.seasonType, game.seasonType)),
+    });
+    if (!unlocked) {
+        res.status(403).json({ error: 'Picks not yet open for this week' });
+        return;
+    }
     // Upsert — user can change pick before lock
     const existing = await db_1.db.query.picks.findFirst({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.picks.userId, req.currentUser.id), (0, drizzle_orm_1.eq)(schema.picks.gameId, gameId)),

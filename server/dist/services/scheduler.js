@@ -76,6 +76,10 @@ node_cron_1.default.schedule('0 6 * * 2', async () => {
         await (0, espnService_1.syncWeekGames)(week, season, 'regular');
         // Backfill box score stats for all completed games in the prior week
         await (0, espnService_1.backfillTeamStats)(season, 'regular');
+        // Auto-unlock week in DB so the picks gate opens
+        await db_1.db.insert(schema.unlockedWeeks)
+            .values({ week, season, seasonType: 'regular', unlockedBy: 'scheduler' })
+            .onConflictDoNothing();
         // Notify users week is open
         await (0, notificationService_1.notifyWeekUnlocked)(week);
         await (0, activity_1.logActivity)('week_opened', `Week ${week} picks are now open!`, 'global', { metadata: { week, season } });

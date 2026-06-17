@@ -189,6 +189,7 @@ export const unlockedWeeks = pgTable('unlocked_weeks', {
   id: uuid('id').primaryKey().defaultRandom(),
   week: integer('week').notNull(),
   season: integer('season').notNull(),
+  seasonType: text('season_type').notNull().default('regular'),
   unlockedAt: timestamp('unlocked_at').notNull().defaultNow(),
   unlockedBy: text('unlocked_by').notNull(),
 });

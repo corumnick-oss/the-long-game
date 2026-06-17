@@ -2473,6 +2473,23 @@ export declare const unlockedWeeks: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        seasonType: import("drizzle-orm/pg-core").PgColumn<{
+            name: "season_type";
+            tableName: "unlocked_weeks";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         unlockedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "unlocked_at";
             tableName: "unlocked_weeks";
