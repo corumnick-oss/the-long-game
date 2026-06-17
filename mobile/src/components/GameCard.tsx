@@ -110,13 +110,16 @@ function TeamRow({
               {team}
             </Text>
           </TouchableOpacity>
-          {isPicked && pickOutcome === 'pending' && (
-            <Text className="ml-2 text-white text-sm font-bold">✓</Text>
-          )}
-          {isPicked && (pickOutcome === 'correct' || pickOutcome === 'wrong') && (
+          {/* Always reserve space for checkmark to prevent layout shift */}
+          {(pickOutcome === 'correct' || pickOutcome === 'wrong') ? (
             <View className={`ml-2 rounded px-1.5 py-0.5 ${outcomeBadgeStyle}`}>
               <Text className="text-white text-xs font-bold">{outcomeBadgeLabel}</Text>
             </View>
+          ) : (
+            <Text
+              className="ml-2 text-sm font-bold"
+              style={{ color: isPicked ? 'white' : 'transparent' }}
+            >✓</Text>
           )}
         </View>
         {record && !showScore && (

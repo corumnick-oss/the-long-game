@@ -92,19 +92,25 @@ export function useSubmitPick() {
     mutationFn: ({ gameId, pick }: { gameId: string; pick: 'home' | 'away'; week: number; season: number; seasonType: string }) =>
       apiFetch('/api/picks', { method: 'POST', body: JSON.stringify({ gameId, pick }) }, user),
     onMutate: async ({ gameId, pick, week, season, seasonType }) => {
-      const key = ['games', week, season, seasonType, user?.uid ?? null];
-      await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<Game[]>(key);
-      qc.setQueryData<Game[]>(key, old =>
+      const gamesKey = ['games', week, season, seasonType, user?.uid ?? null];
+      const detailKey = ['game-detail', gameId, user?.uid ?? null];
+      await qc.cancelQueries({ queryKey: gamesKey });
+      await qc.cancelQueries({ queryKey: detailKey });
+      const prevGames = qc.getQueryData<Game[]>(gamesKey);
+      const prevDetail = qc.getQueryData<unknown>(detailKey);
+      qc.setQueryData<Game[]>(gamesKey, old =>
         old?.map(g => g.id === gameId ? { ...g, myPick: pick } : g) ?? [],
       );
-      return { prev };
+      qc.setQueryData(detailKey, (old: any) => old ? { ...old, myPick: pick } : old);
+      return { prevGames, prevDetail };
     },
-    onError: (_err, { week, season, seasonType }, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['games', week, season, seasonType, user?.uid ?? null], ctx.prev);
+    onError: (_err, { gameId, week, season, seasonType }, ctx) => {
+      if (ctx?.prevGames) qc.setQueryData(['games', week, season, seasonType, user?.uid ?? null], ctx.prevGames);
+      if (ctx?.prevDetail) qc.setQueryData(['game-detail', gameId, user?.uid ?? null], ctx.prevDetail);
     },
-    onSettled: (_data, _err, { week, season, seasonType }) => {
+    onSettled: (_data, _err, { gameId, week, season, seasonType }) => {
       qc.invalidateQueries({ queryKey: ['games', week, season, seasonType, user?.uid ?? null] });
+      qc.invalidateQueries({ queryKey: ['game-detail', gameId, user?.uid ?? null] });
     },
   });
 }
