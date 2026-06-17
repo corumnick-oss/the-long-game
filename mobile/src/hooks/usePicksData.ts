@@ -89,10 +89,10 @@ export function useSubmitPick() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ gameId, pick }: { gameId: string; pick: 'home' | 'away'; week: number; season: number }) =>
+    mutationFn: ({ gameId, pick }: { gameId: string; pick: 'home' | 'away'; week: number; season: number; seasonType: string }) =>
       apiFetch('/api/picks', { method: 'POST', body: JSON.stringify({ gameId, pick }) }, user),
-    onMutate: async ({ gameId, pick, week, season }) => {
-      const key = ['games', week, season, user?.uid ?? null];
+    onMutate: async ({ gameId, pick, week, season, seasonType }) => {
+      const key = ['games', week, season, seasonType, user?.uid ?? null];
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Game[]>(key);
       qc.setQueryData<Game[]>(key, old =>
@@ -100,11 +100,11 @@ export function useSubmitPick() {
       );
       return { prev };
     },
-    onError: (_err, { week, season }, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['games', week, season, user?.uid ?? null], ctx.prev);
+    onError: (_err, { week, season, seasonType }, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['games', week, season, seasonType, user?.uid ?? null], ctx.prev);
     },
-    onSettled: (_data, _err, { week, season }) => {
-      qc.invalidateQueries({ queryKey: ['games', week, season, user?.uid ?? null] });
+    onSettled: (_data, _err, { week, season, seasonType }) => {
+      qc.invalidateQueries({ queryKey: ['games', week, season, seasonType, user?.uid ?? null] });
     },
   });
 }

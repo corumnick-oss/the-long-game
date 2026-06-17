@@ -42,8 +42,8 @@ export default function PicksScreen() {
 
   const handlePick = useCallback(async (game: Game, pick: 'home' | 'away') => {
     if (game.myPick === pick) return;
-    submitPick.mutate({ gameId: game.id, pick, week: selectedWeek, season });
-  }, [selectedWeek, season, submitPick]);
+    submitPick.mutate({ gameId: game.id, pick, week: selectedWeek, season, seasonType });
+  }, [selectedWeek, season, seasonType, submitPick]);
 
   const handleTiebreaker = useCallback(async (tiebreakerGameId: string, predictedTotal: number) => {
     await submitTiebreaker.mutateAsync({ tiebreakerGameId, predictedTotal, week: selectedWeek, season });
