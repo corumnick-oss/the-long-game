@@ -227,23 +227,22 @@ export default function ProfileScreen() {
       </View>
 
       {/* ── Season stats ── */}
-      {/* ── Season stats ── */}
       <View className="mx-4 mb-5">
-        <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-row items-center justify-center mb-3" style={{ gap: 16 }}>
           <TouchableOpacity
             onPress={() => setSeason(s => Math.max(FIRST_SEASON, s - 1))}
             disabled={season <= FIRST_SEASON}
-            className="w-8 h-8 items-center justify-center"
+            className={`w-9 h-9 bg-surface rounded-full items-center justify-center ${season <= FIRST_SEASON ? 'opacity-30' : ''}`}
           >
-            <Text className={`text-2xl leading-7 ${season <= FIRST_SEASON ? 'text-surface' : 'text-white'}`}>−</Text>
+            <Text className="text-white text-2xl leading-7">−</Text>
           </TouchableOpacity>
-          <Text className="text-muted text-xs font-semibold uppercase tracking-widest">{season} Season</Text>
+          <Text className="text-muted text-xs font-semibold uppercase tracking-widest" style={{ minWidth: 80, textAlign: 'center' }}>{season} Season</Text>
           <TouchableOpacity
             onPress={() => setSeason(s => Math.min(currentSeason, s + 1))}
             disabled={season >= currentSeason}
-            className="w-8 h-8 items-center justify-center"
+            className={`w-9 h-9 bg-surface rounded-full items-center justify-center ${season >= currentSeason ? 'opacity-30' : ''}`}
           >
-            <Text className={`text-2xl leading-7 ${season >= currentSeason ? 'text-surface' : 'text-white'}`}>+</Text>
+            <Text className="text-white text-2xl leading-7">+</Text>
           </TouchableOpacity>
         </View>
         <View className="flex-row gap-2 mb-2">
