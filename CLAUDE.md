@@ -9,42 +9,28 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Test Game Detail + Fix Season Selectors
+## ⚠️ DO THIS FIRST NEXT SESSION — Fix Season Selectors
 
-### DONE: Game detail crash fix ✓
-`isPre` was undeclared → ReferenceError on every render. Fixed June 17 session. OTA pushed. Post-game 2025 box score now works.
+### DONE: Pre-game stats for 2026 games ✓
+Root cause was team name format mismatch: 2025 games stored abbreviations ("TB"), 2026 games store full names ("Tampa Bay Buccaneers"). `fetchTeamStatsMap` fallback query passed full names into a query against abbreviation-keyed rows → no matches. Fixed June 18 session by adding `NFL_FULL_TO_ABBREV` map in `server/src/routes/games.ts` and translating names before the 2025 fallback query.
 
-### STILL BROKEN: Pre-game stats not showing on 2026 games
-2026 game detail opens fine but the stats section (PPG, YPG, 3rd Down %, etc.) is blank — only the spread and pick message show.
-
-**What was tried (June 17 session):**
-1. Fixed `isPre` declaration → game detail loads now
-2. Changed `fetchTeamStatsMap` to query by game IDs from the `games` table instead of filtering by `additionalStats.seasonType` — still not showing
-
-**Most likely remaining cause: `team_game_stats` is empty or team names don't match**  
-The backfill ran locally (`npm run backfill:stats`) and reported "272 processed", but the backend may not be finding rows. To diagnose, start next session by verifying the DB directly:
-
-1. **Check Railway Postgres** — go to Railway → your DB service → "Data" tab (or connect via `psql`) and run:
-   ```sql
-   SELECT COUNT(*), season, team_name FROM team_game_stats GROUP BY season, team_name ORDER BY season LIMIT 20;
-   ```
-   If count is 0 or rows are missing, the backfill data isn't in the DB.
-
-2. **Check team name mismatch** — if rows exist, compare a `team_name` from `team_game_stats` with `home_team` from the `games` table for a 2026 game. They must match exactly.
-   ```sql
-   SELECT DISTINCT team_name FROM team_game_stats LIMIT 10;
-   SELECT home_team, away_team FROM games WHERE season = 2026 LIMIT 5;
-   ```
-
-3. **If DB is empty** — re-run `npm run backfill:stats` in `server/` (reads Railway DB URL from `.env`). Check for errors in output. If ESPN returns 400s again, the Railway IP block may now affect more endpoints.
-
-4. **If names mismatch** — the fix is to update the `teamName` stored in `syncBoxScoreStats` to use a normalized form, or to change the fallback query to use a case-insensitive/fuzzy match.
+### DONE: Spread removed, win probability added ✓
+- GameCard divider: spread label removed, "X% fav" already on right
+- Game Detail header: `away% – home%` shown under "vs" when data available
+- Game Detail stats: Spread row removed; WinProbBar remains at bottom
+- Win prob for 2026 games: ESPN doesn't publish win probs months out; will auto-populate via Tue/Wed crons once games are within ~1 week. Admin "Sync Win Probabilities" button already exists in NFL Tools.
 
 ### Fix 1: Profile season selector layout (`profile.tsx`) — STILL NEEDED
 The +/- buttons sit at the far left and right edges of the screen. They should be compact and centered inline with the year label, matching the style of other selectors in the app (e.g., the admin week picker: `−  Week X  +` centered together). Redesign so the three elements (−, label, +) are grouped tightly in the center, not spread across the full width.
 
 ### Fix 2: Team Detail season selector layout + bug (`team/[name].tsx`) — STILL NEEDED
 Same visual problem as profile — buttons look different from other selectors. Additionally, changing the season causes a **"Team not found" error**. Likely cause: when the season changes, `seasonType` is still read from the original URL param (e.g., 'preseason' from a 2026 navigation), but the new season has no games for that type (no 2025 preseason in DB). Fix: either reset `seasonType` to 'regular' when season changes, or add a seasonType toggle alongside the season selector. Also fix the visual style to match the admin/picks selector pattern.
+
+### COMPLETED SESSION June 18 2026
+- **Pre-game stats fix (2026)** — Root cause: `team_game_stats` stores 2025 team names as ESPN abbreviations; 2026 `games` table stores full names. `fetchTeamStatsMap` fallback was querying full names against abbreviation rows → no match. Added `NFL_FULL_TO_ABBREV` map (32 teams) in `server/src/routes/games.ts`; translate names before 2025 fallback query and match rows by either format when averaging. Backend rebuilt and deployed.
+- **Spread replaced with win probability** — GameCard divider: removed `Spread: X` label. Game Detail header: shows `away% – home%` under "vs" when `winningTeamWinProb` + `favoriteTeam` are set. Removed Spread stat row from pre-game stats table. WinProbBar remains at bottom of stats section.
+- **Stat table header alignment fixed** — pre-game and box score headers used `justify-between` with auto-width label; `StatRow` uses `flex-1`. Switched headers to `flex-row` with `flex-1` label so columns line up. Both pre-game averages and box score headers fixed.
+- **Android preview APK built** — `eas build --profile preview --platform android`. Download link available in EAS dashboard. OTA updates work on Android preview build the same as iOS (`eas update --branch preview`).
 
 ### COMPLETED SESSION June 17 2026
 - **ESPN stats sync root cause** — ESPN returns 400 for historical 2025 game summaries from Railway's server IP (server-side block on bulk historical data). Works fine from local/browser IPs.
