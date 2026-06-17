@@ -14,6 +14,13 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ACTION REQUIRED: Re-unlock preseason week 1 picks
 The DB migration added `season_type` to `unlocked_weeks` and cleared the old stale row. Nick must open the Admin tab → NFL Tools → select **Preseason** tab → Week 1 → tap **Unlock Week**. This re-enables preseason week 1 picks with the correct seasonType.
 
+### Bug to fix next session: Season context not propagated on navigation
+A general pattern: when a user selects a past season (e.g. 2025) on any screen and taps through to another screen, the destination resets to the current season (2026) instead of inheriting the selected season. Known instances:
+- **Leaderboard → User Profile** — viewing 2025 leaderboard and tapping a user shows their 2026 profile stats, not 2025
+- **Profile → Picks by Team** — selecting 2025 on Profile tab then tapping Picks by Team shows 2026 data (see bug below)
+
+**Fix approach:** Pass `season` (and `seasonType` where relevant) as router params whenever navigating from a season-scoped screen. The destination screen should read the param and initialize its season state from it rather than defaulting to `getCurrentNFLSeason()`. Audit all `router.push` calls that navigate between season-aware screens and ensure season is threaded through.
+
 ### Bug to fix next session: Picks by Team ignores selected season on Profile
 When the user selects the 2025 season on the Profile tab and taps "Picks by Team", the Picks by Team screen shows 2026 data instead of 2025. The selected season from the Profile tab is not being passed through to the `GET /api/picks/by-team?season=X` call. Check how `picks-by-team.tsx` receives its season parameter (likely from router params or a hook) and ensure the Profile tab passes the active season when navigating there.
 
