@@ -39,6 +39,24 @@ const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
 const auth_1 = require("../middleware/auth");
 const season_1 = require("../utils/season");
+// 2025 games stored team names as ESPN abbreviations; 2026+ store full names.
+const NFL_FULL_TO_ABBREV = {
+    'Arizona Cardinals': 'ARI', 'Atlanta Falcons': 'ATL', 'Baltimore Ravens': 'BAL',
+    'Buffalo Bills': 'BUF', 'Carolina Panthers': 'CAR', 'Chicago Bears': 'CHI',
+    'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Dallas Cowboys': 'DAL',
+    'Denver Broncos': 'DEN', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB',
+    'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX',
+    'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+    'Los Angeles Rams': 'LAR', 'Miami Dolphins': 'MIA', 'Minnesota Vikings': 'MIN',
+    'New England Patriots': 'NE', 'New Orleans Saints': 'NO', 'New York Giants': 'NYG',
+    'New York Jets': 'NYJ', 'Philadelphia Eagles': 'PHI', 'Pittsburgh Steelers': 'PIT',
+    'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA', 'Tampa Bay Buccaneers': 'TB',
+    'Tennessee Titans': 'TEN', 'Washington Commanders': 'WSH',
+};
+const NFL_ABBREV_TO_FULL = Object.fromEntries(Object.entries(NFL_FULL_TO_ABBREV).map(([k, v]) => [v, k]));
+function translateTeamName(name) {
+    return NFL_FULL_TO_ABBREV[name] ?? NFL_ABBREV_TO_FULL[name] ?? null;
+}
 const avgOf = (nums) => {
     const valid = nums.filter((v) => v != null && typeof v === 'number' && !isNaN(v));
     return valid.length ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
@@ -123,7 +141,20 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     const allGames = await db_1.db.query.games.findMany({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
     });
-    const teamGames = allGames.filter(g => g.homeTeam === teamName || g.awayTeam === teamName).sort((a, b) => {
+    let resolvedName = teamName;
+    let teamGames = allGames.filter(g => g.homeTeam === teamName || g.awayTeam === teamName);
+    // 2025 uses abbreviations, 2026+ uses full names — translate and retry if no match.
+    if (teamGames.length === 0) {
+        const alt = translateTeamName(teamName);
+        if (alt) {
+            const altGames = allGames.filter(g => g.homeTeam === alt || g.awayTeam === alt);
+            if (altGames.length > 0) {
+                resolvedName = alt;
+                teamGames = altGames;
+            }
+        }
+    }
+    teamGames = teamGames.sort((a, b) => {
         const at = a.gameTime ? new Date(a.gameTime).getTime() : 0;
         const bt = b.gameTime ? new Date(b.gameTime).getTime() : 0;
         return bt - at;
@@ -136,7 +167,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     const pointsScored = [];
     const pointsAllowed = [];
     const recentGames = teamGames.filter(g => g.status === 'post').slice(0, 5).map(game => {
-        const isHome = game.homeTeam === teamName;
+        const isHome = game.homeTeam === resolvedName;
         const opponent = isHome ? game.awayTeam : game.homeTeam;
         const opponentLogo = isHome ? game.awayTeamLogo : game.homeTeamLogo;
         const myScore = isHome ? game.homeScore : game.awayScore;
@@ -161,7 +192,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     for (const game of teamGames) {
         if (game.status !== 'post' || game.homeScore === null || game.awayScore === null)
             continue;
-        const isHome = game.homeTeam === teamName;
+        const isHome = game.homeTeam === resolvedName;
         const myScore = isHome ? game.homeScore : game.awayScore;
         const theirScore = isHome ? game.awayScore : game.homeScore;
         if (myScore > theirScore)
@@ -186,7 +217,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
             if (!game)
                 continue;
             const pickedTeam = pick.pick === 'home' ? game.homeTeam : game.awayTeam;
-            if (pickedTeam !== teamName)
+            if (pickedTeam !== resolvedName)
                 continue;
             if (pick.isCorrect)
                 pickWins++;
@@ -195,16 +226,17 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
         }
     }
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
-    const logo = teamGames[0]?.homeTeam === teamName ? teamGames[0].homeTeamLogo : teamGames[0]?.awayTeamLogo;
-    // Team stats from team_game_stats (yards, passing, rushing)
+    const logo = teamGames[0]?.homeTeam === resolvedName ? teamGames[0].homeTeamLogo : teamGames[0]?.awayTeamLogo;
+    // Team stats from team_game_stats — use abbrev for 2025 data, full name for 2026+
+    const statsName = NFL_FULL_TO_ABBREV[resolvedName] ?? resolvedName;
     let statsRows = await db_1.db.query.teamGameStats.findMany({
-        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, teamName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, season), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, statsName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, season), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
     });
     let statsSeasonUsed = null;
     let filteredStats = statsRows.filter(r => r.additionalStats?.seasonType === seasonType);
     if (filteredStats.length === 0 && season > 2025) {
         statsRows = await db_1.db.query.teamGameStats.findMany({
-            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, teamName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, 2025), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, statsName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, 2025), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
         });
         filteredStats = statsRows.filter(r => r.additionalStats?.seasonType === 'regular');
         if (filteredStats.length > 0)
@@ -214,7 +246,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
         statsSeasonUsed = season;
     }
     res.json({
-        name: teamName,
+        name: NFL_ABBREV_TO_FULL[resolvedName] ?? resolvedName,
         logo: logo ?? null,
         wins,
         losses,
