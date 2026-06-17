@@ -80,17 +80,8 @@ function TeamRow({
     ? 'rgba(0,0,0,0.18)'
     : undefined;
 
-  const badgeStyle = pickOutcome === 'correct'
-    ? 'bg-success'
-    : pickOutcome === 'wrong'
-    ? 'bg-danger'
-    : 'bg-primary';
-
-  const badgeLabel = pickOutcome === 'correct'
-    ? '✓ CORRECT'
-    : pickOutcome === 'wrong'
-    ? '✗ WRONG'
-    : 'MY PICK';
+  const outcomeBadgeStyle = pickOutcome === 'correct' ? 'bg-success' : 'bg-danger';
+  const outcomeBadgeLabel = pickOutcome === 'correct' ? '✓ CORRECT' : '✗ WRONG';
 
   return (
     <TouchableOpacity
@@ -119,9 +110,12 @@ function TeamRow({
               {team}
             </Text>
           </TouchableOpacity>
-          {isPicked && (
-            <View className={`ml-2 rounded px-1.5 py-0.5 ${badgeStyle}`}>
-              <Text className="text-white text-xs font-bold">{badgeLabel}</Text>
+          {isPicked && pickOutcome === 'pending' && (
+            <Text className="ml-2 text-white text-sm font-bold">✓</Text>
+          )}
+          {isPicked && (pickOutcome === 'correct' || pickOutcome === 'wrong') && (
+            <View className={`ml-2 rounded px-1.5 py-0.5 ${outcomeBadgeStyle}`}>
+              <Text className="text-white text-xs font-bold">{outcomeBadgeLabel}</Text>
             </View>
           )}
         </View>
