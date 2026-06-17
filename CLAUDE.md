@@ -9,22 +9,19 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ---
 
-## ⚠️ DO THIS FIRST NEXT SESSION — Fix Season Selectors
+## ⚠️ DO THIS FIRST NEXT SESSION
 
-### DONE: Pre-game stats for 2026 games ✓
-Root cause was team name format mismatch: 2025 games stored abbreviations ("TB"), 2026 games store full names ("Tampa Bay Buccaneers"). `fetchTeamStatsMap` fallback query passed full names into a query against abbreviation-keyed rows → no matches. Fixed June 18 session by adding `NFL_FULL_TO_ABBREV` map in `server/src/routes/games.ts` and translating names before the 2025 fallback query.
+No immediate blockers. Next priority items:
+1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs
+2. **Past seasons row on Profile** — W-L per season for historical context
+3. **Onboarding polish** — Nick wants redesign before launch
+4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
 
-### DONE: Spread removed, win probability added ✓
-- GameCard divider: spread label removed, "X% fav" already on right
-- Game Detail header: `away% – home%` shown under "vs" when data available
-- Game Detail stats: Spread row removed; WinProbBar remains at bottom
-- Win prob for 2026 games: ESPN doesn't publish win probs months out; will auto-populate via Tue/Wed crons once games are within ~1 week. Admin "Sync Win Probabilities" button already exists in NFL Tools.
-
-### Fix 1: Profile season selector layout (`profile.tsx`) — STILL NEEDED
-The +/- buttons sit at the far left and right edges of the screen. They should be compact and centered inline with the year label, matching the style of other selectors in the app (e.g., the admin week picker: `−  Week X  +` centered together). Redesign so the three elements (−, label, +) are grouped tightly in the center, not spread across the full width.
-
-### Fix 2: Team Detail season selector layout + bug (`team/[name].tsx`) — STILL NEEDED
-Same visual problem as profile — buttons look different from other selectors. Additionally, changing the season causes a **"Team not found" error**. Likely cause: when the season changes, `seasonType` is still read from the original URL param (e.g., 'preseason' from a 2026 navigation), but the new season has no games for that type (no 2025 preseason in DB). Fix: either reset `seasonType` to 'regular' when season changes, or add a seasonType toggle alongside the season selector. Also fix the visual style to match the admin/picks selector pattern.
+### COMPLETED SESSION June 19 2026
+- **Season selector layout fixed (Profile + Team Detail)** — compact centered circular buttons matching admin week picker style. OTA pushed.
+- **Team Detail season-change crash fixed** — two-part fix: (1) `seasonType` converted to state, resets to 'regular' when season changes; (2) backend `teams.ts` now translates team name full↔abbrev (using `NFL_FULL_TO_ABBREV`/`NFL_ABBREV_TO_FULL`) and retries lookup if initial query returns empty — fixes crash when navigating from 2026 full-name to 2025 abbreviated data. Backend rebuilt and deployed.
+- **Push notifications confirmed wired** — all 5 functions already called: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`. CLAUDE.md was stale on this.
+- **Season flip cutoff changed to March** — `getCurrentNFLSeason()` now returns current year when `month >= 3` (was `month >= 8`). App now shows 2026 as the current season. Both `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts` updated. Backend deployed, OTA pushed.
 
 ### COMPLETED SESSION June 18 2026
 - **Pre-game stats fix (2026)** — Root cause: `team_game_stats` stores 2025 team names as ESPN abbreviations; 2026 `games` table stores full names. `fetchTeamStatsMap` fallback was querying full names against abbreviation rows → no match. Added `NFL_FULL_TO_ABBREV` map (32 teams) in `server/src/routes/games.ts`; translate names before 2025 fallback query and match rows by either format when averaging. Backend rebuilt and deployed.
