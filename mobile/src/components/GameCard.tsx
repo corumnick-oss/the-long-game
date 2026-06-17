@@ -61,6 +61,7 @@ function TeamRow({
   pickPct: number;
   showPct: boolean;
   pickOutcome: 'correct' | 'wrong' | 'pending' | null;
+  otherTeamPicked: boolean;
   onPress: () => void;
   onTeamPress?: () => void;
   disabled: boolean;
@@ -73,7 +74,9 @@ function TeamRow({
     : pickOutcome === 'wrong'
     ? 'rgba(239,68,68,0.12)'
     : pickOutcome === 'pending'
-    ? 'rgba(59,130,246,0.08)'
+    ? 'rgba(59,130,246,0.20)'
+    : otherTeamPicked && !isFinal
+    ? 'rgba(0,0,0,0.18)'
     : undefined;
 
   const badgeStyle = pickOutcome === 'correct'
@@ -224,6 +227,7 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
         pickPct={awayPct}
         showPct={showPct}
         pickOutcome={awayPickOutcome}
+        otherTeamPicked={homePicked}
         onPress={() => onPick('away')}
         onTeamPress={onTeamPress ? () => onTeamPress(game.awayTeam) : undefined}
         disabled={!canPick}
@@ -261,6 +265,7 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
         pickPct={homePct}
         showPct={showPct}
         pickOutcome={homePickOutcome}
+        otherTeamPicked={awayPicked}
         onPress={() => onPick('home')}
         onTeamPress={onTeamPress ? () => onTeamPress(game.homeTeam) : undefined}
         disabled={!canPick}

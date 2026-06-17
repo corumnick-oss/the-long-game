@@ -9,6 +9,7 @@ exports.notifyWeekUnlocked = notifyWeekUnlocked;
 exports.notifyDeadlineApproaching = notifyDeadlineApproaching;
 exports.notifyPicksLocked = notifyPicksLocked;
 exports.notifyAchievementEarned = notifyAchievementEarned;
+exports.notifyDefaultPicksApplied = notifyDefaultPicksApplied;
 exports.notifyGameFinal = notifyGameFinal;
 const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
@@ -66,6 +67,9 @@ async function notifyPicksLocked(week) {
 }
 async function notifyAchievementEarned(userId, achievementName, week) {
     await sendPushToUsers([userId], "You earned " + achievementName + "! 🏅", "Week " + week + " achievement unlocked.", { type: 'achievement', week });
+}
+async function notifyDefaultPicksApplied(userId, count, week) {
+    await sendPushToUsers([userId], "Your picks were filled in", `You had ${count} unpicked game${count === 1 ? '' : 's'} for Week ${week}. We defaulted to the Raiders (or away team).`, { type: 'default_picks', week });
 }
 async function notifyGameFinal(userId, homeTeam, awayTeam, homeScore, awayScore, isCorrect) {
     const result = isCorrect ? 'correct ✓' : 'wrong ✗';

@@ -93,6 +93,15 @@ export async function notifyAchievementEarned(userId: string, achievementName: s
   );
 }
 
+export async function notifyDefaultPicksApplied(userId: string, count: number, week: number): Promise<void> {
+  await sendPushToUsers(
+    [userId],
+    "Your picks were filled in",
+    `You had ${count} unpicked game${count === 1 ? '' : 's'} for Week ${week}. We defaulted to the Raiders (or away team).`,
+    { type: 'default_picks', week }
+  );
+}
+
 export async function notifyGameFinal(userId: string, homeTeam: string, awayTeam: string, homeScore: number, awayScore: number, isCorrect: boolean): Promise<void> {
   const result = isCorrect ? 'correct ✓' : 'wrong ✗';
   await sendPushToUsers(
