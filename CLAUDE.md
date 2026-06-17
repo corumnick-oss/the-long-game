@@ -14,6 +14,9 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ACTION REQUIRED: Re-unlock preseason week 1 picks
 The DB migration added `season_type` to `unlocked_weeks` and cleared the old stale row. Nick must open the Admin tab → NFL Tools → select **Preseason** tab → Week 1 → tap **Unlock Week**. This re-enables preseason week 1 picks with the correct seasonType.
 
+### Bug to fix next session: Picks by Team ignores selected season on Profile
+When the user selects the 2025 season on the Profile tab and taps "Picks by Team", the Picks by Team screen shows 2026 data instead of 2025. The selected season from the Profile tab is not being passed through to the `GET /api/picks/by-team?season=X` call. Check how `picks-by-team.tsx` receives its season parameter (likely from router params or a hook) and ensure the Profile tab passes the active season when navigating there.
+
 ### Bug to fix next session: GameCard bounces when changing pick
 Tapping to change a pick still causes the GameCard to briefly jump/bounce in the FlatList. The `✓` checkmark was made always-rendered with transparent color to fix the text-level shift, but something else is still causing a height change — likely the stats lines (PPG/YPG) conditionally showing/hiding or a border width change. Investigate what changes between picked/unpicked state in `TeamRow` (in `GameCard.tsx`) and ensure all conditional content reserves constant height.
 
