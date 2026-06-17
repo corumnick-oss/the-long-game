@@ -116,3 +116,21 @@ After one full 2026 season:
 - Every QB/RB/WR performance linked to team win/loss outcomes
 
 This data gets more valuable every season. It IS the premium product. ESPN just feeds raw game data to populate it. Fields already collected: `winningTeamWinProb` on every game, `pickWinProbability` on every pick, all pick outcomes, team stats in `team_game_stats`, post-game box scores in `team_game_stats.additionalStats` + `player_stats`.
+
+### Raw ESPN Box Score Archive — Future-Proof Stats Vault
+
+**Goal:** Store the full raw ESPN `/summary?event={id}` JSON response for every completed game so we can compute any stat we want later without being dependent on ESPN remaining available or accessible.
+
+**Why:** ESPN's API is undocumented and could change or block us at any time. Storing the raw payload gives us:
+- A complete historical record we own
+- Freedom to derive any custom stat (QBR, target share, pressure rate, etc.) without re-hitting ESPN
+- Foundation for "Long Game Pro" analytics that can't be bought from a third-party API
+
+**Implementation sketch (when ready to build):**
+- New table: `espn_game_snapshots` — `id`, `espnGameId` (text, unique), `season`, `week`, `capturedAt` (timestamp), `rawJson` (jsonb)
+- In `espnService.ts`: after fetching `/summary?event={id}`, also upsert the full response into `espn_game_snapshots`
+- Wire to the same trigger that calls `syncBoxScoreStats` (when game goes `in → post`)
+- Backfill: fetch + store raw JSON for all 272 2025 games via a local script (ESPN's historical endpoints work from local IP, not Railway)
+- Keep the existing computed `team_game_stats` rows for fast querying — this is an archival layer alongside it, not a replacement
+
+**Note:** The JSON payloads are ~50–200 KB per game. 272 games/season × 10 seasons = a few hundred MB of JSONB — totally fine for PostgreSQL on Railway.
