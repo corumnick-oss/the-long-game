@@ -17,11 +17,20 @@ No immediate blockers. Next priority items:
 3. **Onboarding polish** — Nick wants redesign before launch
 4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
 
+### ⚠️ BEFORE PRESEASON STARTS (Aug 7) — Default Picks Preseason Fix
+`applyDefaultPicks()` in `scheduler.ts` hardcodes `seasonType: 'regular'`. During preseason weeks (Aug 7–28), it queries for regular season games, finds none, and silently does nothing — **preseason default picks will NOT fire**. Regular season (Sept 4+) works correctly.
+
+**Fix needed before Aug 7:** Detect the active seasonType from the week's games (or pass it in from the scheduler context) instead of hardcoding `'regular'`. The lock cron already knows the week — add a query to determine whether that week has preseason or regular season games and pass it through.
+
+**Also future feature:** Add a rules/explanation page in the app so users know that missing picks defaults to Raiders (if playing) or away team.
+
 ### COMPLETED SESSION June 19 2026
 - **Season selector layout fixed (Profile + Team Detail)** — compact centered circular buttons matching admin week picker style. OTA pushed.
 - **Team Detail season-change crash fixed** — two-part fix: (1) `seasonType` converted to state, resets to 'regular' when season changes; (2) backend `teams.ts` now translates team name full↔abbrev (using `NFL_FULL_TO_ABBREV`/`NFL_ABBREV_TO_FULL`) and retries lookup if initial query returns empty — fixes crash when navigating from 2026 full-name to 2025 abbreviated data. Backend rebuilt and deployed.
 - **Push notifications confirmed wired** — all 5 functions already called: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`. CLAUDE.md was stale on this.
 - **Season flip cutoff changed to March** — `getCurrentNFLSeason()` now returns current year when `month >= 3` (was `month >= 8`). App now shows 2026 as the current season. Both `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts` updated. Backend deployed, OTA pushed.
+- **Pick indicator improved** — selected team row highlighted with 20% blue background (was ~0%); non-picked team dims when other is selected. `GameCard.tsx` updated. OTA pushed.
+- **Default picks at lock time** — `applyDefaultPicks()` runs at Wednesday 9PM PT after lock; fills missing picks with Raiders (if playing) or away team; sends push notification to affected users. `notifyDefaultPicksApplied()` added. Backend deployed. NOTE: only works for regular season — see preseason fix note above.
 
 ### COMPLETED SESSION June 18 2026
 - **Pre-game stats fix (2026)** — Root cause: `team_game_stats` stores 2025 team names as ESPN abbreviations; 2026 `games` table stores full names. `fetchTeamStatsMap` fallback was querying full names against abbreviation rows → no match. Added `NFL_FULL_TO_ABBREV` map (32 teams) in `server/src/routes/games.ts`; translate names before 2025 fallback query and match rows by either format when averaging. Backend rebuilt and deployed.
