@@ -43,6 +43,7 @@ function TeamRow({
   pickPct,
   showPct,
   pickOutcome,
+  otherTeamPicked,
   onPress,
   onTeamPress,
   disabled,
