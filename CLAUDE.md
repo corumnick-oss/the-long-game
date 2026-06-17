@@ -11,7 +11,10 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
-No immediate blockers. Next priority items:
+### ACTION REQUIRED: Re-unlock preseason week 1 picks
+The DB migration added `season_type` to `unlocked_weeks` and cleared the old stale row. Nick must open the Admin tab → NFL Tools → select **Preseason** tab → Week 1 → tap **Unlock Week**. This re-enables preseason week 1 picks with the correct seasonType.
+
+### Next priority items after that:
 1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs
 2. **Past seasons row on Profile** — W-L per season for historical context
 3. **Onboarding polish** — Nick wants redesign before launch
@@ -23,6 +26,18 @@ No immediate blockers. Next priority items:
 **Fix needed before Aug 7:** Detect the active seasonType from the week's games (or pass it in from the scheduler context) instead of hardcoding `'regular'`. The lock cron already knows the week — add a query to determine whether that week has preseason or regular season games and pass it through.
 
 **Also future feature:** Add a rules/explanation page in the app so users know that missing picks defaults to Raiders (if playing) or away team.
+
+### COMPLETED SESSION June 20 2026 (picks gate fix)
+- **Picks gate: `isPicksOpen` via `unlockedWeeks`** — Root cause of "all 2026 regular season games open": season flip to March broke the old `game.season > getCurrentNFLSeason()` guard. Fixed with proper DB-backed gate:
+  - `unlocked_weeks` table got a new `season_type` column (migration run locally: `npm run migrate:unlocked-weeks`)
+  - `GET /api/games` now returns `isPicksOpen: boolean` per game based on `unlockedWeeks` (week+season+seasonType)
+  - `POST /api/picks` rejects with 403 if week not in `unlockedWeeks` for that seasonType
+  - `GET /api/admin/unlock-week` now accepts and stores `seasonType`
+  - Tuesday 6AM scheduler auto-inserts into `unlockedWeeks` when opening regular season weeks
+  - `GameCard.tsx` uses `game.isPicksOpen` instead of season-year comparison
+  - Admin Unlock Week dialog now shows which seasonType is being unlocked
+- **2026 regular season picks deleted** — Nick manually deleted them; no 2025 data was touched
+- Backend rebuilt and deployed to Railway; OTA pushed to preview branch
 
 ### COMPLETED SESSION June 19 2026
 - **Season selector layout fixed (Profile + Team Detail)** — compact centered circular buttons matching admin week picker style. OTA pushed.
