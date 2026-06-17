@@ -2,8 +2,8 @@ export function getCurrentNFLSeason(): number {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
-  // Flip to new season on August 1 — preseason starts Aug 7
-  return month >= 8 ? year : year - 1;
+  // Flip to new season in March — after the Super Bowl, before preseason
+  return month >= 3 ? year : year - 1;
 }
 
 export function getCurrentNFLWeek(): number {
