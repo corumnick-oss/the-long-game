@@ -80,14 +80,14 @@ router.post('/', auth_1.requireFirebaseToken, async (req, res) => {
     }).returning();
     res.status(201).json(newUser);
 });
-// GET /api/users/:id — other user profile (limited info + H2H vs viewer)
+// GET /api/users/:id?season=X — other user profile (limited info + H2H vs viewer)
 router.get('/:id', auth_1.optionalAuth, async (req, res) => {
     const targetUser = await db_1.db.query.users.findFirst({ where: (0, drizzle_orm_1.eq)(schema.users.id, req.params['id']) });
     if (!targetUser) {
         res.status(404).json({ error: 'User not found' });
         return;
     }
-    const season = (0, season_1.getCurrentNFLSeason)();
+    const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
     const stats = await getUserStats(targetUser.id, season, { publicOnly: true });
     // H2H vs viewer (current week only, after lock only)
     let h2hCurrentWeek = null;

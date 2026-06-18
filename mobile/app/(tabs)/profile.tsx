@@ -99,13 +99,13 @@ function WeeklyHistory({ history }: { history: WeekRecord[] }) {
 
 // ── H2H row ───────────────────────────────────────────────────────────────────
 
-function H2HRow({ entry }: { entry: H2HEntry }) {
+function H2HRow({ entry, season }: { entry: H2HEntry; season: number }) {
   const router = useRouter();
   const total = entry.wins + entry.losses + entry.ties;
   const initials = entry.teamName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   return (
     <TouchableOpacity
-      onPress={() => router.push({ pathname: '/user/[id]' as any, params: { id: entry.opponentId } })}
+      onPress={() => router.push({ pathname: '/user/[id]' as any, params: { id: entry.opponentId, season: String(season) } })}
       activeOpacity={0.7}
       className="flex-row items-center py-2.5 border-b border-border"
     >
@@ -308,7 +308,7 @@ export default function ProfileScreen() {
               </View>
             )}
             <TouchableOpacity
-              onPress={() => router.push('/picks-by-team' as any)}
+              onPress={() => router.push({ pathname: '/picks-by-team' as any, params: { season: String(season) } })}
               activeOpacity={0.7}
               className="flex-row items-center px-4 py-3"
             >
@@ -325,7 +325,7 @@ export default function ProfileScreen() {
         <Section title="Head to Head">
           <View className="bg-surface rounded-xl px-4">
             {profile.h2h.map(entry => (
-              <H2HRow key={entry.opponentId} entry={entry} />
+              <H2HRow key={entry.opponentId} entry={entry} season={season} />
             ))}
           </View>
         </Section>

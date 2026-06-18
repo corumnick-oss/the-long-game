@@ -50,12 +50,12 @@ router.post('/', requireFirebaseToken, async (req, res) => {
   res.status(201).json(newUser);
 });
 
-// GET /api/users/:id — other user profile (limited info + H2H vs viewer)
+// GET /api/users/:id?season=X — other user profile (limited info + H2H vs viewer)
 router.get('/:id', optionalAuth, async (req, res) => {
   const targetUser = await db.query.users.findFirst({ where: eq(schema.users.id, req.params['id'] as string) });
   if (!targetUser) { res.status(404).json({ error: 'User not found' }); return; }
 
-  const season = getCurrentNFLSeason();
+  const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
   const stats = await getUserStats(targetUser.id, season, { publicOnly: true });
 
   // H2H vs viewer (current week only, after lock only)

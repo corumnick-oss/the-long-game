@@ -19,12 +19,12 @@ export type PublicProfile = {
   h2hCurrentWeek: { wins: number; losses: number; ties: number } | null;
 };
 
-export function usePublicProfile(userId: string) {
+export function usePublicProfile(userId: string, season?: number) {
   const { user } = useAuth();
-  const season = getCurrentNFLSeason();
+  const effectiveSeason = season ?? getCurrentNFLSeason();
   return useQuery({
-    queryKey: ['public-profile', userId, user?.uid ?? null],
-    queryFn: () => apiFetch<PublicProfile>(`/api/users/${userId}`, undefined, user),
+    queryKey: ['public-profile', userId, effectiveSeason, user?.uid ?? null],
+    queryFn: () => apiFetch<PublicProfile>(`/api/users/${userId}?season=${effectiveSeason}`, undefined, user),
     enabled: !!userId,
     staleTime: 60_000,
   });

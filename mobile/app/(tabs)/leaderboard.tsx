@@ -231,7 +231,7 @@ export default function LeaderboardScreen() {
               if (item.isCurrentUser) {
                 router.push('/(tabs)/profile');
               } else {
-                router.push({ pathname: '/user/[id]' as any, params: { id: item.userId } });
+                router.push({ pathname: '/user/[id]' as any, params: { id: item.userId, season: String(entry.year) } });
               }
             }}
           />

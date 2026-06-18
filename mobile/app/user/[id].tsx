@@ -7,8 +7,6 @@ import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useAuth } from '@/context/AuthContext';
 import type { WeekRecord } from '@/hooks/useProfile';
 
-const SEASON = getCurrentNFLSeason();
-
 // ── Reusable pieces (kept local — no shared component file yet) ───────────────
 
 function Avatar({ name, size = 56 }: { name: string; size?: number }) {
@@ -182,8 +180,9 @@ function PickComparison({
 
 export default function PublicProfileScreen() {
   const router = useRouter();
-  const { id: userId } = useLocalSearchParams<{ id: string }>();
-  const { data: profile, isLoading } = usePublicProfile(userId);
+  const { id: userId, season: seasonParam } = useLocalSearchParams<{ id: string; season?: string }>();
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentNFLSeason();
+  const { data: profile, isLoading } = usePublicProfile(userId, season);
 
   if (isLoading) {
     return (
@@ -242,7 +241,7 @@ export default function PublicProfileScreen() {
         {/* Season stats */}
         <View className="mx-4 mb-5">
           <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
-            {getCurrentNFLSeason()} Season
+            {season} Season
           </Text>
           <View className="flex-row gap-2 mb-2">
             <StatBox

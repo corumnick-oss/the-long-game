@@ -1,10 +1,8 @@
 import { useState, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { usePicksByTeam, type TeamPickRecord } from '@/hooks/useProfile';
-
-const SEASON = getCurrentNFLSeason();
 
 type SortKey = 'most-picked' | 'accuracy' | 'name';
 
@@ -82,8 +80,10 @@ function SortToggle({ value, onChange }: { value: SortKey; onChange: (k: SortKey
 
 export default function PicksByTeamScreen() {
   const router = useRouter();
+  const { season: seasonParam } = useLocalSearchParams<{ season?: string }>();
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentNFLSeason();
   const [sort, setSort] = useState<SortKey>('most-picked');
-  const { data = [], isLoading, isError } = usePicksByTeam(SEASON);
+  const { data = [], isLoading, isError } = usePicksByTeam(season);
 
   const sorted = useMemo(() => {
     const copy = [...data];
@@ -107,7 +107,7 @@ export default function PicksByTeamScreen() {
         </TouchableOpacity>
         <View className="flex-1 items-center">
           <Text className="text-white font-bold text-base">Picks by Team</Text>
-          <Text className="text-muted text-xs">{SEASON} Season</Text>
+          <Text className="text-muted text-xs">{season} Season</Text>
         </View>
         <View style={{ width: 56 }} />
       </View>
@@ -158,7 +158,7 @@ export default function PicksByTeamScreen() {
           renderItem={({ item }) => (
             <TeamRow
               item={item}
-              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.team, season: String(SEASON), seasonType: 'regular' } })}
+              onPress={() => router.push({ pathname: '/team/[name]' as any, params: { name: item.team, season: String(season), seasonType: 'regular' } })}
             />
           )}
           showsVerticalScrollIndicator={false}
