@@ -11,34 +11,40 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
-### ACTION REQUIRED: Re-unlock preseason week 1 picks
-The DB migration added `season_type` to `unlocked_weeks` and cleared the old stale row. Nick must open the Admin tab → NFL Tools → select **Preseason** tab → Week 1 → tap **Unlock Week**. This re-enables preseason week 1 picks with the correct seasonType.
+### ⚠️ TEST BEFORE FIXING ANYTHING ELSE: Season context propagation
+The season propagation fix was shipped this session (OTA pushed). **Test it before doing any other work:**
+- Leaderboard: select 2025 Season → tap a user → their profile should show 2025 stats (not 2026)
+- Profile: select 2025 Season → tap Picks by Team → should show 2025 data (not 2026)
+- Profile: select 2025 Season → tap a user in H2H → should show 2025 profile stats
+If anything is broken, fix it before moving on.
 
-### Bug to fix next session: Season context not propagated on navigation
-A general pattern: when a user selects a past season (e.g. 2025) on any screen and taps through to another screen, the destination resets to the current season (2026) instead of inheriting the selected season. Known instances:
-- **Leaderboard → User Profile** — viewing 2025 leaderboard and tapping a user shows their 2026 profile stats, not 2025
-- **Profile → Picks by Team** — selecting 2025 on Profile tab then tapping Picks by Team shows 2026 data (see bug below)
-
-**Fix approach:** Pass `season` (and `seasonType` where relevant) as router params whenever navigating from a season-scoped screen. The destination screen should read the param and initialize its season state from it rather than defaulting to `getCurrentNFLSeason()`. Audit all `router.push` calls that navigate between season-aware screens and ensure season is threaded through.
-
-### Bug to fix next session: Picks by Team ignores selected season on Profile
-When the user selects the 2025 season on the Profile tab and taps "Picks by Team", the Picks by Team screen shows 2026 data instead of 2025. The selected season from the Profile tab is not being passed through to the `GET /api/picks/by-team?season=X` call. Check how `picks-by-team.tsx` receives its season parameter (likely from router params or a hook) and ensure the Profile tab passes the active season when navigating there.
-
-### Bug to fix next session: GameCard bounces when changing pick
+### Bug to fix next: GameCard bounces when changing pick
 Tapping to change a pick still causes the GameCard to briefly jump/bounce in the FlatList. The `✓` checkmark was made always-rendered with transparent color to fix the text-level shift, but something else is still causing a height change — likely the stats lines (PPG/YPG) conditionally showing/hiding or a border width change. Investigate what changes between picked/unpicked state in `TeamRow` (in `GameCard.tsx`) and ensure all conditional content reserves constant height.
 
-### Next priority items after that:
+### Bug to fix: Team Detail 2026 scoring stats missing
+Team Detail screen shows correct 2025 stats but 2026 season is missing PPG, PPG allowed, and point diff in the Scoring section. Check how the backend returns scoring stats for 2026 teams vs 2025.
+
+### Bug to fix: Post-game Game Detail shows last 5 games
+The last 5 games section should only appear in the pre-game state on Game Detail. Remove it from the post-game view. (`game/[id].tsx`)
+
+### Next priority items after bugs:
 1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs
 2. **Past seasons row on Profile** — W-L per season for historical context
 3. **Onboarding polish** — Nick wants redesign before launch
 4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
 
 ### ⚠️ BEFORE PRESEASON STARTS (Aug 7) — Default Picks Preseason Fix
-`applyDefaultPicks()` in `scheduler.ts` hardcodes `seasonType: 'regular'`. During preseason weeks (Aug 7–28), it queries for regular season games, finds none, and silently does nothing — **preseason default picks will NOT fire**. Regular season (Sept 4+) works correctly.
-
-**Fix needed before Aug 7:** Detect the active seasonType from the week's games (or pass it in from the scheduler context) instead of hardcoding `'regular'`. The lock cron already knows the week — add a query to determine whether that week has preseason or regular season games and pass it through.
+`applyDefaultPicks()` in `scheduler.ts` previously hardcoded `seasonType: 'regular'` — **FIXED this session**. It now reads seasonType from the `unlocked_weeks` row and also guards against running if the week is not unlocked. Cron timezone also fixed (now passes `{ timezone: 'America/Los_Angeles' }` explicitly to all schedules).
 
 **Also future feature:** Add a rules/explanation page in the app so users know that missing picks defaults to Raiders (if playing) or away team.
+
+### COMPLETED SESSION (current session — test before continuing)
+- **Stale 2026 picks deleted** — 146 regular season + 1 preseason week 2 picks removed via SQL; preseason week 1 re-unlocked by Nick in Admin panel.
+- **Scheduler: timezone fixed** — all cron schedules now pass `{ timezone: 'America/Los_Angeles' }` explicitly so they fire at correct PT times regardless of Railway TZ env var. Previously firing at 9PM UTC (2PM PDT) instead of 9PM PT.
+- **Scheduler: `applyDefaultPicks` guard added** — now checks `unlocked_weeks` before running; skips if week is not unlocked (prevents offseason ghost notifications). Also reads `seasonType` from the unlocked row instead of hardcoding `'regular'` — preseason default picks will now work correctly after Aug 7.
+- **Season context propagation fixed** — passing `season` param through all cross-screen navigation: Leaderboard→Profile, Profile→Picks by Team, Profile H2H→Profile, Picks by Team→Team Detail. `GET /api/users/:id` now accepts `?season=X`. `usePublicProfile` hook updated to accept season. `picks-by-team.tsx` reads season from route params instead of module-level const.
+- **OTA pushed to preview branch** — restart app to pick up season propagation fix. **Test this before doing other work** (see top of DO THIS FIRST section).
+- **Android Google Sign-In DEVELOPER_ERROR** — diagnosed as missing SHA-1 fingerprint in Firebase. Decision: fix when Google Play is set up (late July), not now. Play App Signing will give the definitive SHA-1 at that point.
 
 ### COMPLETED SESSION June 20 2026 (picks gate fix)
 - **Picks gate: `isPicksOpen` via `unlockedWeeks`** — Root cause of "all 2026 regular season games open": season flip to March broke the old `game.season > getCurrentNFLSeason()` guard. Fixed with proper DB-backed gate:
