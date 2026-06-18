@@ -46,6 +46,7 @@ const schema_1 = require("../db/schema");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
 const activity_1 = require("../routes/activity");
+const PT = { timezone: 'America/Los_Angeles' };
 async function getActiveWeek() {
     return (0, season_1.getCurrentNFLWeek)();
 }
@@ -61,7 +62,6 @@ node_cron_1.default.schedule('*/30 * * * * *', async () => {
     }
 });
 // Tuesday 6AM PT — weekly transition: award trophies, sync new week games
-// With TZ=America/Los_Angeles on Railway, this cron runs in local time
 node_cron_1.default.schedule('0 6 * * 2', async () => {
     try {
         if (await (0, season_1.isPreseasonMode)())
@@ -87,7 +87,7 @@ node_cron_1.default.schedule('0 6 * * 2', async () => {
     catch (err) {
         console.error('[Scheduler] Tuesday 6AM job failed:', err);
     }
-});
+}, PT);
 // Tuesday 9PM PT — win probability refresh
 node_cron_1.default.schedule('0 21 * * 2', async () => {
     try {
@@ -98,7 +98,7 @@ node_cron_1.default.schedule('0 21 * * 2', async () => {
     catch (err) {
         console.error('[Scheduler] Tuesday 9PM prob sync failed:', err);
     }
-});
+}, PT);
 // Wednesday 6AM PT — win probability refresh
 node_cron_1.default.schedule('0 6 * * 3', async () => {
     try {
@@ -109,7 +109,7 @@ node_cron_1.default.schedule('0 6 * * 3', async () => {
     catch (err) {
         console.error('[Scheduler] Wednesday 6AM prob sync failed:', err);
     }
-});
+}, PT);
 // Wednesday 5PM PT — win probability refresh
 node_cron_1.default.schedule('0 17 * * 3', async () => {
     try {
@@ -120,7 +120,7 @@ node_cron_1.default.schedule('0 17 * * 3', async () => {
     catch (err) {
         console.error('[Scheduler] Wednesday 5PM prob sync failed:', err);
     }
-});
+}, PT);
 // Wednesday 8PM PT — 1 hour warning
 node_cron_1.default.schedule('0 20 * * 3', async () => {
     try {
@@ -130,7 +130,7 @@ node_cron_1.default.schedule('0 20 * * 3', async () => {
     catch (err) {
         console.error('[Scheduler] Wednesday 8PM warning failed:', err);
     }
-});
+}, PT);
 // Wednesday 9PM PT — picks lock notification + apply default picks
 node_cron_1.default.schedule('0 21 * * 3', async () => {
     try {
@@ -143,13 +143,21 @@ node_cron_1.default.schedule('0 21 * * 3', async () => {
     catch (err) {
         console.error('[Scheduler] Wednesday 9PM lock notification failed:', err);
     }
-});
+}, PT);
 // Apply default picks for users who didn't pick all games.
 // Default: Raiders if playing, otherwise away team.
+// Only runs if the week is unlocked; reads seasonType from unlocked_weeks instead of hardcoding.
 async function applyDefaultPicks(week, season) {
     const RAIDERS_NAMES = new Set(['Las Vegas Raiders', 'LV']);
     try {
-        const seasonType = 'regular';
+        const unlocked = await db_1.db.query.unlockedWeeks.findFirst({
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.week, week), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, season)),
+        });
+        if (!unlocked) {
+            console.log(`[Scheduler] applyDefaultPicks: week ${week} season ${season} not unlocked — skipping`);
+            return;
+        }
+        const seasonType = unlocked.seasonType;
         const weekGames = await db_1.db.query.games.findMany({
             where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.games.week, week), (0, drizzle_orm_1.eq)(schema_1.games.season, season), (0, drizzle_orm_1.eq)(schema_1.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema_1.games.seasonType, seasonType)),
         });
@@ -181,12 +189,12 @@ async function applyDefaultPicks(week, season) {
                 }).onConflictDoNothing();
             }
             (0, notificationService_1.notifyDefaultPicksApplied)(user.id, missing.length, week).catch(err => console.error('[Scheduler] notifyDefaultPicksApplied failed for user', user.id, err));
-            console.log(`[Scheduler] Applied ${missing.length} default pick(s) for user ${user.id}`);
+            console.log(`[Scheduler] Applied ${missing.length} default pick(s) for user ${user.id} (${seasonType})`);
         }
     }
     catch (err) {
         console.error('[Scheduler] applyDefaultPicks failed:', err);
     }
 }
-console.log('[Scheduler] All cron jobs registered (TZ=America/Los_Angeles)');
+console.log('[Scheduler] All cron jobs registered (America/Los_Angeles)');
 //# sourceMappingURL=scheduler.js.map
