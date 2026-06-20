@@ -38,7 +38,7 @@ export default function PicksScreen() {
   const submitPick = useSubmitPick();
   const submitTiebreaker = useSubmitTiebreaker();
 
-  const isLocked = isWeekCurrentlyLocked();
+  const isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked();
 
   const handlePick = useCallback(async (game: Game, pick: 'home' | 'away') => {
     if (game.myPick === pick) return;
