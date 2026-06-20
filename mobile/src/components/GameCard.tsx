@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, TouchableOpacity, Pressable, Image } from 'react-native';
 import type { Game } from '../hooks/usePicksData';
 
@@ -155,7 +156,7 @@ function TeamRow({
   );
 }
 
-export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props) {
+function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) {
   const isFinal = game.status === 'post';
   const isLive = game.status === 'in';
   const isPre = game.status === 'pre';
@@ -280,3 +281,10 @@ export function GameCard({ game, isLocked, onPick, onPress, onTeamPress }: Props
     </Pressable>
   );
 }
+
+// Only re-render when game data or lock state changes.
+// onPick/onPress/onTeamPress are inline functions recreated every PicksScreen render —
+// safe to ignore because when week/season change, game object references change too.
+export const GameCard = React.memo(GameCardInner, (prev, next) =>
+  prev.game === next.game && prev.isLocked === next.isLocked,
+);
