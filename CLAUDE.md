@@ -15,9 +15,26 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ### Next priority items:
 1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs (in `espnService.ts` where games go `in → post`)
-2. **Past seasons row on Profile** — W-L per season for historical context
-3. **Onboarding polish** — Nick wants redesign before launch
-4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
+2. **Achievement images + Profile achievement display redesign** — see details below
+3. **Past seasons row on Profile** — W-L per season for historical context
+4. **Onboarding polish** — Nick wants redesign before launch
+5. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
+
+### Achievement images + Profile display redesign (discuss with Nick)
+Current state: Achievement case on Profile uses placeholder emojis. Nick wants real images and a better layout.
+
+**Images needed (Nick to supply art):**
+- `most_wins` — has image ✓
+- `loser` — has image ✓
+- `upset_pick` — has image ✓
+- `lone_wolf` — has image ✓
+- `contrarian` — **missing, placeholder emoji only** — needs new image created
+
+**Profile display to redesign:**
+- Current: emoji grid in "Achievement Case" section, no visual hierarchy
+- Discuss with Nick: card-style layout? show count + most recent per type? show all earned vs. just types unlocked? trophy room aesthetic?
+- Also decide: does the Achievement Case show ALL-TIME achievements or just current season?
+- The public profile (`user/[id].tsx`) also shows `trophyCount` — may need updating once display is redesigned
 
 ### ⚠️ BEFORE PRESEASON STARTS (Aug 7) — Default Picks Preseason Fix
 `applyDefaultPicks()` in `scheduler.ts` previously hardcoded `seasonType: 'regular'` — **FIXED**. It now reads seasonType from the `unlocked_weeks` row and also guards against running if the week is not unlocked. Cron timezone also fixed (now passes `{ timezone: 'America/Los_Angeles' }` explicitly to all schedules).
@@ -179,7 +196,7 @@ All core infrastructure and screens are complete:
 - **Past seasons row on Profile** — W-L per season for historical context.
 - **Onboarding polish** — Nick wants redesign before launch (currently plain emoji icons, needs custom imagery).
 - **Week 18 2025 tiebreaker wrong** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025.
-- **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image never created.
+- **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image never created. See "Achievement images + Profile display redesign" in DO THIS FIRST section for full details.
 - **Trophies (podium) system** — season-end 1st/2nd/3rd/last place. NOT YET BUILT. Design with Nick first.
 - **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link (OTA-safe, zero backend) vs. in-app form via nodemailer/SendGrid. Discuss with Nick.
 - **Admin email editing** — deferred. Workaround: new account + UID reassignment.
