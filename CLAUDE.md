@@ -11,10 +11,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
-### ⚠️ TEST: GameCard bounce fix (shipped last, not yet confirmed)
-Three-part fix was OTA-pushed. Test by changing picks on preseason week 1:
-- Tap one team, then tap the other — should switch smoothly with no jump
-If still bouncing, the issue may require switching FlatList → ScrollView in `picks.tsx`.
+### ✅ GameCard bounce fix — CONFIRMED WORKING
 
 ### Next priority items:
 1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs (in `espnService.ts` where games go `in → post`)
@@ -30,7 +27,7 @@ If still bouncing, the issue may require switching FlatList → ScrollView in `p
 ### COMPLETED SESSION (current session)
 - **Public profile crash fixed** — `user/[id].tsx`: `PickComparison` referenced undefined `SEASON` variable (leftover from season propagation refactor). Fixed to `getCurrentNFLSeason()`. Affected flows: Leaderboard→Profile and Profile H2H→Profile when 2025 season selected. OTA pushed.
 - **Preseason picks unlocked** — `picks.tsx`: `isWeekCurrentlyLocked()` is a Wednesday-gate for regular season only. For preseason, it was blocking all picks Thu–Tue. Fixed: `isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked()`. Preseason picks now open whenever admin has unlocked the week, regardless of day. OTA pushed.
-- **GameCard bounce (3-part fix)** — OTA pushed, not yet confirmed resolved:
+- **GameCard bounce (3-part fix)** — CONFIRMED FIXED:
   1. `GameCard.tsx`: Stats lines (record/PPG/YPG) now always render in pre-game state with `opacity: 0` when null, instead of unmounting — prevents height change during refetch
   2. `GameCard.tsx`: Wrapped with `React.memo` + custom comparator (`game === game && isLocked === isLocked`) — prevents all 16+ cards re-rendering on each pick; only the changed card re-renders
   3. `usePicksData.ts`: Removed `invalidateQueries` from `onSettled` — optimistic update is correct on success; the background refetch was causing a second full re-render wave. On error, `onError` still restores + invalidates.
