@@ -11,39 +11,38 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
-### ⚠️ TEST BEFORE FIXING ANYTHING ELSE: Season context propagation
-The season propagation fix was shipped this session (OTA pushed). **Test it before doing any other work:**
-- Leaderboard: select 2025 Season → tap a user → their profile should show 2025 stats (not 2026)
-- Profile: select 2025 Season → tap Picks by Team → should show 2025 data (not 2026)
-- Profile: select 2025 Season → tap a user in H2H → should show 2025 profile stats
-If anything is broken, fix it before moving on.
+### ⚠️ TEST: GameCard bounce fix (shipped last, not yet confirmed)
+Three-part fix was OTA-pushed. Test by changing picks on preseason week 1:
+- Tap one team, then tap the other — should switch smoothly with no jump
+If still bouncing, the issue may require switching FlatList → ScrollView in `picks.tsx`.
 
-### Bug to fix next: GameCard bounces when changing pick
-Tapping to change a pick still causes the GameCard to briefly jump/bounce in the FlatList. The `✓` checkmark was made always-rendered with transparent color to fix the text-level shift, but something else is still causing a height change — likely the stats lines (PPG/YPG) conditionally showing/hiding or a border width change. Investigate what changes between picked/unpicked state in `TeamRow` (in `GameCard.tsx`) and ensure all conditional content reserves constant height.
-
-### Bug to fix: Team Detail 2026 scoring stats missing
-Team Detail screen shows correct 2025 stats but 2026 season is missing PPG, PPG allowed, and point diff in the Scoring section. Check how the backend returns scoring stats for 2026 teams vs 2025.
-
-### Bug to fix: Post-game Game Detail shows last 5 games
-The last 5 games section should only appear in the pre-game state on Game Detail. Remove it from the post-game view. (`game/[id].tsx`)
-
-### Next priority items after bugs:
-1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs
+### Next priority items:
+1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs (in `espnService.ts` where games go `in → post`)
 2. **Past seasons row on Profile** — W-L per season for historical context
 3. **Onboarding polish** — Nick wants redesign before launch
 4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
 
 ### ⚠️ BEFORE PRESEASON STARTS (Aug 7) — Default Picks Preseason Fix
-`applyDefaultPicks()` in `scheduler.ts` previously hardcoded `seasonType: 'regular'` — **FIXED this session**. It now reads seasonType from the `unlocked_weeks` row and also guards against running if the week is not unlocked. Cron timezone also fixed (now passes `{ timezone: 'America/Los_Angeles' }` explicitly to all schedules).
+`applyDefaultPicks()` in `scheduler.ts` previously hardcoded `seasonType: 'regular'` — **FIXED**. It now reads seasonType from the `unlocked_weeks` row and also guards against running if the week is not unlocked. Cron timezone also fixed (now passes `{ timezone: 'America/Los_Angeles' }` explicitly to all schedules).
 
 **Also future feature:** Add a rules/explanation page in the app so users know that missing picks defaults to Raiders (if playing) or away team.
 
-### COMPLETED SESSION (current session — test before continuing)
+### COMPLETED SESSION (current session)
+- **Public profile crash fixed** — `user/[id].tsx`: `PickComparison` referenced undefined `SEASON` variable (leftover from season propagation refactor). Fixed to `getCurrentNFLSeason()`. Affected flows: Leaderboard→Profile and Profile H2H→Profile when 2025 season selected. OTA pushed.
+- **Preseason picks unlocked** — `picks.tsx`: `isWeekCurrentlyLocked()` is a Wednesday-gate for regular season only. For preseason, it was blocking all picks Thu–Tue. Fixed: `isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked()`. Preseason picks now open whenever admin has unlocked the week, regardless of day. OTA pushed.
+- **GameCard bounce (3-part fix)** — OTA pushed, not yet confirmed resolved:
+  1. `GameCard.tsx`: Stats lines (record/PPG/YPG) now always render in pre-game state with `opacity: 0` when null, instead of unmounting — prevents height change during refetch
+  2. `GameCard.tsx`: Wrapped with `React.memo` + custom comparator (`game === game && isLocked === isLocked`) — prevents all 16+ cards re-rendering on each pick; only the changed card re-renders
+  3. `usePicksData.ts`: Removed `invalidateQueries` from `onSettled` — optimistic update is correct on success; the background refetch was causing a second full re-render wave. On error, `onError` still restores + invalidates.
+- **Post-game Game Detail: last 5 games removed** — `game/[id].tsx`: recent games section now guarded with `isPre &&`. Was showing in post-game view. OTA pushed.
+- **2026 Team Detail scoring stats fixed** — `server/src/routes/teams.ts`: PPG/PPGAllowed now fall back to 2025 game data when no completed 2026 games exist (mirrors existing ypg/stats fallback). Backend deployed to Railway.
+- **Season context propagation crash fixed** — flows 1 & 3 from previous session: Leaderboard→Profile and Profile H2H→Profile now work when 2025 season is selected. (See public profile crash above.)
+
+### COMPLETED SESSION (previous session — scheduler + season fixes)
 - **Stale 2026 picks deleted** — 146 regular season + 1 preseason week 2 picks removed via SQL; preseason week 1 re-unlocked by Nick in Admin panel.
 - **Scheduler: timezone fixed** — all cron schedules now pass `{ timezone: 'America/Los_Angeles' }` explicitly so they fire at correct PT times regardless of Railway TZ env var. Previously firing at 9PM UTC (2PM PDT) instead of 9PM PT.
 - **Scheduler: `applyDefaultPicks` guard added** — now checks `unlocked_weeks` before running; skips if week is not unlocked (prevents offseason ghost notifications). Also reads `seasonType` from the unlocked row instead of hardcoding `'regular'` — preseason default picks will now work correctly after Aug 7.
 - **Season context propagation fixed** — passing `season` param through all cross-screen navigation: Leaderboard→Profile, Profile→Picks by Team, Profile H2H→Profile, Picks by Team→Team Detail. `GET /api/users/:id` now accepts `?season=X`. `usePublicProfile` hook updated to accept season. `picks-by-team.tsx` reads season from route params instead of module-level const.
-- **OTA pushed to preview branch** — restart app to pick up season propagation fix. **Test this before doing other work** (see top of DO THIS FIRST section).
 - **Android Google Sign-In DEVELOPER_ERROR** — diagnosed as missing SHA-1 fingerprint in Firebase. Decision: fix when Google Play is set up (late July), not now. Play App Signing will give the definitive SHA-1 at that point.
 
 ### COMPLETED SESSION June 20 2026 (picks gate fix)
