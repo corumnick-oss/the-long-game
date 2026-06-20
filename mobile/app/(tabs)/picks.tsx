@@ -4,13 +4,11 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
-import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker } from '@/hooks/usePicksData';
-import type { Game } from '@/hooks/usePicksData';
+import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker, type Game } from '@/hooks/usePicksData';
 import { WeekSelector } from '@/components/WeekSelector';
 import { GameCard } from '@/components/GameCard';
 import { TiebreakerCard } from '@/components/TiebreakerCard';
 import { isWeekCurrentlyLocked } from '@/lib/lockTime';
-import type { Game } from '@/hooks/usePicksData';
 
 const CURRENT_SEASON = getCurrentNFLSeason();
 const CURRENT_WEEK = getCurrentNFLWeek();
