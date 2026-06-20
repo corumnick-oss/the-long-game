@@ -12,13 +12,13 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
 ### ✅ GameCard bounce fix — CONFIRMED WORKING
+### ✅ Team Central + Picks by Team real-time cache invalidation — DONE
 
 ### Next priority items:
-1. **Team Central + Picks by Team real-time cache invalidation** — invalidate `['teams', ...]` + `['picks-by-team', ...]` when live score sync runs (in `espnService.ts` where games go `in → post`)
-2. **Achievement images + Profile achievement display redesign** — see details below
-3. **Past seasons row on Profile** — W-L per season for historical context
-4. **Onboarding polish** — Nick wants redesign before launch
-5. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
+1. **Achievement images + Profile achievement display redesign** — see details below
+2. **Past seasons row on Profile** — W-L per season for historical context
+3. **Onboarding polish** — Nick wants redesign before launch
+4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit --platform ios`. Wife will also test via TestFlight — invite via App Store Connect → TestFlight → External Testing → add by email.
 
 ### Achievement images + Profile display redesign (discuss with Nick)
 Current state: Achievement case on Profile uses placeholder emojis. Nick wants real images and a better layout.
@@ -41,7 +41,8 @@ Current state: Achievement case on Profile uses placeholder emojis. Nick wants r
 
 **Also future feature:** Add a rules/explanation page in the app so users know that missing picks defaults to Raiders (if playing) or away team.
 
-### COMPLETED SESSION (current session)
+### COMPLETED SESSION (current session — cache invalidation + bug fixes)
+- **Team Central + Picks by Team cache invalidation** — `picks.tsx`: added `useEffect` with `useRef` to detect when any game transitions `in → post` during the live poll; automatically calls `queryClient.invalidateQueries(['teams'])` + `['picks-by-team']` so both screens update W-L without manual refresh. OTA pushed (update group `8fd6c772`).
 - **Public profile crash fixed** — `user/[id].tsx`: `PickComparison` referenced undefined `SEASON` variable (leftover from season propagation refactor). Fixed to `getCurrentNFLSeason()`. Affected flows: Leaderboard→Profile and Profile H2H→Profile when 2025 season selected. OTA pushed.
 - **Preseason picks unlocked** — `picks.tsx`: `isWeekCurrentlyLocked()` is a Wednesday-gate for regular season only. For preseason, it was blocking all picks Thu–Tue. Fixed: `isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked()`. Preseason picks now open whenever admin has unlocked the week, regardless of day. OTA pushed.
 - **GameCard bounce (3-part fix)** — CONFIRMED FIXED:
