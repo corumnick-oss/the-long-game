@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker } from '@/hooks/usePicksData';
+import type { Game } from '@/hooks/usePicksData';
 import { WeekSelector } from '@/components/WeekSelector';
 import { GameCard } from '@/components/GameCard';
 import { TiebreakerCard } from '@/components/TiebreakerCard';
@@ -33,9 +35,27 @@ export default function PicksScreen() {
   const changeSeason = (newSeason: number) => { setSeason(newSeason); setSelectedWeek(1); };
   const changeSeasonType = (newType: 'regular' | 'preseason') => { setSeasonType(newType); setSelectedWeek(1); };
 
+  const queryClient = useQueryClient();
   const { data: games, isLoading, isError, refetch, isRefetching } = useGames(selectedWeek, season, seasonType);
   const { data: tiebreaker } = useTiebreaker(selectedWeek, season);
   const submitPick = useSubmitPick();
+
+  // When any live game goes final, invalidate team + picks-by-team caches
+  // so Team Central and Picks by Team reflect updated W-L without manual refresh.
+  const prevGamesRef = useRef<Game[] | undefined>(undefined);
+  useEffect(() => {
+    if (games && prevGamesRef.current) {
+      const anyWentFinal = games.some(g =>
+        g.status === 'post' &&
+        prevGamesRef.current!.find(pg => pg.id === g.id)?.status !== 'post'
+      );
+      if (anyWentFinal) {
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
+        queryClient.invalidateQueries({ queryKey: ['picks-by-team'] });
+      }
+    }
+    prevGamesRef.current = games;
+  }, [games, queryClient]);
   const submitTiebreaker = useSubmitTiebreaker();
 
   const isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked();
