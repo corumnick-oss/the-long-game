@@ -417,8 +417,8 @@ export default function GameDetailScreen() {
           </View>
         )}
 
-        {/* ── Recent games ── */}
-        {(game.awayTeamRecentGames?.length > 0 || game.homeTeamRecentGames?.length > 0) && (
+        {/* ── Recent games (pre-game only) ── */}
+        {isPre && (game.awayTeamRecentGames?.length > 0 || game.homeTeamRecentGames?.length > 0) && (
           <View className="mx-4 mb-4 flex-row gap-3">
             {[{ label: game.awayTeam, games: game.awayTeamRecentGames }, { label: game.homeTeam, games: game.homeTeamRecentGames }].map(({ label, games: rg }) =>
               rg?.length > 0 ? (

@@ -245,13 +245,41 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     else if (filteredStats.length > 0) {
         statsSeasonUsed = season;
     }
+    // Fall back to 2025 game averages for PPG if no completed games in current season
+    let ppgOut = avg(pointsScored);
+    let ppgAllowedOut = avg(pointsAllowed);
+    if (ppgOut === null && season > 2025) {
+        const games2025 = await db_1.db.query.games.findMany({
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, 2025), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, 'regular')),
+        });
+        const scored2025 = [];
+        const allowed2025 = [];
+        for (const g of games2025) {
+            if (g.status !== 'post' || g.homeScore === null || g.awayScore === null)
+                continue;
+            if (g.homeTeam === statsName) {
+                scored2025.push(g.homeScore);
+                allowed2025.push(g.awayScore);
+            }
+            else if (g.awayTeam === statsName) {
+                scored2025.push(g.awayScore);
+                allowed2025.push(g.homeScore);
+            }
+        }
+        if (scored2025.length > 0) {
+            ppgOut = avg(scored2025);
+            ppgAllowedOut = avg(allowed2025);
+            if (statsSeasonUsed === null)
+                statsSeasonUsed = 2025;
+        }
+    }
     res.json({
         name: NFL_ABBREV_TO_FULL[resolvedName] ?? resolvedName,
         logo: logo ?? null,
         wins,
         losses,
-        ppg: avg(pointsScored),
-        ppgAllowed: avg(pointsAllowed),
+        ppg: ppgOut,
+        ppgAllowed: ppgAllowedOut,
         ypg: avgOf(filteredStats.map(r => r.yardsPerGame)),
         yapg: avgOf(filteredStats.map(r => r.yardsAllowedPerGame)),
         passYpg: avgOf(filteredStats.map(r => r.additionalStats?.passingYards)),

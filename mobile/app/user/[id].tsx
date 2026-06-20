@@ -61,8 +61,8 @@ function PickComparison({
 }) {
   const { user } = useAuth();
   const week = getCurrentNFLWeek();
-  const { data: weekPicksData } = useWeekPicks(week, SEASON);
-  const { data: myGames } = useGames(week, SEASON);
+  const { data: weekPicksData } = useWeekPicks(week, getCurrentNFLSeason());
+  const { data: myGames } = useGames(week, getCurrentNFLSeason());
 
   if (!weekPicksData?.locked) {
     return (

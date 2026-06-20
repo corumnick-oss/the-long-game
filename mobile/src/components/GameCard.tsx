@@ -121,14 +121,18 @@ function TeamRow({
             >✓</Text>
           )}
         </View>
-        {record && !showScore && (
-          <Text className="text-muted text-xs mt-0.5">{record}</Text>
-        )}
-        {!showScore && ppg !== null && (
-          <Text className="text-muted text-xs">{ppg.toFixed(1)} PPG · {ppgAllowed?.toFixed(1) ?? '—'} PPGA</Text>
-        )}
-        {!showScore && ypg !== null && (
-          <Text className="text-muted text-xs">{ypg} YPG</Text>
+        {!showScore && (
+          <>
+            <Text className="text-muted text-xs mt-0.5" style={{ opacity: record ? 1 : 0 }}>
+              {record ?? ' '}
+            </Text>
+            <Text className="text-muted text-xs" style={{ opacity: ppg !== null ? 1 : 0 }}>
+              {ppg !== null ? `${ppg.toFixed(1)} PPG · ${ppgAllowed?.toFixed(1) ?? '—'} PPGA` : ' '}
+            </Text>
+            <Text className="text-muted text-xs" style={{ opacity: ypg !== null ? 1 : 0 }}>
+              {ypg !== null ? `${ypg} YPG` : ' '}
+            </Text>
+          </>
         )}
         {/* Pick % bar */}
         {showPct && (
