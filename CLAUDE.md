@@ -19,7 +19,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ Win probability — homeTeamFPI/awayTeamFPI on Game Detail page (blue/amber bar, team labels, hidden after lock)
 
 ### Next priority items:
-1. **UI polish pass** — Nick to share screenshots of each screen; identify improvements page by page. This is the pre-launch beauty pass before TestFlight goes wide.
+1. **UI polish pass** — Nick to share screenshots of each screen; identify improvements page by page. **This is the final gate before App Store + Google Play submission.** Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile → Activity panel.
 2. **Achievement images + Profile achievement display redesign** — see details below
 3. **Past seasons row on Profile** — W-L per season for historical context
 4. **Onboarding polish** — Nick wants redesign before launch
