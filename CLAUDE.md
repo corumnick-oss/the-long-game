@@ -15,12 +15,18 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ Team Central + Picks by Team real-time cache invalidation — DONE
 ### ✅ Pre-game stats + post-game box scores — SHIPPED
 ### ✅ Push notifications — ALL 5 WIRED
+### ✅ TestFlight preview build — SUBMITTED (awaiting Apple Beta App Review for external testing)
+### ✅ Win probability — homeTeamFPI/awayTeamFPI on Game Detail page (blue/amber bar, team labels, hidden after lock)
 
 ### Next priority items:
-1. **Achievement images + Profile achievement display redesign** — see details below
-2. **Past seasons row on Profile** — W-L per season for historical context
-3. **Onboarding polish** — Nick wants redesign before launch
-4. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit --platform ios`. Wife will also test via TestFlight — invite via App Store Connect → TestFlight → External Testing → add by email.
+1. **UI polish pass** — Nick to share screenshots of each screen; identify improvements page by page. This is the pre-launch beauty pass before TestFlight goes wide.
+2. **Achievement images + Profile achievement display redesign** — see details below
+3. **Past seasons row on Profile** — W-L per season for historical context
+4. **Onboarding polish** — Nick wants redesign before launch
+5. **TestFlight for Longies** — early July. Build already submitted. Waiting on Apple Beta Review. Once approved, invite via App Store Connect → TestFlight → External Testing → add by email. Wife also testing — same flow.
+
+### Win Probability — weekly workflow
+Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`. Example: `npm run sync:winprobs 1 2026`. The admin "Sync Win Probabilities" button is blocked on Railway (ESPN IP block on /summary endpoint — see ESPN section below). Run locally once per week, ideally Wednesday afternoon before the 9PM lock.
 
 ### Achievement images + Profile display redesign (discuss with Nick)
 Current state: Achievement case on Profile uses placeholder emojis. Nick wants real images and a better layout.
