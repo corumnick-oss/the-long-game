@@ -6,7 +6,7 @@ export type LeaderboardEntry = {
   userId: string;
   teamName: string;
   profileImageUrl: string | null;
-  isLongie: boolean;
+  isGridiron: boolean;
   isPremium: boolean;
   wins: number;
   losses: number;
@@ -19,12 +19,12 @@ export type LeaderboardResponse = {
   type: 'season' | 'weekly';
   week: number | null;
   season: number;
-  filter: 'longies' | 'global';
+  filter: 'gridirons' | 'global';
   entries: LeaderboardEntry[];
 };
 
 export function useLeaderboard(
-  filter: 'longies' | 'global',
+  filter: 'gridirons' | 'global',
   type: 'season' | 'weekly',
   week: number,
   season: number,

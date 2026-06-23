@@ -66,7 +66,7 @@ Tapping a team logo opens that team's full past game history. ESPN `/teams/{team
 Commissioner, buy-in tracking, pool leaderboards, pool game modes.
 
 **Architecture notes:**
-- Current `isLongie` boolean is a hardcoded single-pool concept — when pools arrive, "Longies" becomes one pool among many and `isLongie` migrates to pool membership
+- Current `isGridiron` boolean is a hardcoded single-pool concept — when pools arrive, "Gridirons" becomes one pool among many and `isGridiron` migrates to pool membership
 - Needs: `pools` table (id, name, commissioner, invite code, buy-in) + `pool_members` table (poolId, userId, role)
 - Leaderboard, tiebreaker, and trophy queries need a `poolId` filter option added
 - Current architecture is clean enough to add pools without a rebuild — it's an addition, not a rewrite
@@ -77,7 +77,7 @@ Allow admins to send a custom push notification to all users or a subset from Ad
 **Scope when building:**
 - New "Broadcast" section in Admin → NFL Tools tab (or its own tab)
 - Input: message title + body text
-- Target selector: All Users / Longies Only / specific user(s)
+- Target selector: All Users / Gridirons Only / specific user(s)
 - Sends via existing `notificationService.ts` / Expo Push API infrastructure
 - Log sent broadcasts to `activity_log` for audit trail
 

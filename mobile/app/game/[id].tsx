@@ -28,29 +28,27 @@ function formatDate(iso: string) {
   });
 }
 
-function WinProbBar({ favoriteTeam, prob, homeTeam, awayTeam }: {
-  favoriteTeam: string | null;
-  prob: number | null;
-  homeTeam: string;
-  awayTeam: string;
+function SplitBar({ leftPct, rightPct, leftLabel, rightLabel, title }: {
+  leftPct: number;
+  rightPct: number;
+  leftLabel: string;
+  rightLabel: string;
+  title: string;
 }) {
-  if (!prob || !favoriteTeam) return null;
-  const favPct = Math.round(Number(prob));
-  const undPct = 100 - favPct;
-  const favIsHome = favoriteTeam === homeTeam;
-  const homePct = favIsHome ? favPct : undPct;
-  const awayPct = favIsHome ? undPct : favPct;
-
   return (
     <View className="mt-4">
-      <Text className="text-muted text-xs mb-1">Win probability</Text>
-      <View className="h-2 bg-surface rounded-full overflow-hidden flex-row">
-        <View className="h-full bg-primary/60" style={{ flex: awayPct }} />
-        <View className="h-full bg-primary" style={{ flex: homePct }} />
+      <Text className="text-muted text-xs text-center mb-2">{title}</Text>
+      <View className="flex-row justify-between mb-1.5">
+        <Text style={{ color: '#3b82f6', fontSize: 12 }} numberOfLines={1} className="flex-1">
+          {leftLabel} {leftPct}%
+        </Text>
+        <Text style={{ color: '#f59e0b', fontSize: 12 }} numberOfLines={1} className="flex-1 text-right">
+          {rightPct}% {rightLabel}
+        </Text>
       </View>
-      <View className="flex-row justify-between mt-1">
-        <Text className="text-muted text-xs">{awayPct}%</Text>
-        <Text className="text-muted text-xs">{homePct}%</Text>
+      <View className="h-2 rounded-full overflow-hidden flex-row">
+        <View style={{ flex: leftPct, backgroundColor: '#3b82f6' }} />
+        <View style={{ flex: rightPct, backgroundColor: '#f59e0b' }} />
       </View>
     </View>
   );
@@ -231,6 +229,7 @@ export default function GameDetailScreen() {
             >
               {game.awayTeam}
             </Text>
+            <Text className="text-muted text-xs">Away</Text>
             {game.awayTeamRecord && !isFinal && (
               <Text className="text-muted text-xs">{game.awayTeamRecord}</Text>
             )}
@@ -261,15 +260,7 @@ export default function GameDetailScreen() {
                 )}
               </View>
             ) : (
-              <>
-                <Text className="text-muted text-base font-bold">vs</Text>
-                {game.winningTeamWinProb && game.favoriteTeam && (() => {
-                  const favPct = Math.round(Number(game.winningTeamWinProb));
-                  const awayPct = game.favoriteTeam === game.awayTeam ? favPct : 100 - favPct;
-                  const homePct = game.favoriteTeam === game.homeTeam ? favPct : 100 - favPct;
-                  return <Text className="text-muted text-xs mt-1">{awayPct}% – {homePct}%</Text>;
-                })()}
-              </>
+              <Text className="text-muted text-base font-bold">vs</Text>
             )}
           </View>
 
@@ -292,6 +283,7 @@ export default function GameDetailScreen() {
             >
               {game.homeTeam}
             </Text>
+            <Text className="text-muted text-xs">Home</Text>
             {game.homeTeamRecord && !isFinal && (
               <Text className="text-muted text-xs">{game.homeTeamRecord}</Text>
             )}
@@ -306,7 +298,7 @@ export default function GameDetailScreen() {
         </View>
 
         {/* ── Pre-game stats (season averages) ── */}
-        {isPre && (game.awayPPG !== null || game.homeYPG !== null || game.winningTeamWinProb !== null) && (
+        {isPre && !game.isLocked && (game.awayPPG !== null || game.homeYPG !== null || game.homeTeamFPI !== null) && (
           <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
             {game.statsSeasonUsed !== null && game.statsSeasonUsed < game.season && (
               <Text className="text-muted text-xs mb-2 text-center">Using {game.statsSeasonUsed} season averages</Text>
@@ -346,12 +338,15 @@ export default function GameDetailScreen() {
             {game.awayTurnoversPG !== null && game.homeTurnoversPG !== null && (
               <StatRow label="Turnovers/G" away={game.awayTurnoversPG.toFixed(1)} home={game.homeTurnoversPG.toFixed(1)} />
             )}
-            <WinProbBar
-              favoriteTeam={game.favoriteTeam}
-              prob={game.winningTeamWinProb}
-              homeTeam={game.homeTeam}
-              awayTeam={game.awayTeam}
-            />
+            {game.homeTeamFPI != null && game.awayTeamFPI != null && (
+              <SplitBar
+                leftPct={Math.round(game.awayTeamFPI)}
+                rightPct={Math.round(game.homeTeamFPI)}
+                leftLabel={game.awayTeam}
+                rightLabel={game.homeTeam}
+                title="Win Probability"
+              />
+            )}
           </View>
         )}
 
@@ -438,6 +433,17 @@ export default function GameDetailScreen() {
         {/* ── Pick list (after lock only) ── */}
         {game.isLocked && game.pickBreakdown && (
           <>
+            {/* Pick distribution bar */}
+            <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-4">
+              <SplitBar
+                leftPct={game.pickBreakdown.awayPct}
+                rightPct={game.pickBreakdown.homePct}
+                leftLabel={game.awayTeam}
+                rightLabel={game.homeTeam}
+                title="Pick Distribution"
+              />
+            </View>
+
             {/* Away picks */}
             {awayPicks.length > 0 && (
               <View className="mx-4 mb-4">

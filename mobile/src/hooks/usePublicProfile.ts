@@ -8,7 +8,7 @@ export type PublicProfile = {
   id: string;
   teamName: string;
   profileImageUrl: string | null;
-  isLongie: boolean;
+  isGridiron: boolean;
   isPremium: boolean;
   createdAt: string;
   seasonRecord: { wins: number; losses: number };

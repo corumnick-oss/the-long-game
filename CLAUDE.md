@@ -20,10 +20,11 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ### Next priority items:
 1. **UI polish pass** — Nick to share screenshots of each screen; identify improvements page by page. **This is the final gate before App Store + Google Play submission.** Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile → Activity panel.
-2. **Achievement images + Profile achievement display redesign** — see details below
-3. **Past seasons row on Profile** — W-L per season for historical context
-4. **Onboarding polish** — Nick wants redesign before launch
-5. **TestFlight for Longies** — early July. Build already submitted. Waiting on Apple Beta Review. Once approved, invite via App Store Connect → TestFlight → External Testing → add by email. Wife also testing — same flow.
+2. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
+3. **Achievement images + Profile achievement display redesign** — see details below
+4. **Past seasons row on Profile** — W-L per season for historical context
+5. **Onboarding polish** — Nick wants redesign before launch
+6. **TestFlight for Gridirons** — early July. Build already submitted. Waiting on Apple Beta Review. Once approved, invite via App Store Connect → TestFlight → External Testing → add by email. Wife also testing — same flow.
 
 ### Win Probability — weekly workflow
 Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`. Example: `npm run sync:winprobs 1 2026`. The admin "Sync Win Probabilities" button is blocked on Railway (ESPN IP block on /summary endpoint — see ESPN section below). Run locally once per week, ideally Wednesday afternoon before the 9PM lock.
@@ -88,7 +89,7 @@ Files that should exist but are NOT in git (verify manually):
 | Build | Command | Purpose |
 |---|---|---|
 | `development` | `eas build --profile development` | Dev testing (Nick only) |
-| `preview` | `eas build --profile preview` | TestFlight beta (Longies) |
+| `preview` | `eas build --profile preview` | TestFlight beta (Gridirons) |
 | `production` | `eas build --profile production` | App Store |
 
 ### EAS CLI Windows Bug — IMPORTANT
@@ -106,17 +107,17 @@ All core infrastructure, screens, stats, and push notifications are complete. Pr
 1. **Achievement images + Profile achievement display redesign** — see DO THIS FIRST section
 2. **Past seasons row on Profile** — W-L per season for historical context
 3. **Onboarding polish** — Nick wants redesign before launch
-4. **TestFlight preview build for Longies** — early July
+4. **TestFlight preview build for Gridirons** — early July
 5. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
 6. **Trophies (podium) system** — season-end 1st/2nd/3rd/last place. NOT YET BUILT. Design with Nick first.
 7. **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link vs. in-app form. Discuss with Nick.
 8. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
-9. **2025 data migration** — when Longies sign up with Google/Apple
+9. **2025 data migration** — when Gridirons sign up with Google/Apple
 10. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
 11. **Leaderboard Season Selector** — all users (currently admin only)
 
 ### seed:nick — Re-run After Any Cleanup
-`npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isLongie=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
+`npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isGridiron=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
 
 ### Season Detection — ALWAYS USE THIS
 ```typescript
@@ -167,9 +168,9 @@ Firebase project: the-long-game-prod-bef05. Bundle ID: com.thelonggame.picks —
 
 ---
 
-## The Longies — Nick's Friend Group
+## The Gridirons — Nick's Friend Group
 
-7 active users from 2025 season. All isLongie: true. Will create FRESH accounts via Google/Apple Sign-In, then Nick runs UID reassignment script.
+7 active users from 2025 season. All isGridiron: true. Will create FRESH accounts via Google/Apple Sign-In, then Nick runs UID reassignment script.
 
 | Team Name | Email | Is Admin |
 |---|---|---|
@@ -481,7 +482,7 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 4. Never show anyone's picks before Wednesday 9PM PST lock.
 5. Full team names always. Never abbreviations.
 6. Top/bottom game card layout. Never left/right.
-7. Friend group = "Longies". isLongie boolean.
+7. Friend group = "Gridirons". isGridiron boolean.
 8. isPremium = future paid tier, ~$10/season. Free tier: Picks tab, Leaderboard, own Profile only. Premium tier: full access (Team Central, GameCards with stats, other players' profiles, Game Detail, etc.). All 2026 users get full access. `isPremium` field already on users table. Stripe web-only (no in-app purchase). Do NOT build premium gating yet — plan and confirm with Nick first.
 9. Never hardcode a year. Always getCurrentNFLSeason().
 10. Lock times admin-configurable per week.
@@ -489,7 +490,7 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 12. H2H pick comparison: current week only, after lock only, other profiles only.
 13. Admin picks page: read-only default, confirm + audit log to edit.
 14. Activity: two tabs, paginated 20 per load.
-15. Tiebreaker: admin-designates, all submit, Longies vs Longies only.
+15. Tiebreaker: admin-designates, all submit, Gridirons vs Gridirons only.
 16. Sport-agnostic architecture — every table has sport field.
 17. No Download Picks button in mobile app.
 18. Export All Data = admin only.

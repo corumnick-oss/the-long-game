@@ -200,9 +200,9 @@ export default function ProfileScreen() {
         <View className="ml-4 flex-1">
           <View className="flex-row items-center gap-2">
             <Text className="text-white text-xl font-bold">{profile.teamName}</Text>
-            {profile.isLongie && (
+            {profile.isGridiron && (
               <View className="bg-primary/20 rounded px-2 py-0.5">
-                <Text className="text-primary text-xs font-semibold">LONGIE</Text>
+                <Text className="text-primary text-xs font-semibold">GRIDIRON</Text>
               </View>
             )}
           </View>

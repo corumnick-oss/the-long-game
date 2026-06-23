@@ -54,8 +54,8 @@ router.get('/week', requireAuth, async (req, res) => {
 
   const gameIds = weekGames.map(g => g.id);
 
-  const [longies, allPicks] = await Promise.all([
-    db.query.users.findMany({ where: eq(schema.users.isLongie, true) }),
+  const [gridirons, allPicks] = await Promise.all([
+    db.query.users.findMany({ where: eq(schema.users.isGridiron, true) }),
     gameIds.length
       ? db.query.picks.findMany({ where: inArray(schema.picks.gameId, gameIds) })
       : Promise.resolve([]),
@@ -82,7 +82,7 @@ router.get('/week', requireAuth, async (req, res) => {
       awayScore: g.awayScore,
       status: g.status,
     })),
-    users: longies.map(u => ({
+    users: gridirons.map(u => ({
       id: u.id,
       teamName: u.teamName,
       profileImageUrl: u.profileImageUrl,

@@ -51,10 +51,10 @@ router.get('/users', async (req, res) => {
     res.json(allUsers);
 });
 router.patch('/users/:id', async (req, res) => {
-    const { isLongie, isAdmin, nflAccess, teamName } = req.body;
+    const { isGridiron, isAdmin, nflAccess, teamName } = req.body;
     const updates = { updatedAt: new Date() };
-    if (isLongie !== undefined)
-        updates.isLongie = Boolean(isLongie);
+    if (isGridiron !== undefined)
+        updates.isGridiron = Boolean(isGridiron);
     if (isAdmin !== undefined)
         updates.isAdmin = Boolean(isAdmin);
     if (nflAccess !== undefined)

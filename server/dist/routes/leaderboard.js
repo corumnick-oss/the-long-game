@@ -6,19 +6,19 @@ const drizzle_orm_1 = require("drizzle-orm");
 const auth_1 = require("../middleware/auth");
 const season_1 = require("../utils/season");
 const router = (0, express_1.Router)();
-// GET /api/leaderboard?type=season|weekly&week=X&season=Y&filter=longies|global
+// GET /api/leaderboard?type=season|weekly&week=X&season=Y&filter=gridirons|global
 router.get('/', auth_1.optionalAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
     const type = req.query['type'] ?? 'season';
     const week = req.query['week'] ? parseInt(req.query['week'], 10) : undefined;
-    const filter = req.query['filter'] ?? (req.currentUser?.isLongie ? 'longies' : 'global');
+    const filter = req.query['filter'] ?? (req.currentUser?.isGridiron ? 'gridirons' : 'global');
     const seasonType = req.query['seasonType'] ?? 'regular';
     const isWeekly = type === 'weekly' && week != null;
-    const longiesOnly = filter === 'longies';
+    const gridironsOnly = filter === 'gridirons';
     const gameFilter = isWeekly
         ? (0, drizzle_orm_1.sql) `g.season = ${season} AND g.week = ${week} AND g.sport = 'nfl' AND g.season_type = ${seasonType}`
         : (0, drizzle_orm_1.sql) `g.season = ${season} AND g.sport = 'nfl' AND g.season_type = ${seasonType}`;
-    const userFilter = longiesOnly ? (0, drizzle_orm_1.sql) `u.is_longie = true` : (0, drizzle_orm_1.sql) `u.nfl_access = true`;
+    const userFilter = gridironsOnly ? (0, drizzle_orm_1.sql) `u.is_gridiron = true` : (0, drizzle_orm_1.sql) `u.nfl_access = true`;
     // Join order: users → games (filtered) → picks
     // This ensures is_correct counts only apply to the filtered game set
     const result = await db_1.db.execute((0, drizzle_orm_1.sql) `
@@ -26,7 +26,7 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
       u.id                  AS user_id,
       u.team_name,
       u.profile_image_url,
-      u.is_longie,
+      u.is_gridiron,
       u.is_premium,
       u.is_admin,
       COALESCE(CAST(COUNT(CASE WHEN p.is_correct = true  THEN 1 END) AS INTEGER), 0) AS wins,
@@ -39,7 +39,7 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
     LEFT JOIN games g ON ${gameFilter}
     LEFT JOIN picks p ON p.user_id = u.id AND p.game_id = g.id
     WHERE ${userFilter}
-    GROUP BY u.id, u.team_name, u.profile_image_url, u.is_longie, u.is_premium, u.is_admin
+    GROUP BY u.id, u.team_name, u.profile_image_url, u.is_gridiron, u.is_premium, u.is_admin
     HAVING COUNT(p.id) > 0
     ORDER BY wins DESC, losses ASC
   `);
@@ -54,7 +54,7 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
             userId: row.user_id,
             teamName: row.team_name,
             profileImageUrl: row.profile_image_url,
-            isLongie: row.is_longie,
+            isGridiron: row.is_gridiron,
             isPremium: row.is_premium,
             wins,
             losses,

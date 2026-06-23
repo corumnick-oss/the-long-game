@@ -42,7 +42,7 @@ router.post('/', requireFirebaseToken, async (req, res) => {
     email: req.body.email ?? '',
     teamName: teamName?.trim() ?? 'New Player',
     isAdmin: false,
-    isLongie: false,
+    isGridiron: false,
     isPremium: false,
     nflAccess: true,
     profileImageUrl: profileImageUrl ?? null,
@@ -68,7 +68,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     id: targetUser.id,
     teamName: targetUser.teamName,
     profileImageUrl: targetUser.profileImageUrl,
-    isLongie: targetUser.isLongie,
+    isGridiron: targetUser.isGridiron,
     isPremium: targetUser.isPremium,
     createdAt: targetUser.createdAt,
     ...stats,
@@ -139,7 +139,7 @@ async function getUserStats(userId: string, season: number, opts?: { publicOnly?
 }
 
 async function getFullH2H(userId: string, season: number) {
-  const longies = await db.query.users.findMany({ where: eq(schema.users.isLongie, true) });
+  const longies = await db.query.users.findMany({ where: eq(schema.users.isGridiron, true) });
 
   const results = [];
   for (const opponent of longies) {

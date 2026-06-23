@@ -70,8 +70,8 @@ export declare const users: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        isLongie: import("drizzle-orm/pg-core").PgColumn<{
-            name: "is_longie";
+        isGridiron: import("drizzle-orm/pg-core").PgColumn<{
+            name: "is_gridiron";
             tableName: "users";
             dataType: "boolean";
             columnType: "PgBoolean";

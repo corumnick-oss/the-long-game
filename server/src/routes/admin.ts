@@ -21,10 +21,10 @@ router.get('/users', async (req, res) => {
 });
 
 router.patch('/users/:id', async (req, res) => {
-  const { isLongie, isAdmin, nflAccess, teamName } = req.body as Record<string, any>;
+  const { isGridiron, isAdmin, nflAccess, teamName } = req.body as Record<string, any>;
   const updates: Partial<typeof schema.users.$inferInsert> = { updatedAt: new Date() };
 
-  if (isLongie !== undefined) updates.isLongie = Boolean(isLongie);
+  if (isGridiron !== undefined) updates.isGridiron = Boolean(isGridiron);
   if (isAdmin !== undefined) updates.isAdmin = Boolean(isAdmin);
   if (nflAccess !== undefined) updates.nflAccess = Boolean(nflAccess);
   if (teamName?.trim()) updates.teamName = teamName.trim();

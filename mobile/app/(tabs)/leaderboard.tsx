@@ -4,7 +4,7 @@ import { getCurrentNFLSeason, getCurrentNFLWeek } from '../../src/lib/nflSeason'
 
 const currentWeek = getCurrentNFLWeek();
 
-type Filter = 'longies' | 'global';
+type Filter = 'gridirons' | 'global';
 type ViewType = 'season' | 'weekly';
 
 // Ordered list of selectable seasons — each has a year, seasonType, and display label
@@ -106,12 +106,12 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
   );
 }
 
-function ListHeader({ filter, setFilter, type, setType, isLongie, entryIdx, setEntryIdx }: {
+function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, setEntryIdx }: {
   filter: Filter;
   setFilter: (f: Filter) => void;
   type: ViewType;
   setType: (t: ViewType) => void;
-  isLongie: boolean;
+  isGridiron: boolean;
   entryIdx: number;
   setEntryIdx: (i: number) => void;
 }) {
@@ -138,10 +138,10 @@ function ListHeader({ filter, setFilter, type, setType, isLongie, entryIdx, setE
         </TouchableOpacity>
       </View>
 
-      {isLongie && (
+      {isGridiron && (
         <Toggle<Filter>
           options={[
-            { label: 'Longies', value: 'longies' },
+            { label: 'Gridirons', value: 'gridirons' },
             { label: 'Global', value: 'global' },
           ]}
           value={filter}
@@ -178,14 +178,14 @@ import { useMyProfile } from '../../src/hooks/useProfile';
 export default function LeaderboardScreen() {
   const router = useRouter();
   const { data: profile } = useMyProfile();
-  const isLongie = profile?.isLongie ?? false;
+  const isGridiron = profile?.isGridiron ?? false;
   const [filter, setFilter] = useState<Filter>('global');
   const [type, setType] = useState<ViewType>('season');
   const [entryIdx, setEntryIdx] = useState(DEFAULT_IDX);
 
   useEffect(() => {
-    if (profile?.isLongie) setFilter('longies');
-  }, [profile?.isLongie]);
+    if (profile?.isGridiron) setFilter('gridirons');
+  }, [profile?.isGridiron]);
 
   // Reset weekly view when switching away from current regular season
   useEffect(() => { setType('season'); }, [entryIdx]);
@@ -242,7 +242,7 @@ export default function LeaderboardScreen() {
             setFilter={setFilter}
             type={type}
             setType={setType}
-            isLongie={isLongie}
+            isGridiron={isGridiron}
             entryIdx={entryIdx}
             setEntryIdx={setEntryIdx}
           />

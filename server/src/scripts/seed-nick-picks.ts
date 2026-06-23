@@ -65,7 +65,7 @@ async function main() {
   if (existing) {
     console.log(`Found existing DB record: "${existing.teamName}"`);
     await db.update(schema.users)
-      .set({ isAdmin: true, isLongie: true, teamName: 'Nicholas', nflAccess: true, updatedAt: new Date() })
+      .set({ isAdmin: true, isGridiron: true, teamName: 'Nicholas', nflAccess: true, updatedAt: new Date() })
       .where(eq(schema.users.id, firebaseUid));
   } else {
     console.log('No DB record found — creating one...');
@@ -74,13 +74,13 @@ async function main() {
       email: TARGET_EMAIL,
       teamName: 'Nicholas',
       isAdmin: true,
-      isLongie: true,
+      isGridiron: true,
       isPremium: false,
       nflAccess: true,
       profileImageUrl: null,
     });
   }
-  console.log('User: isAdmin=true, isLongie=true, teamName=Nicholas');
+  console.log('User: isAdmin=true, isGridiron=true, teamName=Nicholas');
 
   // 3. Remove the old migration Nicholas record if it exists (avoids duplicate on leaderboard)
   const oldNicholasExists = await db.query.users.findFirst({ where: eq(schema.users.id, NICHOLAS_OLD_UID) });

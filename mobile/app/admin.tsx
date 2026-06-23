@@ -91,7 +91,7 @@ function UsersTab({ season }: { season: number }) {
             )}
             <View className="flex-row gap-1.5 items-center">
               {u.isAdmin && <View className="bg-orange-600/30 rounded px-1.5 py-0.5"><Text className="text-orange-400 text-xs font-bold">ADMIN</Text></View>}
-              {u.isLongie && <View className="bg-primary/20 rounded px-1.5 py-0.5"><Text className="text-primary text-xs font-bold">LONGIE</Text></View>}
+              {u.isGridiron && <View className="bg-primary/20 rounded px-1.5 py-0.5"><Text className="text-primary text-xs font-bold">GRIDIRON</Text></View>}
               {editingId === u.id ? (
                 <TouchableOpacity
                   onPress={() => {
@@ -115,15 +115,15 @@ function UsersTab({ season }: { season: number }) {
 
           <Text className="text-muted text-xs mb-3">{u.email}</Text>
 
-          {/* Longie toggle */}
+          {/* Gridiron toggle */}
           <View className="flex-row items-center justify-between border-t border-border pt-2">
-            <Text className="text-muted text-sm">Longie</Text>
+            <Text className="text-muted text-sm">Gridiron</Text>
             <Switch
-              value={u.isLongie}
-              onValueChange={val => updateUser({ id: u.id, isLongie: val })}
+              value={u.isGridiron}
+              onValueChange={val => updateUser({ id: u.id, isGridiron: val })}
               disabled={isPending}
               trackColor={{ false: '#374151', true: '#1d4ed8' }}
-              thumbColor={u.isLongie ? '#3b82f6' : '#9ca3af'}
+              thumbColor={u.isGridiron ? '#3b82f6' : '#9ca3af'}
             />
           </View>
         </View>

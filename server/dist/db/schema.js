@@ -7,7 +7,7 @@ exports.users = (0, pg_core_1.pgTable)('users', {
     email: (0, pg_core_1.text)('email').notNull(),
     teamName: (0, pg_core_1.text)('team_name').notNull(),
     isAdmin: (0, pg_core_1.boolean)('is_admin').notNull().default(false),
-    isLongie: (0, pg_core_1.boolean)('is_longie').notNull().default(false),
+    isGridiron: (0, pg_core_1.boolean)('is_gridiron').notNull().default(false),
     isPremium: (0, pg_core_1.boolean)('is_premium').notNull().default(false),
     nflAccess: (0, pg_core_1.boolean)('nfl_access').notNull().default(true),
     profileImageUrl: (0, pg_core_1.text)('profile_image_url'),

@@ -14,7 +14,7 @@ export const users = pgTable('users', {
   email: text('email').notNull(),
   teamName: text('team_name').notNull(),
   isAdmin: boolean('is_admin').notNull().default(false),
-  isLongie: boolean('is_longie').notNull().default(false),
+  isGridiron: boolean('is_gridiron').notNull().default(false),
   isPremium: boolean('is_premium').notNull().default(false),
   nflAccess: boolean('nfl_access').notNull().default(true),
   profileImageUrl: text('profile_image_url'),

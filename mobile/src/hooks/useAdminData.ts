@@ -7,7 +7,7 @@ export type AdminUser = {
   email: string;
   teamName: string;
   isAdmin: boolean;
-  isLongie: boolean;
+  isGridiron: boolean;
   isPremium: boolean;
   nflAccess: boolean;
   createdAt: string;
@@ -27,7 +27,7 @@ export function useUpdateUser() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updates }: { id: string; isLongie?: boolean; isAdmin?: boolean; nflAccess?: boolean; teamName?: string }) =>
+    mutationFn: ({ id, ...updates }: { id: string; isGridiron?: boolean; isAdmin?: boolean; nflAccess?: boolean; teamName?: string }) =>
       apiFetch(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }, user),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
   });

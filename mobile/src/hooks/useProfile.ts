@@ -23,7 +23,7 @@ export type MyProfile = {
   email: string;
   teamName: string;
   isAdmin: boolean;
-  isLongie: boolean;
+  isGridiron: boolean;
   profileImageUrl: string | null;
   createdAt: string;
   seasonRecord: { wins: number; losses: number };

@@ -82,7 +82,7 @@ async function main() {
       email: u['email']!,
       teamName: u['team_name']!,
       isAdmin: parseBool(u['is_admin']!),
-      isLongie: LONGIE_USER_IDS.has(u['id']!),
+      isGridiron: LONGIE_USER_IDS.has(u['id']!),
       isPremium: false,
       nflAccess: parseBool(u['nfl_access']!),
       profileImageUrl: u['profile_image_url'] || null,
