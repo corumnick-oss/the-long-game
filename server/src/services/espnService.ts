@@ -349,7 +349,7 @@ export async function syncWinProbabilities(week: number, season: number): Promis
   for (const game of weekGames) {
     try {
       const url = `${BASE}/summary?event=${game.espnId}`;
-      const { data } = await axios.get<any>(url);
+      const { data } = await axios.get<any>(url, { headers: ESPN_HEADERS });
 
       // Only use pre-game predictor — homeTeamFPI/awayTeamFPI store the pre-kickoff prediction.
       // winningTeamWinProb/losingTeamWinProb are set post-game when the actual winner is known.
