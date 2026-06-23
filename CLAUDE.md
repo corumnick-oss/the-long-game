@@ -13,6 +13,8 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ### ✅ GameCard bounce fix — CONFIRMED WORKING
 ### ✅ Team Central + Picks by Team real-time cache invalidation — DONE
+### ✅ Pre-game stats + post-game box scores — SHIPPED
+### ✅ Push notifications — ALL 5 WIRED
 
 ### Next priority items:
 1. **Achievement images + Profile achievement display redesign** — see details below
@@ -40,82 +42,6 @@ Current state: Achievement case on Profile uses placeholder emojis. Nick wants r
 `applyDefaultPicks()` in `scheduler.ts` previously hardcoded `seasonType: 'regular'` — **FIXED**. It now reads seasonType from the `unlocked_weeks` row and also guards against running if the week is not unlocked. Cron timezone also fixed (now passes `{ timezone: 'America/Los_Angeles' }` explicitly to all schedules).
 
 **Also future feature:** Add a rules/explanation page in the app so users know that missing picks defaults to Raiders (if playing) or away team.
-
-### COMPLETED SESSION (current session — cache invalidation + bug fixes)
-- **Team Central + Picks by Team cache invalidation** — `picks.tsx`: added `useEffect` with `useRef` to detect when any game transitions `in → post` during the live poll; automatically calls `queryClient.invalidateQueries(['teams'])` + `['picks-by-team']` so both screens update W-L without manual refresh. OTA pushed (update group `8fd6c772`).
-- **Public profile crash fixed** — `user/[id].tsx`: `PickComparison` referenced undefined `SEASON` variable (leftover from season propagation refactor). Fixed to `getCurrentNFLSeason()`. Affected flows: Leaderboard→Profile and Profile H2H→Profile when 2025 season selected. OTA pushed.
-- **Preseason picks unlocked** — `picks.tsx`: `isWeekCurrentlyLocked()` is a Wednesday-gate for regular season only. For preseason, it was blocking all picks Thu–Tue. Fixed: `isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked()`. Preseason picks now open whenever admin has unlocked the week, regardless of day. OTA pushed.
-- **GameCard bounce (3-part fix)** — CONFIRMED FIXED:
-  1. `GameCard.tsx`: Stats lines (record/PPG/YPG) now always render in pre-game state with `opacity: 0` when null, instead of unmounting — prevents height change during refetch
-  2. `GameCard.tsx`: Wrapped with `React.memo` + custom comparator (`game === game && isLocked === isLocked`) — prevents all 16+ cards re-rendering on each pick; only the changed card re-renders
-  3. `usePicksData.ts`: Removed `invalidateQueries` from `onSettled` — optimistic update is correct on success; the background refetch was causing a second full re-render wave. On error, `onError` still restores + invalidates.
-- **Post-game Game Detail: last 5 games removed** — `game/[id].tsx`: recent games section now guarded with `isPre &&`. Was showing in post-game view. OTA pushed.
-- **2026 Team Detail scoring stats fixed** — `server/src/routes/teams.ts`: PPG/PPGAllowed now fall back to 2025 game data when no completed 2026 games exist (mirrors existing ypg/stats fallback). Backend deployed to Railway.
-- **Season context propagation crash fixed** — flows 1 & 3 from previous session: Leaderboard→Profile and Profile H2H→Profile now work when 2025 season is selected. (See public profile crash above.)
-
-### COMPLETED SESSION (previous session — scheduler + season fixes)
-- **Stale 2026 picks deleted** — 146 regular season + 1 preseason week 2 picks removed via SQL; preseason week 1 re-unlocked by Nick in Admin panel.
-- **Scheduler: timezone fixed** — all cron schedules now pass `{ timezone: 'America/Los_Angeles' }` explicitly so they fire at correct PT times regardless of Railway TZ env var. Previously firing at 9PM UTC (2PM PDT) instead of 9PM PT.
-- **Scheduler: `applyDefaultPicks` guard added** — now checks `unlocked_weeks` before running; skips if week is not unlocked (prevents offseason ghost notifications). Also reads `seasonType` from the unlocked row instead of hardcoding `'regular'` — preseason default picks will now work correctly after Aug 7.
-- **Season context propagation fixed** — passing `season` param through all cross-screen navigation: Leaderboard→Profile, Profile→Picks by Team, Profile H2H→Profile, Picks by Team→Team Detail. `GET /api/users/:id` now accepts `?season=X`. `usePublicProfile` hook updated to accept season. `picks-by-team.tsx` reads season from route params instead of module-level const.
-- **Android Google Sign-In DEVELOPER_ERROR** — diagnosed as missing SHA-1 fingerprint in Firebase. Decision: fix when Google Play is set up (late July), not now. Play App Signing will give the definitive SHA-1 at that point.
-
-### COMPLETED SESSION June 20 2026 (picks gate fix)
-- **Picks gate: `isPicksOpen` via `unlockedWeeks`** — Root cause of "all 2026 regular season games open": season flip to March broke the old `game.season > getCurrentNFLSeason()` guard. Fixed with proper DB-backed gate:
-  - `unlocked_weeks` table got a new `season_type` column (migration run locally: `npm run migrate:unlocked-weeks`)
-  - `GET /api/games` now returns `isPicksOpen: boolean` per game based on `unlockedWeeks` (week+season+seasonType)
-  - `POST /api/picks` rejects with 403 if week not in `unlockedWeeks` for that seasonType
-  - `GET /api/admin/unlock-week` now accepts and stores `seasonType`
-  - Tuesday 6AM scheduler auto-inserts into `unlockedWeeks` when opening regular season weeks
-  - `GameCard.tsx` uses `game.isPicksOpen` instead of season-year comparison
-  - Admin Unlock Week dialog now shows which seasonType is being unlocked
-- **2026 regular season picks deleted** — Nick manually deleted them; no 2025 data was touched
-- Backend rebuilt and deployed to Railway; OTA pushed to preview branch
-
-### COMPLETED SESSION June 19 2026
-- **Season selector layout fixed (Profile + Team Detail)** — compact centered circular buttons matching admin week picker style. OTA pushed.
-- **Team Detail season-change crash fixed** — two-part fix: (1) `seasonType` converted to state, resets to 'regular' when season changes; (2) backend `teams.ts` now translates team name full↔abbrev (using `NFL_FULL_TO_ABBREV`/`NFL_ABBREV_TO_FULL`) and retries lookup if initial query returns empty — fixes crash when navigating from 2026 full-name to 2025 abbreviated data. Backend rebuilt and deployed.
-- **Push notifications confirmed wired** — all 5 functions already called: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`. CLAUDE.md was stale on this.
-- **Season flip cutoff changed to March** — `getCurrentNFLSeason()` now returns current year when `month >= 3` (was `month >= 8`). App now shows 2026 as the current season. Both `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts` updated. Backend deployed, OTA pushed.
-- **Pick indicator improved** — selected team row highlighted with 20% blue background (was ~0%); non-picked team dims when other is selected. `GameCard.tsx` updated. OTA pushed.
-- **Default picks at lock time** — `applyDefaultPicks()` runs at Wednesday 9PM PT after lock; fills missing picks with Raiders (if playing) or away team; sends push notification to affected users. `notifyDefaultPicksApplied()` added. Backend deployed. NOTE: only works for regular season — see preseason fix note above.
-
-### COMPLETED SESSION June 18 2026
-- **Pre-game stats fix (2026)** — Root cause: `team_game_stats` stores 2025 team names as ESPN abbreviations; 2026 `games` table stores full names. `fetchTeamStatsMap` fallback was querying full names against abbreviation rows → no match. Added `NFL_FULL_TO_ABBREV` map (32 teams) in `server/src/routes/games.ts`; translate names before 2025 fallback query and match rows by either format when averaging. Backend rebuilt and deployed.
-- **Spread replaced with win probability** — GameCard divider: removed `Spread: X` label. Game Detail header: shows `away% – home%` under "vs" when `winningTeamWinProb` + `favoriteTeam` are set. Removed Spread stat row from pre-game stats table. WinProbBar remains at bottom of stats section.
-- **Stat table header alignment fixed** — pre-game and box score headers used `justify-between` with auto-width label; `StatRow` uses `flex-1`. Switched headers to `flex-row` with `flex-1` label so columns line up. Both pre-game averages and box score headers fixed.
-- **Android preview APK built** — `eas build --profile preview --platform android`. Download link available in EAS dashboard. OTA updates work on Android preview build the same as iOS (`eas update --branch preview`).
-
-### COMPLETED SESSION June 17 2026
-- **ESPN stats sync root cause** — ESPN returns 400 for historical 2025 game summaries from Railway's server IP (server-side block on bulk historical data). Works fine from local/browser IPs.
-- **`backfill-stats-local.ts` script** — runs ESPN backfill from local machine, bypassing Railway IP block. `npm run backfill:stats` in server/. Re-run after any espnService.ts changes.
-- **Expanded stats** — extracted sacks (defensive), turnovers, first downs, raw ratio strings (e.g. "6-14" for 3rd down) from ESPN boxscore. Added to `team_game_stats` via `sackRate` column + `additionalStats` JSONB fields.
-- **Box score on Game Detail (post-game)** — `game/[id].tsx` now shows actual box score for completed games (Total/Pass/Rush yards, 3rd Down as ratio, Red Zone as ratio, Sacks, Turnovers, 1st Downs). Pre-game still shows season averages. Live shows neither.
-- **Expanded averages on Game Detail (pre-game)** — stats table now includes 3rd Down %, Red Zone %, Sacks/G, Turnovers/G in addition to existing PPG/YPG stats.
-- **Efficiency section on Team Detail** — new section below Yards with 3rd Down %, Red Zone %, Sacks/G, Turnovers/G.
-- **2026 pre-game fallback** — backend already had 2025 fallback logic in `fetchTeamStatsMap`. Now populated with full stats. 2026 games will auto-populate as they complete via live sync.
-- **2025 data fully backfilled** — all 272 regular season games have complete box score stats in `team_game_stats`. Re-ran `npm run backfill:stats` locally after expanding ESPN extraction.
-- **ESPN box score sync (live 2026)** — `syncBoxScoreStats` fires automatically when a game goes `in → post` in the live loop. New fields will populate in real time.
-
-### COMPLETED SESSION June 16 2026
-- **Pre-game team stats** — full implementation shipped (backend + mobile). See session-2026-06-16.md for complete file list.
-- **Win probability `*100` bug** — FIXED in GameCard.tsx and game/[id].tsx WinProbBar.
-- **Startup crash (ypg)** — `ypg` added to TeamRow type but missing from destructuring → ReferenceError crash on every render. FIXED.
-- **Season selectors** — +/- on Profile tab and Team Detail screen. Buttons visible now but layout wrong (see fixes above). Upper bound uses `new Date().getFullYear()`.
-- **Team detail Yards section** — YPG/YAPG/Pass YPG/Rush YPG display added below Scoring section.
-- **Admin Sync Team Stats button** — in NFL Tools tab, triggers backfill of all completed games for selected season/type. Note: Admin button still hits Railway (blocked for historical data) — use `npm run backfill:stats` locally instead.
-
-### COMPLETED SESSION June 15 2026
-- **Picks tab crash** — `onTeamPress` in `TeamRow` type but missing from destructuring → ReferenceError. Fixed. Error boundary removed.
-- **Admin/Data tab week default** — `getCurrentNFLWeek()` returned 18 in offseason. Fixed: return 1 when week > 18.
-- **2026 regular season synced** — 272/272 games (all with logos). ESPN scoreboard blocked for future seasons; team-schedule approach works.
-- **2026 preseason synced** — 49 games (weeks 1–4). Week 1 = Hall of Fame game only.
-- **Team logos fixed** — ESPN summary returns empty logo for future games; sync script now collects logos from team schedule (`logos[0].href`) and uses as fallback.
-- **"Picks locked" message** — hidden for future season games (`game.season > getCurrentNFLSeason()`).
-- **Team tap in game detail** — tapping team logo/name in `game/[id].tsx` navigates to Team Central.
-- **`sync:2026:preseason` npm script** — `--preseason` flag added to local sync script.
-- **Diagnostic no-auth routes removed** — `GET /api/admin/test-espn-2026` and `test-espn-scoreboard-2026` removed from `admin.ts`. Built and pushed.
-- **Live score fixes** — `updateLiveScores()` seasonType bug fixed; OT/HALFTIME display added; client polls every 30s during live games. Committed.
 
 ---
 
@@ -168,39 +94,20 @@ EAS CLI v20 has `EPERM: operation not permitted, rmdir` bug on Windows during up
 
 ## Current Status
 
-### What's Built (as of June 4 2026)
-All core infrastructure and screens are complete:
-- Backend deployed to Railway, all API routes working, 2025 season data in DB (272 games)
-- EAS dev build + preview build installed on Nick's iPhone; OTA updates confirmed working
-- Google + Apple Sign-In fixed June 3 2026
+All core infrastructure, screens, stats, and push notifications are complete. Preview build active on Nick's iPhone.
 
-**Screens and features:**
-- **Picks tab** — GameCard (pre/live/final states), WeekSelector, TiebreakerCard, pick % bars after lock, preseason/regular toggle, Team Central entry button
-- **Leaderboard tab** — Longies/Global + Season/Weekly toggles, rank badges, W-L + accuracy, tap rows → profiles
-- **Week Picks tab** — compact grid with synchronized horizontal scroll, pick outcome tinting, season/type selector
-- **Profile tab** — avatar, season stats, weekly history color blocks, insights, H2H vs Longies, achievement case
-- **Game Detail** (`game/[id].tsx`) — compact header, prev/next, pre-game stats (PPG/OppPPG), pick list after lock
-- **Public Profile** (`user/[id].tsx`) — H2H vs viewer, pick comparison (current week, after lock only)
-- **Picks by Team** (`picks-by-team.tsx`) — from Profile → Insights; W-L per team, sortable, taps → Team Detail
-- **Team Central** (`team-central.tsx`) — from Picks tab; all 32 teams, W-L + community pick %, search + sort
-- **Team Detail** (`team/[name].tsx`) — logo/record, PPG/PPG-Allowed/point diff, community picks, last 10 games
-- **Admin Dashboard** (`admin.tsx`) — Users tab (teamName edit, Longie toggle), NFL Tools tab (sync + notifications + score correction), Data tab (exports)
-- **Activity bell** — slide-in drawer, Global Feed + Your Activity tabs, paginated 20/load
-- **Onboarding/splash** — embedded in `login.tsx`, shown once via AsyncStorage
-
-### Known TODOs (Before Launch)
-- **Pre-game team stats on GameCard** — BEFORE LAUNCH. ESPN `/summary?event={id}` predictor section. DB tables (`team_game_stats`, `player_stats`) already exist.
-- **Post-game box scores on Game Detail** — BEFORE LAUNCH. ESPN boxscore section, stored permanently after each game.
-- **Wire push notification crons** — all 5 functions built in `notificationService.ts`, need calling from `scheduler.ts`.
-- **Team Central + Picks by Team real-time updates** — invalidate `['teams', ...]` + `['picks-by-team', ...]` cache keys when live score sync runs (same logic as `['games', ...]`).
-- **Preseason season flip** — `getCurrentNFLSeason()` needs to flip on Aug 7, not Sept 1. Options: change cutoff to month >= 8, or check app_settings for preseasonStartDate. Discuss with Nick.
-- **Past seasons row on Profile** — W-L per season for historical context.
-- **Onboarding polish** — Nick wants redesign before launch (currently plain emoji icons, needs custom imagery).
-- **Week 18 2025 tiebreaker wrong** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025.
-- **Achievement case UI redesign** — placeholder emojis need custom artwork. Contrarian image never created. See "Achievement images + Profile display redesign" in DO THIS FIRST section for full details.
-- **Trophies (podium) system** — season-end 1st/2nd/3rd/last place. NOT YET BUILT. Design with Nick first.
-- **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link (OTA-safe, zero backend) vs. in-app form via nodemailer/SendGrid. Discuss with Nick.
-- **Admin email editing** — deferred. Workaround: new account + UID reassignment.
+### Open TODOs — Priority Order
+1. **Achievement images + Profile achievement display redesign** — see DO THIS FIRST section
+2. **Past seasons row on Profile** — W-L per season for historical context
+3. **Onboarding polish** — Nick wants redesign before launch
+4. **TestFlight preview build for Longies** — early July
+5. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
+6. **Trophies (podium) system** — season-end 1st/2nd/3rd/last place. NOT YET BUILT. Design with Nick first.
+7. **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link vs. in-app form. Discuss with Nick.
+8. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
+9. **2025 data migration** — when Longies sign up with Google/Apple
+10. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
+11. **Leaderboard Season Selector** — all users (currently admin only)
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isLongie=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
@@ -215,18 +122,6 @@ export function getCurrentNFLSeason(): number {
 }
 ```
 NEVER hardcode 2025 or any year. Lives in `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts`.
-
-### What's Next — Priority Order
-1. **Investigate ESPN stats sync** — check Railway logs for "No boxscore teams" warnings; determine if ESPN returns historical boxscore data from server; fix if needed
-2. **Wire push notification crons** — call functions from `notificationService.ts` in `scheduler.ts`
-3. **Preseason season flip** — `getCurrentNFLSeason()` update for Aug 7 (hard deadline — preseason starts Aug 7)
-4. **Post-game box scores on Game Detail** — `syncBoxScoreStats` is built; add final-game display section on Game Detail
-5. **Team Central + Picks by Team real-time cache invalidation**
-6. **Past seasons** — Profile past seasons row
-7. **Onboarding polish**
-8. **TestFlight preview build for Longies** — early July, `eas build --profile preview` + `eas submit`
-9. **2025 data migration** — when Longies sign up with Google/Apple
-10. **App Store + Google Play submission** — target late July
 
 ---
 
@@ -379,7 +274,7 @@ TheLongGame/
     │   │   ├── pushTokens.ts, teams.ts, tiebreaker.ts, trophies.ts, users.ts
     │   ├── services/
     │   │   ├── espnService.ts       ← ALL ESPN logic isolated here
-    │   │   ├── notificationService.ts ← all 5 push triggers (not yet wired to crons)
+    │   │   ├── notificationService.ts ← all 5 push triggers
     │   │   ├── scheduler.ts         ← cron jobs
     │   │   └── trophyService.ts
     │   ├── utils/season.ts          ← getCurrentNFLSeason()
@@ -435,7 +330,7 @@ Additional tables beyond the main ones: `tiebreaker_games`, `tiebreaker_picks`, 
 - **Achievements** = Weekly awards. Stored in `trophies` DB table. Always say "Achievements" in UI.
 - **Trophies** = Season-end podium (1st/2nd/3rd/last). **NOT YET BUILT.** Design with Nick first.
 
-### Achievement Types (bugs fixed in trophyService.ts)
+### Achievement Types
 - **most_wins** — Most correct picks that week (ties = multiple winners)
 - **loser** — Most incorrect picks that week
 - **upset_pick** — Correctly picked lowest win probability winner (uses `winningTeamWinProb`)
@@ -455,10 +350,20 @@ Trophy images: most_wins, loser, upset_pick, lone_wolf have images. **contrarian
 | Tuesday 9PM PST | Win probability refresh |
 | Wednesday 6AM PST | Win probability refresh |
 | Wednesday 5PM PST | Win probability refresh |
-| Wednesday 8PM PST | Push: "1 hour left for Week X picks!" ← **NOT YET WIRED** |
-| Wednesday 9PM PST | Picks lock + push notification ← **NOT YET WIRED** |
+| Wednesday 8PM PST | Push: "1 hour left for Week X picks!" |
+| Wednesday 9PM PST | Picks lock + push notification |
 
-All 5 push functions in `notificationService.ts`. Need to be called from `scheduler.ts`.
+All 5 push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`.
+
+### ESPN `/summary` Endpoint — Railway IP Block
+ESPN returns 400 for any `/summary?event=` request from Railway's server IP (confirmed — even with browser User-Agent headers). This affects two things:
+
+1. **Stats backfill** — must run locally: `npm run backfill:stats` in server/
+2. **Win probability sync** — must run locally: `npm run sync:winprobs <week> <season>` in server/
+   - Example before week 1: `npm run sync:winprobs 1 2026`
+   - The Tuesday/Wednesday cron jobs attempt this automatically but will fail if Railway is still blocked. The Admin → NFL Tools → "Sync Win Probabilities" button also fails for the same reason.
+   - **Workaround:** run the local script before each week's games. Re-run if you see `homeTeamFPI`/`awayTeamFPI` null on GameCards.
+   - Live score updates are NOT affected (they use the scoreboard endpoint, not /summary).
 
 ### Lock Times
 - Default: Wednesday 9PM PST
@@ -504,55 +409,18 @@ After lock: Week Picks full grid, Game Detail pick list, other profiles H2H for 
 - 6px thick pick % bars — visible after lock only
 - 3 states: pre-game (stats), live (score+clock), final (score+result)
 
-### TO BUILD: Game Preview Screen (Pre-Game Stats on GameCard)
-
-The locked pre-game GameCard state should show team stats side by side before picks lock. DB tables (`team_game_stats`, `player_stats`) already exist in schema.
-
-**Stats to show (decide with Nick which subset to surface in UI):**
-- PPG / PPG Allowed
-- Total yards/game / yards allowed/game
-- Offensive rank / Defensive rank
-- 3rd down conversion %
-- Red zone efficiency
-- Win probability bar (from ESPN predictor section, already synced as `winningTeamWinProb` on game)
-- Top QB: comp/att, pass yards, TDs, INTs
-- Top RB: carries, rush yards, TDs
-- Top WR: receptions/targets, yards, TDs
-
-**Stats fallback strategy (IMPORTANT — discuss with Nick before building):**
-- Preseason 2026 games: show 2025 season averages (no 2026 data yet)
-- Regular season Week 1 2026: show 2025 season averages (no 2026 games played yet)
-- Regular season Week 2+ 2026: show 2026 running averages (accumulated from played games)
-- Logic: query `team_game_stats` for `season=2026` first; if no rows, fall back to `season=2025`
-
-**Collection:**
-- Pre-game stats: ESPN `/summary?event={id}` predictor section — sync on Tuesday 6AM + Wednesday crons
-- Post-game stats (box score): ESPN `/summary?event={id}` boxscore section — sync when game goes 'post'
-
-### TO BUILD: Post-Game Box Score on Game Detail
-Visible only on final games: team totals (yards, pass, rush, TDs, turnovers, 3rd-down %, red zone) + top QB (comp/att, pass yards, TDs, INTs), RB (carries, rush yards, TDs), WR (rec/targets, yards, TDs).
-
-### TO BUILD: Pre/Post Stats Implementation Plan
-1. Explore ESPN `/summary?event={id}` predictor + boxscore sections to confirm available fields
-2. `espnService.ts`: add `syncTeamStats(game)` — pre-game stats from ESPN predictor section
-3. `espnService.ts`: add `syncBoxScore(game)` — post-game stats from ESPN boxscore section
-4. Wire `syncTeamStats` to Tuesday 6AM + Wednesday crons
-5. Wire `syncBoxScore` to live loop when game status goes 'post'
-6. Update `GET /api/games` and `GET /api/games/:id` to include stats with 2025 fallback when no 2026 rows
-7. GameCard pre-game state shows team stats; Game Detail final state shows box score
-8. Add `npm run sync:stats` to backfill 2025 box scores
-
 ### TO BUILD: Leaderboard Season Selector (all users)
 Same +/− control the admin has, lets any user view 2025 final standings.
 
 ### TO BUILD: Profile Past Seasons Row
 W-L per season for historical context.
 
-### Other Built Screen Notes
-- **Team Central** — real-time updates needed: invalidate `['teams', ...]` cache when scores sync
-- **Picks by Team** — real-time updates needed: invalidate `['picks-by-team', ...]` cache when scores sync
-- **Team Detail** — expand stats when `syncTeamStats()` is built (add yards, sacks, rankings from `team_game_stats`)
+### Screen Notes
+- **Game Detail** — pre-game: season averages (PPG, YPG, 3rd Down %, Red Zone %, Sacks, Turnovers); post-game: actual box score; live: neither
+- **Team Detail** — PPG, YPG, efficiency stats (3rd Down %, Red Zone %, Sacks/G, Turnovers/G). Stats fall back to 2025 when no 2026 games played.
 - **Public Profile** — H2H pick comparison: current week only, after lock only, no email, no full pick history
+- **Admin Sync Team Stats button** — hits Railway (blocked) — use `npm run backfill:stats` locally instead
+- **Admin Sync Win Probabilities button** — hits Railway (blocked) — use `npm run sync:winprobs <week> <season>` locally instead
 
 ---
 
@@ -560,13 +428,13 @@ W-L per season for historical context.
 
 | Trigger | Message | When | Status |
 |---|---|---|---|
-| Week unlocked | "Week X picks are now open! 🏈" | Tue 6AM | built, NOT wired |
-| Deadline | "1 hour left for Week X picks!" | Wed 8PM | built, NOT wired |
-| Locked | "Picks locked. Good luck! 🏈" | Wed 9PM | built, NOT wired |
-| Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring | built, NOT wired |
-| Final | "Final: [score]. Your pick: ✓/✗" | As games end | built, NOT wired |
+| Week unlocked | "Week X picks are now open! 🏈" | Tue 6AM | wired |
+| Deadline | "1 hour left for Week X picks!" | Wed 8PM | wired |
+| Locked | "Picks locked. Good luck! 🏈" | Wed 9PM | wired |
+| Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring | wired |
+| Final | "Final: [score]. Your pick: ✓/✗" | As games end | wired |
 
-All in `notificationService.ts`. Test via Admin → NFL Tools → "Send Test Notification Now" or "Schedule Deadline Reminder Test" (1/5/10/30m presets).
+Test via Admin → NFL Tools → "Send Test Notification Now" or "Schedule Deadline Reminder Test" (1/5/10/30m presets).
 
 ---
 
