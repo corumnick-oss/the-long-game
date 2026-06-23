@@ -163,8 +163,8 @@ router.post('/games/sync-probs', async (req, res) => {
   const week = parseInt(req.body.week, 10);
   if (!week) { res.status(400).json({ error: 'week required' }); return; }
 
-  await syncWinProbabilities(week, season);
-  res.json({ ok: true, week, season });
+  const updated = await syncWinProbabilities(week, season);
+  res.json({ ok: true, week, season, updated });
 });
 
 // ── Trophies ──────────────────────────────────────────────────────────────────

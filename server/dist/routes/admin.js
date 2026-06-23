@@ -200,8 +200,8 @@ router.post('/games/sync-probs', async (req, res) => {
         res.status(400).json({ error: 'week required' });
         return;
     }
-    await (0, espnService_1.syncWinProbabilities)(week, season);
-    res.json({ ok: true, week, season });
+    const updated = await (0, espnService_1.syncWinProbabilities)(week, season);
+    res.json({ ok: true, week, season, updated });
 });
 // ── Trophies ──────────────────────────────────────────────────────────────────
 router.post('/trophies/award', async (req, res) => {

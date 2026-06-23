@@ -327,10 +327,13 @@ export async function syncWeekScores(week: number, season: number, seasonType: '
   return updated;
 }
 
-export async function syncWinProbabilities(week: number, season: number): Promise<void> {
+export async function syncWinProbabilities(week: number, season: number): Promise<number> {
   const weekGames = await db.query.games.findMany({
     where: and(eq(games.week, week), eq(games.season, season), eq(games.seasonType, 'regular')),
   });
+
+  console.log(`[WinProb] week=${week} season=${season}: found ${weekGames.length} games`);
+  let updated = 0;
 
   for (const game of weekGames) {
     try {
@@ -360,10 +363,14 @@ export async function syncWinProbabilities(week: number, season: number): Promis
         losingTeamWinProb: homeIsLeading ? awayWinProb : homeWinProb,
         favoriteTeam: homeIsLeading ? game.homeTeam : game.awayTeam,
       }).where(eq(games.id, game.id));
-    } catch {
-      // Individual game failure shouldn't stop the whole sync
+      updated++;
+    } catch (err: any) {
+      console.warn(`[WinProb] failed for espnId=${game.espnId}: ${err?.message}`);
     }
   }
+
+  console.log(`[WinProb] updated ${updated}/${weekGames.length} games`);
+  return updated;
 }
 
 // Sync box score stats for a completed game into team_game_stats (idempotent — delete + insert).

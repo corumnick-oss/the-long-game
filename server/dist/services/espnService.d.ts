@@ -2,7 +2,7 @@ export declare function syncGamesByEventIds(eventIds: string[], week: number, se
 export declare function syncWeekGames(week: number, season: number, seasonType?: 'regular' | 'preseason' | 'postseason'): Promise<number>;
 export declare function updateLiveScores(): Promise<void>;
 export declare function syncWeekScores(week: number, season: number, seasonType?: 'regular' | 'preseason' | 'postseason'): Promise<number>;
-export declare function syncWinProbabilities(week: number, season: number): Promise<void>;
+export declare function syncWinProbabilities(week: number, season: number): Promise<number>;
 export declare function syncBoxScoreStats(game: {
     id: string;
     espnId: string;

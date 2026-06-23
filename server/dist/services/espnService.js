@@ -291,6 +291,8 @@ async function syncWinProbabilities(week, season) {
     const weekGames = await db_1.db.query.games.findMany({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.games.week, week), (0, drizzle_orm_1.eq)(schema_1.games.season, season), (0, drizzle_orm_1.eq)(schema_1.games.seasonType, 'regular')),
     });
+    console.log(`[WinProb] week=${week} season=${season}: found ${weekGames.length} games`);
+    let updated = 0;
     for (const game of weekGames) {
         try {
             const url = `${BASE}/summary?event=${game.espnId}`;
@@ -318,11 +320,14 @@ async function syncWinProbabilities(week, season) {
                 losingTeamWinProb: homeIsLeading ? awayWinProb : homeWinProb,
                 favoriteTeam: homeIsLeading ? game.homeTeam : game.awayTeam,
             }).where((0, drizzle_orm_1.eq)(schema_1.games.id, game.id));
+            updated++;
         }
-        catch {
-            // Individual game failure shouldn't stop the whole sync
+        catch (err) {
+            console.warn(`[WinProb] failed for espnId=${game.espnId}: ${err?.message}`);
         }
     }
+    console.log(`[WinProb] updated ${updated}/${weekGames.length} games`);
+    return updated;
 }
 // Sync box score stats for a completed game into team_game_stats (idempotent — delete + insert).
 async function syncBoxScoreStats(game) {
