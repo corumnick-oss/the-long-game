@@ -17,6 +17,9 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ Push notifications — ALL 5 WIRED
 ### ✅ TestFlight preview build — SUBMITTED (awaiting Apple Beta App Review for external testing)
 ### ✅ Win probability — homeTeamFPI/awayTeamFPI on Game Detail page (blue/amber bar, team labels, hidden after lock)
+### ✅ Away/Home labels — added to GameCard and Game Detail page
+### ✅ Pick % bar — shown on both GameCard (picks tab) and Game Detail (after lock)
+### ✅ Longies → Gridirons rename — complete in all code, DB column (is_longie → is_gridiron), and UI
 
 ### Next priority items:
 1. **UI polish pass** — Nick to share screenshots of each screen; identify improvements page by page. **This is the final gate before App Store + Google Play submission.** Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile → Activity panel.
