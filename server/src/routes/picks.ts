@@ -173,7 +173,7 @@ router.post('/', requireAuth, async (req, res) => {
       userId: req.currentUser!.id,
       gameId,
       pick,
-      pickWinProbability: game.winningTeamWinProb,
+      pickWinProbability: pick === 'home' ? game.homeTeamFPI : game.awayTeamFPI,
     }).returning();
     res.status(201).json(newPick);
   }

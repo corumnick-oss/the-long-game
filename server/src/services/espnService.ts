@@ -263,9 +263,20 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
 
   // Fire game-final notifications and sync box score stats for just-finished games
   for (const game of justFinished) {
+    const homeWon = game.homeScore > game.awayScore;
+
+    // Write winningTeamWinProb/losingTeamWinProb now that we know who won.
+    // These are used to evaluate ESPN's pre-game prediction accuracy.
+    const existing = existingByEspnId.get(game.espnId);
+    if (existing?.homeTeamFPI != null && existing?.awayTeamFPI != null) {
+      await db.update(games).set({
+        winningTeamWinProb: homeWon ? existing.homeTeamFPI : existing.awayTeamFPI,
+        losingTeamWinProb:  homeWon ? existing.awayTeamFPI : existing.homeTeamFPI,
+      }).where(eq(games.id, game.id));
+    }
+
     try {
       const gamePicks = await db.query.picks.findMany({ where: eq(picks.gameId, game.id) });
-      const homeWon = game.homeScore > game.awayScore;
       for (const pick of gamePicks) {
         const isCorrect = pick.pick === 'home' ? homeWon : !homeWon;
         notifyGameFinal(pick.userId, game.homeTeam, game.awayTeam, game.homeScore, game.awayScore, isCorrect).catch(err =>
@@ -340,29 +351,15 @@ export async function syncWinProbabilities(week: number, season: number): Promis
       const url = `${BASE}/summary?event=${game.espnId}`;
       const { data } = await axios.get<any>(url);
 
-      let homeWinProb: number;
-      let awayWinProb: number;
+      // Only use pre-game predictor — homeTeamFPI/awayTeamFPI store the pre-kickoff prediction.
+      // winningTeamWinProb/losingTeamWinProb are set post-game when the actual winner is known.
+      const predictor = data.predictor;
+      if (!predictor?.homeTeam?.gameProjection || !predictor?.awayTeam?.gameProjection) continue;
 
-      const winProb = data.winprobability;
-      if (Array.isArray(winProb) && winProb.length > 0) {
-        // Live or completed game — use last entry
-        const last = winProb[winProb.length - 1] as { homeWinPercentage: number };
-        homeWinProb = Math.round(last.homeWinPercentage * 100);
-        awayWinProb = 100 - homeWinProb;
-      } else {
-        // Pre-game — use predictor section
-        const predictor = data.predictor;
-        if (!predictor?.homeTeam?.gameProjection || !predictor?.awayTeam?.gameProjection) continue;
-        homeWinProb = Math.round(parseFloat(predictor.homeTeam.gameProjection));
-        awayWinProb = Math.round(parseFloat(predictor.awayTeam.gameProjection));
-      }
+      const homeTeamFPI = Math.round(parseFloat(predictor.homeTeam.gameProjection));
+      const awayTeamFPI = Math.round(parseFloat(predictor.awayTeam.gameProjection));
 
-      const homeIsLeading = homeWinProb >= awayWinProb;
-      await db.update(games).set({
-        winningTeamWinProb: homeIsLeading ? homeWinProb : awayWinProb,
-        losingTeamWinProb: homeIsLeading ? awayWinProb : homeWinProb,
-        favoriteTeam: homeIsLeading ? game.homeTeam : game.awayTeam,
-      }).where(eq(games.id, game.id));
+      await db.update(games).set({ homeTeamFPI, awayTeamFPI }).where(eq(games.id, game.id));
       updated++;
     } catch (err: any) {
       console.warn(`[WinProb] failed for espnId=${game.espnId}: ${err?.message}`);

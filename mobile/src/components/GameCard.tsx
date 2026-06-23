@@ -183,6 +183,9 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
 
   const canPick = !isLocked && game.isPicksOpen && (isPre || isLive);
 
+  const homeWinProb = game.homeTeamFPI != null ? Math.round(game.homeTeamFPI) : null;
+  const awayWinProb = game.awayTeamFPI != null ? Math.round(game.awayTeamFPI) : null;
+
   const hasPick = game.myPick !== null;
   const pickedOutcome = homePickOutcome ?? awayPickOutcome;
   const borderColor = !hasPick
@@ -234,20 +237,30 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
         disabled={!canPick}
       />
 
-      {/* Divider with game info */}
-      <View className="flex-row items-center px-4 py-1.5 border-t border-b border-border">
-        <View className="flex-1" />
-        <Text className="text-muted text-xs text-center flex-1">
-          {isPre ? formatGameTime(game.gameTime) : isLive ? 'LIVE' : 'Final'}
-        </Text>
-        <View className="flex-1 items-end flex-row justify-end gap-2">
-          {isPre && game.winningTeamWinProb && game.favoriteTeam && (
-            <Text className="text-muted text-xs">
-              {Math.round(Number(game.winningTeamWinProb))}% fav
-            </Text>
-          )}
-          {onPress && <Text className="text-muted text-xs">›</Text>}
+      {/* Divider with game info + win probability bar */}
+      <View className="px-4 border-t border-b border-border">
+        <View className="flex-row items-center py-1.5">
+          <View className="flex-1" />
+          <Text className="text-muted text-xs text-center flex-1">
+            {isPre ? formatGameTime(game.gameTime) : isLive ? 'LIVE' : 'Final'}
+          </Text>
+          <View className="flex-1 items-end justify-end">
+            {onPress && <Text className="text-muted text-xs">›</Text>}
+          </View>
         </View>
+        {isPre && homeWinProb != null && awayWinProb != null && (
+          <View className="pb-2.5">
+            <View className="flex-row justify-between mb-1">
+              <Text className="text-muted text-xs">{awayWinProb}%</Text>
+              <Text className="text-muted text-[10px]">Win Probability</Text>
+              <Text className="text-muted text-xs">{homeWinProb}%</Text>
+            </View>
+            <View className="h-1.5 rounded-full overflow-hidden flex-row">
+              <View style={{ flex: awayWinProb, backgroundColor: '#3b82f6' }} />
+              <View style={{ flex: homeWinProb, backgroundColor: '#8b5cf6' }} />
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Home team (bottom) */}

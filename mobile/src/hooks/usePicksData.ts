@@ -43,6 +43,8 @@ export type Game = {
   statsSeasonUsed: number | null;
   spread: number | null;
   favoriteTeam: string | null;
+  homeTeamFPI: number | null;
+  awayTeamFPI: number | null;
   gameTime: string;
   status: 'pre' | 'in' | 'post';
   statusType: string | null;
@@ -108,11 +110,12 @@ export function useSubmitPick() {
     onError: (_err, { gameId, week, season, seasonType }, ctx) => {
       if (ctx?.prevGames) qc.setQueryData(['games', week, season, seasonType, user?.uid ?? null], ctx.prevGames);
       if (ctx?.prevDetail) qc.setQueryData(['game-detail', gameId, user?.uid ?? null], ctx.prevDetail);
-    },
-    onSettled: (_data, _err, { gameId, week, season, seasonType }) => {
+      // Refetch after error so the UI reflects true server state
       qc.invalidateQueries({ queryKey: ['games', week, season, seasonType, user?.uid ?? null] });
       qc.invalidateQueries({ queryKey: ['game-detail', gameId, user?.uid ?? null] });
     },
+    // No onSettled invalidation: optimistic update is correct on success, and the
+    // background refetch was causing a second full re-render of all GameCards.
   });
 }
 
