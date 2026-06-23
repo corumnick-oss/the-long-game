@@ -329,7 +329,7 @@ export async function syncWeekScores(week: number, season: number, seasonType: '
 
 export async function syncWinProbabilities(week: number, season: number): Promise<void> {
   const weekGames = await db.query.games.findMany({
-    where: eq(games.week, week),
+    where: and(eq(games.week, week), eq(games.season, season), eq(games.seasonType, 'regular')),
   });
 
   for (const game of weekGames) {
@@ -337,12 +337,22 @@ export async function syncWinProbabilities(week: number, season: number): Promis
       const url = `${BASE}/summary?event=${game.espnId}`;
       const { data } = await axios.get<any>(url);
 
-      const winProb = data.winprobability;
-      if (!Array.isArray(winProb) || winProb.length === 0) continue;
+      let homeWinProb: number;
+      let awayWinProb: number;
 
-      const last = winProb[winProb.length - 1] as { homeWinPercentage: number };
-      const homeWinProb = Math.round(last.homeWinPercentage * 100);
-      const awayWinProb = 100 - homeWinProb;
+      const winProb = data.winprobability;
+      if (Array.isArray(winProb) && winProb.length > 0) {
+        // Live or completed game — use last entry
+        const last = winProb[winProb.length - 1] as { homeWinPercentage: number };
+        homeWinProb = Math.round(last.homeWinPercentage * 100);
+        awayWinProb = 100 - homeWinProb;
+      } else {
+        // Pre-game — use predictor section
+        const predictor = data.predictor;
+        if (!predictor?.homeTeam?.gameProjection || !predictor?.awayTeam?.gameProjection) continue;
+        homeWinProb = Math.round(parseFloat(predictor.homeTeam.gameProjection));
+        awayWinProb = Math.round(parseFloat(predictor.awayTeam.gameProjection));
+      }
 
       const homeIsLeading = homeWinProb >= awayWinProb;
       await db.update(games).set({
