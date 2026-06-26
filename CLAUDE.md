@@ -15,19 +15,34 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ Team Central + Picks by Team real-time cache invalidation — DONE
 ### ✅ Pre-game stats + post-game box scores — SHIPPED
 ### ✅ Push notifications — ALL 5 WIRED
-### ✅ TestFlight preview build — SUBMITTED (awaiting Apple Beta App Review for external testing)
+### ✅ TestFlight preview build — SUBMITTED; TheRidl3r added as internal tester
 ### ✅ Win probability — homeTeamFPI/awayTeamFPI on Game Detail page (blue/amber bar, team labels, hidden after lock)
 ### ✅ Away/Home labels — added to GameCard and Game Detail page
 ### ✅ Pick % bar — shown on both GameCard (picks tab) and Game Detail (after lock)
 ### ✅ Longies → Gridirons rename — complete in all code, DB column (is_longie → is_gridiron), and UI
+### ✅ OTA auto-update — app checks for update on launch and restarts silently (one close, not two)
+### ✅ Public profile season selector — users can view any past season on another user's profile
+### ✅ Pick comparison week navigation — WeekSelector on public profiles lets you browse any past week's H2H
+### ✅ H2H Win Pct on own profile — replaced W/L/T with win percentage (green ≥50%, red below)
+### ✅ Launch screen flash fix — blank +not-found.tsx backstop + SplashScreen.hideAsync() after navigation
+### ✅ Profile season selector bug fix — was using calendar year (2026), now uses getCurrentNFLSeason() (2025)
+### ✅ Profile stats regular-season-only — week history, season record, H2H, and insights all filter to season_type = 'regular'; preseason picks no longer bleed into profile
 
-### Next priority items:
-1. **UI polish pass** — Nick to share screenshots of each screen; identify improvements page by page. **This is the final gate before App Store + Google Play submission.** Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile → Activity panel.
-2. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
-3. **Achievement images + Profile achievement display redesign** — see details below
-4. **Past seasons row on Profile** — W-L per season for historical context
-5. **Onboarding polish** — Nick wants redesign before launch
-6. **TestFlight for Gridirons** — early July. Build already submitted. Waiting on Apple Beta Review. Once approved, invite via App Store Connect → TestFlight → External Testing → add by email. Wife also testing — same flow.
+### ⚠️ PENDING — Do these next session:
+1. **Run TheRidl3r UID reassignment** — from `server/`: `npm run reassign:user -- --old BQMdo8NUOgY8n0QxdUophLPMewp2 --email cloud7king10@yahoo.com`
+2. **Run Leo (dad) UID reassignment** — from `server/`: `npm run reassign:user -- --old uTosuZBxPucsOAnCnHmdA3pzBlb2 --email leocorum@gmail.com`
+3. **Award 2025 season trophies (podium)** — Kevin Akers = 1st, Nicholas = 2nd, TheRidl3r = 3rd. Last place: Gmac and Purdy Mouths tied at 165-107 — ask Nick which gets it (or both). Trophy system not yet built — design with Nick first.
+4. **Achievement images** — All 5 images needed from ChatGPT. None exist yet. Drop in `mobile/assets/achievements/`. See Achievement section below.
+5. **Achievement display on public profiles** — Currently not shown on other users' profiles. Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered achievements.
+
+### Next priority items (after the above):
+1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile → Activity panel. **This is the final gate before App Store + Google Play submission.**
+2. **App logo** — Needed before App Store + Google Play submission. Nick to supply artwork. Must be added to app.json (icon field) and EAS build assets before submitting to stores.
+3. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
+4. **Achievement display redesign** — see details below
+5. **Past seasons row on Profile** — W-L per season for historical context
+6. **Onboarding polish** — Nick wants redesign before launch
+7. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
 
 ### Win Probability — weekly workflow
 Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`. Example: `npm run sync:winprobs 1 2026`. The admin "Sync Win Probabilities" button is blocked on Railway (ESPN IP block on /summary endpoint — see ESPN section below). Run locally once per week, ideally Wednesday afternoon before the 9PM lock.
@@ -35,18 +50,27 @@ Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`
 ### Achievement images + Profile display redesign (discuss with Nick)
 Current state: Achievement case on Profile uses placeholder emojis. Nick wants real images and a better layout.
 
-**Images needed (Nick to supply art):**
-- `most_wins` — has image ✓
-- `loser` — has image ✓
-- `upset_pick` — has image ✓
-- `lone_wolf` — has image ✓
-- `contrarian` — **missing, placeholder emoji only** — needs new image created
+**Images needed — ALL 5 must be generated by ChatGPT (none exist yet):**
+- `most_wins` — Top Picker
+- `loser` — Rough Week
+- `upset_pick` — Upset Pick
+- `lone_wolf` — Lone Wolf
+- `contrarian` — Contrarian
+
+Drop images in `mobile/assets/achievements/` once generated.
 
 **Profile display to redesign:**
 - Current: emoji grid in "Achievement Case" section, no visual hierarchy
 - Discuss with Nick: card-style layout? show count + most recent per type? show all earned vs. just types unlocked? trophy room aesthetic?
 - Also decide: does the Achievement Case show ALL-TIME achievements or just current season?
 - The public profile (`user/[id].tsx`) also shows `trophyCount` — may need updating once display is redesigned
+
+### UID Reassignment Script
+When a Gridiron signs up fresh and needs their 2025 picks migrated from the old account:
+```
+npm run reassign:user -- --old <OLD_UID> --email <EMAIL>
+```
+Script: `server/src/scripts/reassign-user.ts`. Migrates picks, trophies, push tokens, tiebreaker picks, activity log, audit log. Copies isGridiron/isAdmin/isPremium/nflAccess flags. Deletes old record. Reusable for all Gridirons.
 
 ### ⚠️ BEFORE PRESEASON STARTS (Aug 7) — Default Picks Preseason Fix
 `applyDefaultPicks()` in `scheduler.ts` previously hardcoded `seasonType: 'regular'` — **FIXED**. It now reads seasonType from the `unlocked_weeks` row and also guards against running if the week is not unlocked. Cron timezone also fixed (now passes `{ timezone: 'America/Los_Angeles' }` explicitly to all schedules).
@@ -107,17 +131,19 @@ EAS CLI v20 has `EPERM: operation not permitted, rmdir` bug on Windows during up
 All core infrastructure, screens, stats, and push notifications are complete. Preview build active on Nick's iPhone.
 
 ### Open TODOs — Priority Order
-1. **Achievement images + Profile achievement display redesign** — see DO THIS FIRST section
-2. **Past seasons row on Profile** — W-L per season for historical context
-3. **Onboarding polish** — Nick wants redesign before launch
-4. **TestFlight preview build for Gridirons** — early July
-5. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
-6. **Trophies (podium) system** — season-end 1st/2nd/3rd/last place. NOT YET BUILT. Design with Nick first.
-7. **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link vs. in-app form. Discuss with Nick.
-8. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
-9. **2025 data migration** — when Gridirons sign up with Google/Apple
-10. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
-11. **Leaderboard Season Selector** — all users (currently admin only)
+1. **TheRidl3r + Leo UID reassignments** — see PENDING section above
+2. **2025 podium trophies** — award champion/runner_up/third_place (and last_place?) for 2025 season. NOT YET BUILT. Design with Nick first.
+3. **Achievement images** — all 5 from ChatGPT, drop in `mobile/assets/achievements/`
+4. **Achievement display on public profiles** — currently not shown
+5. **Achievement display redesign** — card layout, scope decision
+6. **Past seasons row on Profile** — W-L per season for historical context
+7. **Onboarding polish** — Nick wants redesign before launch
+8. **TestFlight for remaining Gridirons** — after UID reassignments complete
+9. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
+10. **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link vs. in-app form. Discuss with Nick.
+11. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
+12. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
+13. **Leaderboard Season Selector** — all users (currently admin only)
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isGridiron=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
@@ -173,23 +199,27 @@ Firebase project: the-long-game-prod-bef05. Bundle ID: com.thelonggame.picks —
 
 ## The Gridirons — Nick's Friend Group
 
-7 active users from 2025 season. All isGridiron: true. Will create FRESH accounts via Google/Apple Sign-In, then Nick runs UID reassignment script.
+7 active users from 2025 season. All isGridiron: true. Create FRESH accounts via Google/Apple Sign-In, then run UID reassignment script (see above).
 
-| Team Name | Email | Is Admin |
-|---|---|---|
-| Nicholas (Nick) | b2msbro@gmail.com | YES |
-| Squid | cloud7king10@yahoo.com | no |
-| Kevin Akers | kakers91@gmail.com | no |
-| The Purdy Mouths | jhayhurst714@gmail.com | no |
-| Gmac | garciagarrett24@gmail.com | no |
-| Leo | leocorum@gmail.com | no |
-| EWIK | erikhernandez531@yahoo.com | no |
+| 2026 Team Name | Email | Is Admin | 2025 Name | Migration Status |
+|---|---|---|---|---|
+| Nicholas (Nick) | b2msbro@gmail.com | YES | Nicholas | ✅ done (seed:nick) |
+| TheRidl3r | cloud7king10@yahoo.com | no | Squid | ⚠️ signed up, reassignment PENDING |
+| Kevin Akers | kakers91@gmail.com | no | Kevin Akers | ❌ not yet signed up |
+| The Purdy Mouths | jhayhurst714@gmail.com | no | The Purdy Mouths | ❌ not yet signed up |
+| Gmac | garciagarrett24@gmail.com | no | Gmac | ❌ not yet signed up |
+| leocorum (Leo/dad) | leocorum@gmail.com | no | Leo | ⚠️ signed up, reassignment PENDING |
+| EWIK | erikhernandez531@yahoo.com | no | EWIK | ❌ not yet signed up |
 
 DO NOT migrate: CBB Test (nicholas.corum@sce.com) or blank team name (nickcorum@gmail.com).
 
 **2025 Final Leaderboard** (verify migration against this):
-1. Kevin Akers 181-91 (66.5%) | 2. Nicholas 179-93 (65.8%) | 3. Squid 177-95 (65.1%)
+1. Kevin Akers 181-91 (66.5%) | 2. Nicholas 179-93 (65.8%) | 3. TheRidl3r (was Squid) 177-95 (65.1%)
 4. Leo 175-97 (64.3%) | 5. EWIK 172-100 (63.2%) | 6. The Purdy Mouths 165-107 (60.7%) | 7. Gmac 165-107 (60.7%)
+
+**Pending UID reassignments (old UIDs):**
+- TheRidl3r: old UID = `BQMdo8NUOgY8n0QxdUophLPMewp2`
+- Leo/dad: old UID = `uTosuZBxPucsOAnCnHmdA3pzBlb2`
 
 Migration script: `server/src/scripts/migrate-2025.ts` — imports 7 users, 272 games, 1903 picks, 109 trophies from `data/` CSVs. Skip: activity_log, pick_audit_log, unlocked_weeks, sessions.
 
@@ -235,7 +265,8 @@ TheLongGame/
 ├── data/                            ← 2025 CSV files for migration
 ├── mobile/
 │   ├── app/
-│   │   ├── _layout.tsx              ← root layout (QueryClientProvider + AuthProvider + AuthGate)
+│   │   ├── _layout.tsx              ← root layout (QueryClientProvider + AuthProvider + AuthGate + OTA check)
+│   │   ├── +not-found.tsx           ← blank dark screen (prevents not-found flash on cold launch)
 │   │   ├── admin.tsx                ← Admin Dashboard (3 tabs: Users, NFL Tools, Data)
 │   │   ├── picks-by-team.tsx        ← Picks by Team (from Profile → Insights)
 │   │   ├── team-central.tsx         ← Team Central list (from Picks tab)
@@ -289,7 +320,9 @@ TheLongGame/
     │   │   └── trophyService.ts
     │   ├── utils/season.ts          ← getCurrentNFLSeason()
     │   ├── middleware/auth.ts
-    │   └── scripts/migrate-2025.ts
+    │   └── scripts/
+│       │   ├── migrate-2025.ts      ← initial 2025 data import
+│       │   └── reassign-user.ts     ← migrate picks/trophies from old UID to new Firebase UID
     ├── dist/                        ← committed to git, used by Railway
     ├── Dockerfile
     └── package.json
@@ -425,10 +458,13 @@ Same +/− control the admin has, lets any user view 2025 final standings.
 ### TO BUILD: Profile Past Seasons Row
 W-L per season for historical context.
 
+### PICK VISIBILITY RULE UPDATE
+Rule 12 is now expanded: H2H pick comparison on public profiles shows current week (after lock) AND all past weeks/past seasons via WeekSelector navigation.
+
 ### Screen Notes
 - **Game Detail** — pre-game: season averages (PPG, YPG, 3rd Down %, Red Zone %, Sacks, Turnovers); post-game: actual box score; live: neither
 - **Team Detail** — PPG, YPG, efficiency stats (3rd Down %, Red Zone %, Sacks/G, Turnovers/G). Stats fall back to 2025 when no 2026 games played.
-- **Public Profile** — H2H pick comparison: current week only, after lock only, no email, no full pick history
+- **Public Profile** — Season selector (past seasons viewable). Pick comparison with `WeekSelector` for browsing any past week's H2H. Comparison hidden before lock for current week, always visible for past weeks/seasons. Profile stats (record, week history, H2H, insights) filter to regular season only — preseason excluded.
 - **Admin Sync Team Stats button** — hits Railway (blocked) — use `npm run backfill:stats` locally instead
 - **Admin Sync Win Probabilities button** — hits Railway (blocked) — use `npm run sync:winprobs <week> <season>` locally instead
 
@@ -490,7 +526,7 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 9. Never hardcode a year. Always getCurrentNFLSeason().
 10. Lock times admin-configurable per week.
 11. Preseason picks and leaderboard are FUNCTIONAL. Preseason stats kept separate from regular season via `seasonType` field. Preseason leaderboard is its own view, not mixed into regular season standings.
-12. H2H pick comparison: current week only, after lock only, other profiles only.
+12. H2H pick comparison on other profiles: current week visible after lock only; past weeks and past seasons always visible via WeekSelector. Your own profile H2H Win Pct (aggregated %, not per-game) is always visible.
 13. Admin picks page: read-only default, confirm + audit log to edit.
 14. Activity: two tabs, paginated 20 per load.
 15. Tiebreaker: admin-designates, all submit, Gridirons vs Gridirons only.
