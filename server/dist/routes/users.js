@@ -113,7 +113,7 @@ async function getUserStats(userId, season, opts) {
       COALESCE(SUM(CASE WHEN p.is_correct = false THEN 1 ELSE 0 END), 0)::integer AS losses
     FROM picks p
     JOIN games g ON g.id = p.game_id
-    WHERE p.user_id = ${userId} AND g.season = ${season} AND g.sport = 'nfl'
+    WHERE p.user_id = ${userId} AND g.season = ${season} AND g.sport = 'nfl' AND g.season_type = 'regular'
   `);
     const seasonRows = (seasonResult.rows ?? seasonResult);
     const seasonRow = seasonRows[0] ?? { wins: 0, losses: 0 };
@@ -125,7 +125,7 @@ async function getUserStats(userId, season, opts) {
       COALESCE(SUM(CASE WHEN p.is_correct = false THEN 1 ELSE 0 END), 0)::integer AS losses
     FROM picks p
     JOIN games g ON g.id = p.game_id
-    WHERE p.user_id = ${userId} AND g.season = ${season} AND g.sport = 'nfl'
+    WHERE p.user_id = ${userId} AND g.season = ${season} AND g.sport = 'nfl' AND g.season_type = 'regular'
     GROUP BY g.week
     ORDER BY g.week ASC
   `);
@@ -194,7 +194,7 @@ async function calcH2H(userId1, userId2, season, week) {
       SUM(CASE WHEN p1.is_correct = p2.is_correct                   THEN 1 ELSE 0 END)::integer AS ties
     FROM picks p1
     JOIN picks p2 ON p2.game_id = p1.game_id AND p2.user_id = ${userId2}
-    JOIN games g  ON g.id = p1.game_id AND g.season = ${season} AND g.sport = 'nfl'${weekFilter}
+    JOIN games g  ON g.id = p1.game_id AND g.season = ${season} AND g.sport = 'nfl' AND g.season_type = 'regular'${weekFilter}
     WHERE p1.user_id = ${userId1}
   `);
     const h2hRows = (result.rows ?? result);
@@ -210,7 +210,7 @@ async function getInsights(userId, season) {
       SUM(CASE WHEN p.is_correct = true THEN 1 ELSE 0 END)::integer AS correct
     FROM picks p
     JOIN games g ON g.id = p.game_id
-    WHERE p.user_id = ${userId} AND g.season = ${season} AND g.sport = 'nfl' AND g.status = 'post' AND p.is_correct IS NOT NULL
+    WHERE p.user_id = ${userId} AND g.season = ${season} AND g.sport = 'nfl' AND g.season_type = 'regular' AND g.status = 'post' AND p.is_correct IS NOT NULL
     GROUP BY team
     HAVING COUNT(*) >= 3
     ORDER BY (SUM(CASE WHEN p.is_correct = true THEN 1 ELSE 0 END)::float / COUNT(*)) DESC
