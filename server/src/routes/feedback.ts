@@ -1,19 +1,24 @@
 import { Router } from 'express';
-import nodemailer, { type TransportOptions } from 'nodemailer';
+import nodemailer from 'nodemailer';
+import { promises as dns } from 'dns';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  family: 4,
-  auth: {
-    user: process.env['SMTP_USER'],
-    pass: process.env['SMTP_PASS'],
-  },
-} as TransportOptions);
+async function sendMail(opts: nodemailer.SendMailOptions): Promise<void> {
+  const [ip] = await dns.resolve4('smtp.gmail.com');
+  const transporter = nodemailer.createTransport({
+    host: ip,
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env['SMTP_USER'],
+      pass: process.env['SMTP_PASS'],
+    },
+    tls: { servername: 'smtp.gmail.com' },
+  });
+  await transporter.sendMail(opts);
+}
 
 router.post('/', requireAuth, async (req, res) => {
   const { subject, message } = req.body as { subject?: string; message: string };
@@ -30,7 +35,7 @@ router.post('/', requireAuth, async (req, res) => {
     : '[TLG Feedback] New message';
 
   try {
-    await transporter.sendMail({
+    await sendMail({
       from: `"The Long Game" <${process.env['SMTP_USER']}>`,
       to: 'nickcorum@gmail.com',
       subject: emailSubject,

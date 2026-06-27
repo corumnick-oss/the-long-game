@@ -5,18 +5,23 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const dns_1 = require("dns");
 const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
-const transporter = nodemailer_1.default.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    family: 4,
-    auth: {
-        user: process.env['SMTP_USER'],
-        pass: process.env['SMTP_PASS'],
-    },
-});
+async function sendMail(opts) {
+    const [ip] = await dns_1.promises.resolve4('smtp.gmail.com');
+    const transporter = nodemailer_1.default.createTransport({
+        host: ip,
+        port: 587,
+        secure: false,
+        auth: {
+            user: process.env['SMTP_USER'],
+            pass: process.env['SMTP_PASS'],
+        },
+        tls: { servername: 'smtp.gmail.com' },
+    });
+    await transporter.sendMail(opts);
+}
 router.post('/', auth_1.requireAuth, async (req, res) => {
     const { subject, message } = req.body;
     if (!message?.trim()) {
@@ -29,7 +34,7 @@ router.post('/', auth_1.requireAuth, async (req, res) => {
         ? `[TLG Feedback] ${subject.trim()}`
         : '[TLG Feedback] New message';
     try {
-        await transporter.sendMail({
+        await sendMail({
             from: `"The Long Game" <${process.env['SMTP_USER']}>`,
             to: 'nickcorum@gmail.com',
             subject: emailSubject,
