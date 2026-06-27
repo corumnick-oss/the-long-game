@@ -40,7 +40,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 5. **Achievement display on public profiles** — Currently not shown on other users' profiles. Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered achievements.
 
 ### Next priority items (after the above):
-1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile → Activity panel. **This is the final gate before App Store + Google Play submission.**
+1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile. **This is the final gate before App Store + Google Play submission.** (Activity panel was removed — replaced by feedback modal.)
 2. **App logo** — Needed before App Store + Google Play submission. Nick to supply artwork. Must be added to app.json (icon field) and EAS build assets before submitting to stores.
 3. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
 4. **Achievement display redesign** — see details below
