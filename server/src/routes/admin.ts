@@ -413,6 +413,16 @@ router.delete('/notifications/schedule-test', async (req, res) => {
   res.json({ cancelled: true });
 });
 
+// ── Feedback ──────────────────────────────────────────────────────────────────
+
+router.get('/feedback', async (req, res) => {
+  const items = await db.query.activityLog.findMany({
+    where: eq(schema.activityLog.type, 'feedback'),
+    orderBy: [desc(schema.activityLog.createdAt)],
+  });
+  res.json(items);
+});
+
 // ── Export ────────────────────────────────────────────────────────────────────
 
 router.get('/export', async (req, res) => {

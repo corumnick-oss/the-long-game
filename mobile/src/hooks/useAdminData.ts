@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/queryClient';
 
@@ -229,6 +229,29 @@ export function useCancelScheduledTest() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: () => apiFetch('/api/admin/notifications/schedule-test', { method: 'DELETE' }, user),
+  });
+}
+
+export type FeedbackItem = {
+  id: string;
+  message: string;
+  targetUserId: string | null;
+  metadata: {
+    subject: string | null;
+    message: string;
+    userEmail: string;
+    teamName: string;
+  } | null;
+  createdAt: string;
+};
+
+export function useFeedbackList() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['admin', 'feedback', user?.uid ?? null],
+    queryFn: () => apiFetch<FeedbackItem[]>('/api/admin/feedback', undefined, user),
+    enabled: !!user,
+    staleTime: 30_000,
   });
 }
 

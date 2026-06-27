@@ -1,24 +1,12 @@
 import { Router } from 'express';
-import nodemailer from 'nodemailer';
-import { promises as dns } from 'dns';
+import { db } from '../db';
+import * as schema from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
+import { logActivity } from './activity';
+import { sendPushToUsers } from '../services/notificationService';
 
 const router = Router();
-
-async function sendMail(opts: nodemailer.SendMailOptions): Promise<void> {
-  const [ip] = await dns.resolve4('smtp.gmail.com');
-  const transporter = nodemailer.createTransport({
-    host: ip,
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env['SMTP_USER'],
-      pass: process.env['SMTP_PASS'],
-    },
-    tls: { servername: 'smtp.gmail.com' },
-  });
-  await transporter.sendMail(opts);
-}
 
 router.post('/', requireAuth, async (req, res) => {
   const { subject, message } = req.body as { subject?: string; message: string };
@@ -30,22 +18,34 @@ router.post('/', requireAuth, async (req, res) => {
 
   const user = req.currentUser!;
   const fromLabel = user.teamName ?? user.email ?? user.id;
-  const emailSubject = subject?.trim()
-    ? `[TLG Feedback] ${subject.trim()}`
-    : '[TLG Feedback] New message';
 
   try {
-    await sendMail({
-      from: `"The Long Game" <${process.env['SMTP_USER']}>`,
-      to: 'nickcorum@gmail.com',
-      subject: emailSubject,
-      text: `From: ${fromLabel} (${user.email})\n\n${message.trim()}`,
+    await logActivity('feedback', `Feedback from ${fromLabel}`, 'admin', {
+      targetUserId: user.id,
+      metadata: {
+        subject: subject?.trim() || null,
+        message: message.trim(),
+        userEmail: user.email,
+        teamName: user.teamName,
+      },
     });
+
+    const admins = await db.query.users.findMany({ where: eq(schema.users.isAdmin, true) });
+    const adminIds = admins.map(u => u.id);
+    if (adminIds.length > 0) {
+      const preview = message.trim().slice(0, 60);
+      await sendPushToUsers(
+        adminIds,
+        `Feedback from ${fromLabel}`,
+        subject?.trim() ? `${subject.trim()}: ${preview}` : preview,
+        { type: 'feedback' },
+      );
+    }
+
     res.json({ ok: true });
   } catch (err: any) {
-    const detail = err?.message ?? String(err);
-    console.error('[Feedback] Email send failed:', detail, '| SMTP_USER set:', !!process.env['SMTP_USER'], '| SMTP_PASS set:', !!process.env['SMTP_PASS']);
-    res.status(500).json({ error: `Email failed: ${detail}` });
+    console.error('[Feedback] Failed to save:', err?.message);
+    res.status(500).json({ error: 'Failed to submit feedback' });
   }
 });
 

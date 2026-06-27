@@ -432,6 +432,14 @@ router.delete('/notifications/schedule-test', async (req, res) => {
     }
     res.json({ cancelled: true });
 });
+// ── Feedback ──────────────────────────────────────────────────────────────────
+router.get('/feedback', async (req, res) => {
+    const items = await db_1.db.query.activityLog.findMany({
+        where: (0, drizzle_orm_1.eq)(schema.activityLog.type, 'feedback'),
+        orderBy: [(0, drizzle_orm_1.desc)(schema.activityLog.createdAt)],
+    });
+    res.json(items);
+});
 // ── Export ────────────────────────────────────────────────────────────────────
 router.get('/export', async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();

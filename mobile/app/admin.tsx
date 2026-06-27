@@ -13,11 +13,11 @@ import {
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
-  useSyncTeamStats, useBroadcastNotification,
+  useSyncTeamStats, useBroadcastNotification, useFeedbackList, type FeedbackItem,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
-type Tab = 'users' | 'tools' | 'data';
+type Tab = 'users' | 'tools' | 'data' | 'feedback';
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
@@ -732,12 +732,54 @@ function DataTab({ season }: { season: number }) {
   );
 }
 
+// ── Feedback Tab ──────────────────────────────────────────────────────────────
+
+function FeedbackTab() {
+  const { data: items = [], isLoading } = useFeedbackList();
+
+  if (isLoading) {
+    return <View className="flex-1 items-center justify-center"><ActivityIndicator color="#3b82f6" /></View>;
+  }
+
+  if (items.length === 0) {
+    return (
+      <View className="flex-1 items-center justify-center px-8">
+        <Text className="text-muted text-sm text-center">No feedback yet</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
+      {items.map((item: FeedbackItem) => (
+        <View key={item.id} className="bg-surface rounded-xl px-4 py-3 mb-3">
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-white font-semibold text-sm">{item.metadata?.teamName ?? 'Unknown'}</Text>
+            <Text className="text-muted text-xs">
+              {new Date(item.createdAt).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+              })}
+            </Text>
+          </View>
+          <Text className="text-muted text-xs mb-2">{item.metadata?.userEmail}</Text>
+          {item.metadata?.subject ? (
+            <Text className="text-primary text-sm font-semibold mb-1">{item.metadata.subject}</Text>
+          ) : null}
+          <Text className="text-white text-sm leading-5">{item.metadata?.message}</Text>
+        </View>
+      ))}
+      <View className="h-8" />
+    </ScrollView>
+  );
+}
+
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'users', label: 'Users' },
   { id: 'tools', label: 'NFL Tools' },
   { id: 'data', label: 'Data' },
+  { id: 'feedback', label: 'Feedback' },
 ];
 
 export default function AdminScreen() {
@@ -802,6 +844,7 @@ export default function AdminScreen() {
         {tab === 'users' && <UsersTab season={adminSeason} />}
         {tab === 'tools' && <ToolsTab season={adminSeason} />}
         {tab === 'data' && <DataTab season={adminSeason} />}
+        {tab === 'feedback' && <FeedbackTab />}
       </View>
     </View>
   );
