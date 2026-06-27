@@ -28,10 +28,14 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ Profile season selector bug fix — was using calendar year (2026), now uses getCurrentNFLSeason() (2025)
 ### ✅ Profile stats regular-season-only — week history, season record, H2H, and insights all filter to season_type = 'regular'; preseason picks no longer bleed into profile
 
+### ✅ Custom broadcast notification — Admin → NFL Tools → Broadcast Notification card (title, body, All Users / Gridirons Only toggle)
+### ✅ In-app feedback — Chat bubble icon in header (replaces activity bell). Stored in activity_log, push notification to admins, viewable in Admin → Feedback tab
+### ✅ OTA update UX — Dark overlay with spinner shown before reload (no more jarring screen jump)
+
 ### ⚠️ PENDING — Do these next session:
-1. **Run TheRidl3r UID reassignment** — from `server/`: `npm run reassign:user -- --old BQMdo8NUOgY8n0QxdUophLPMewp2 --email cloud7king10@yahoo.com`
-2. **Run Leo (dad) UID reassignment** — from `server/`: `npm run reassign:user -- --old uTosuZBxPucsOAnCnHmdA3pzBlb2 --email leocorum@gmail.com`
-3. **Award 2025 season trophies (podium)** — Kevin Akers = 1st, Nicholas = 2nd, TheRidl3r = 3rd. Last place: Gmac and Purdy Mouths tied at 165-107 — ask Nick which gets it (or both). Trophy system not yet built — design with Nick first.
+1. **Award 2025 season trophies (podium)** — Kevin Akers = 1st, Nicholas = 2nd, TheRidl3r = 3rd. Last place: Gmac and Purdy Mouths tied at 165-107 — ask Nick which gets it (or both). Trophy system not yet built — design with Nick first.
+2. **Feedback detail modal — needs full-screen treatment** — Currently slides up from the bottom (partial sheet). Nick wants it to fill the full screen so text is larger and more readable. Redesign as a full-screen modal, not a bottom sheet.
+3. **TestFlight push notifications for test users** — Two TestFlight users (not Nick) are not receiving push notifications. Most likely cause: they denied or dismissed the notification permission prompt. Fix: ask them to go to iPhone Settings → The Long Game → Notifications and enable. If already enabled, check Railway logs for their push token — may not be registered. See NotificationPrompt component.
 4. **Achievement images** — All 5 images needed from ChatGPT. None exist yet. Drop in `mobile/assets/achievements/`. See Achievement section below.
 5. **Achievement display on public profiles** — Currently not shown on other users' profiles. Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered achievements.
 
@@ -204,11 +208,11 @@ Firebase project: the-long-game-prod-bef05. Bundle ID: com.thelonggame.picks —
 | 2026 Team Name | Email | Is Admin | 2025 Name | Migration Status |
 |---|---|---|---|---|
 | Nicholas (Nick) | b2msbro@gmail.com | YES | Nicholas | ✅ done (seed:nick) |
-| TheRidl3r | cloud7king10@yahoo.com | no | Squid | ⚠️ signed up, reassignment PENDING |
-| Kevin Akers | kakers91@gmail.com | no | Kevin Akers | ❌ not yet signed up |
+| TheRidl3r | cloud7king10@yahoo.com | no | Squid | ✅ done (reassign:user) |
+| Kevin Akers | kakers91@gmail.com | no | Kevin Akers | ✅ done (reassign:user) |
 | The Purdy Mouths | jhayhurst714@gmail.com | no | The Purdy Mouths | ❌ not yet signed up |
 | Gmac | garciagarrett24@gmail.com | no | Gmac | ❌ not yet signed up |
-| leocorum (Leo/dad) | leocorum@gmail.com | no | Leo | ⚠️ signed up, reassignment PENDING |
+| leocorum (Leo/dad) | leocorum@gmail.com | no | Leo | ✅ done (reassign:user) |
 | EWIK | erikhernandez531@yahoo.com | no | EWIK | ❌ not yet signed up |
 
 DO NOT migrate: CBB Test (nicholas.corum@sce.com) or blank team name (nickcorum@gmail.com).
