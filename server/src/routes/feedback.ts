@@ -35,8 +35,9 @@ router.post('/', requireAuth, async (req, res) => {
     });
     res.json({ ok: true });
   } catch (err: any) {
-    console.error('[Feedback] Email send failed:', err);
-    res.status(500).json({ error: 'Failed to send feedback' });
+    const detail = err?.message ?? String(err);
+    console.error('[Feedback] Email send failed:', detail, '| SMTP_USER set:', !!process.env['SMTP_USER'], '| SMTP_PASS set:', !!process.env['SMTP_PASS']);
+    res.status(500).json({ error: `Email failed: ${detail}` });
   }
 });
 
