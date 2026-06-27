@@ -401,6 +401,29 @@ router.post('/notifications/schedule-test', async (req, res) => {
         res.status(500).json({ error: err?.message ?? 'Unknown error' });
     }
 });
+router.post('/notifications/broadcast', async (req, res) => {
+    const { title, body, gridirons_only } = req.body;
+    if (!title?.trim() || !body?.trim()) {
+        res.status(400).json({ error: 'title and body are required' });
+        return;
+    }
+    try {
+        if (gridirons_only) {
+            const gridirons = await db_1.db.query.users.findMany({ where: (0, drizzle_orm_1.eq)(schema.users.isGridiron, true) });
+            const ids = gridirons.map(u => u.id);
+            const tickets = await (0, notificationService_1.sendPushToUsers)(ids, title.trim(), body.trim(), { type: 'broadcast' });
+            res.json({ ok: true, sent: ids.length, tickets });
+        }
+        else {
+            await (0, notificationService_1.sendPushToAllUsers)(title.trim(), body.trim(), { type: 'broadcast' });
+            res.json({ ok: true });
+        }
+    }
+    catch (err) {
+        console.error('[Admin] broadcast error:', err);
+        res.status(500).json({ error: err?.message ?? 'Broadcast failed' });
+    }
+});
 router.delete('/notifications/schedule-test', async (req, res) => {
     if (scheduledTestTimeout) {
         clearTimeout(scheduledTestTimeout);

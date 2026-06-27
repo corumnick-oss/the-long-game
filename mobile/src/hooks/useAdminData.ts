@@ -232,6 +232,18 @@ export function useCancelScheduledTest() {
   });
 }
 
+export function useBroadcastNotification() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ title, body, gridirons_only }: { title: string; body: string; gridirons_only: boolean }) =>
+      apiFetch<{ ok: boolean; sent?: number }>(
+        '/api/admin/notifications/broadcast',
+        { method: 'POST', body: JSON.stringify({ title, body, gridirons_only }) },
+        user,
+      ),
+  });
+}
+
 export function useSyncFullSeason() {
   const { user } = useAuth();
   return useMutation({

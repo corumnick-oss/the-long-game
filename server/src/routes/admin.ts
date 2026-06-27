@@ -7,7 +7,7 @@ import { syncWeekGames, syncWeekScores, syncWinProbabilities, syncGamesByEventId
 import { awardWeeklyTrophies } from '../services/trophyService';
 import { getCurrentNFLSeason } from '../utils/season';
 import { logActivity } from './activity';
-import { sendPushToUsers } from '../services/notificationService';
+import { sendPushToUsers, sendPushToAllUsers } from '../services/notificationService';
 
 const router = Router();
 
@@ -377,6 +377,30 @@ router.post('/notifications/schedule-test', async (req, res) => {
   } catch (err: any) {
     console.error('[Admin] notifications/schedule-test error:', err);
     res.status(500).json({ error: err?.message ?? 'Unknown error' });
+  }
+});
+
+router.post('/notifications/broadcast', async (req, res) => {
+  const { title, body, gridirons_only } = req.body as { title: string; body: string; gridirons_only: boolean };
+
+  if (!title?.trim() || !body?.trim()) {
+    res.status(400).json({ error: 'title and body are required' });
+    return;
+  }
+
+  try {
+    if (gridirons_only) {
+      const gridirons = await db.query.users.findMany({ where: eq(schema.users.isGridiron, true) });
+      const ids = gridirons.map(u => u.id);
+      const tickets = await sendPushToUsers(ids, title.trim(), body.trim(), { type: 'broadcast' });
+      res.json({ ok: true, sent: ids.length, tickets });
+    } else {
+      await sendPushToAllUsers(title.trim(), body.trim(), { type: 'broadcast' });
+      res.json({ ok: true });
+    }
+  } catch (err: any) {
+    console.error('[Admin] broadcast error:', err);
+    res.status(500).json({ error: err?.message ?? 'Broadcast failed' });
   }
 });
 

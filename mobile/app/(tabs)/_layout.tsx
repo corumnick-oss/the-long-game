@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Tabs } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityPanel } from '@/components/ActivityPanel';
+import { FeedbackModal } from '@/components/FeedbackModal';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -16,19 +16,19 @@ function TabIcon({ name, focused }: { name: IoniconsName; focused: boolean }) {
   );
 }
 
-function BellButton({ onPress }: { onPress: () => void }) {
+function FeedbackButton({ onPress }: { onPress: () => void }) {
   return (
     <TouchableOpacity className="pr-4 pl-2 py-1" onPress={onPress}>
-      <Ionicons name="notifications-outline" size={24} color="#9ca3af" />
+      <Ionicons name="chatbubble-ellipses-outline" size={24} color="#9ca3af" />
     </TouchableOpacity>
   );
 }
 
 export default function TabLayout() {
-  const [activityOpen, setActivityOpen] = useState(false);
-  const openActivity = useCallback(() => setActivityOpen(true), []);
-  const closeActivity = useCallback(() => setActivityOpen(false), []);
-  const headerRight = useCallback(() => <BellButton onPress={openActivity} />, [openActivity]);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const openFeedback = useCallback(() => setFeedbackOpen(true), []);
+  const closeFeedback = useCallback(() => setFeedbackOpen(false), []);
+  const headerRight = useCallback(() => <FeedbackButton onPress={openFeedback} />, [openFeedback]);
 
   return (
     <>
@@ -77,7 +77,7 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-      <ActivityPanel visible={activityOpen} onClose={closeActivity} />
+      <FeedbackModal visible={feedbackOpen} onClose={closeFeedback} />
     </>
   );
 }

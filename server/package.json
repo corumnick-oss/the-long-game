@@ -17,7 +17,8 @@
     "sync:2026:preseason": "tsx --require dotenv/config src/scripts/sync-2026-local.ts --preseason",
     "backfill:stats": "tsx --require dotenv/config src/scripts/backfill-stats-local.ts",
     "migrate:unlocked-weeks": "tsx --require dotenv/config src/scripts/migrate-unlocked-weeks.ts",
-    "sync:winprobs": "tsx --require dotenv/config src/scripts/sync-winprobs-local.ts"
+    "sync:winprobs": "tsx --require dotenv/config src/scripts/sync-winprobs-local.ts",
+    "reassign:user": "tsx --require dotenv/config src/scripts/reassign-user.ts"
   },
   "keywords": [],
   "author": "",
@@ -36,6 +37,7 @@
     "express": "^5.2.1",
     "firebase-admin": "^13.8.0",
     "node-cron": "^4.2.1",
+    "nodemailer": "^9.0.1",
     "pg": "^8.20.0",
     "typescript": "^5.8.3",
     "zod": "^4.4.2"
@@ -45,6 +47,7 @@
     "@types/caseless": "^0.12.5",
     "@types/http-errors": "^2.0.5",
     "@types/ms": "^2.1.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/qs": "^6.15.1",
     "@types/range-parser": "^1.2.7",
     "@types/send": "^1.2.1",

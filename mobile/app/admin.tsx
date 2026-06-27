@@ -13,7 +13,7 @@ import {
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
-  useSyncTeamStats,
+  useSyncTeamStats, useBroadcastNotification,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
@@ -261,8 +261,12 @@ function ToolsTab({ season }: { season: number }) {
   const scheduleTest = useScheduleTestNotification();
   const cancelScheduled = useCancelScheduledTest();
   const tokenStatus = useTokenStatus();
+  const broadcast = useBroadcastNotification();
   const [scheduleMinutes, setScheduleMinutes] = useState<number>(5);
   const [scheduledFireAt, setScheduledFireAt] = useState<string | null>(null);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastGridironsOnly, setBroadcastGridironsOnly] = useState(false);
 
   const { data: games = [] } = useGames(week, season);
 
@@ -517,6 +521,92 @@ function ToolsTab({ season }: { season: number }) {
           </View>
           {results['notif_schedule'] ? (
             <Text className="text-xs mt-1.5 ml-1 text-muted">{results['notif_schedule']}</Text>
+          ) : null}
+        </View>
+
+        {/* Broadcast notification */}
+        <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Broadcast Notification</Text>
+
+        <View className="bg-surface rounded-xl px-4 py-3.5 mb-4">
+          <TextInput
+            placeholder="Title"
+            placeholderTextColor="#4b5563"
+            value={broadcastTitle}
+            onChangeText={setBroadcastTitle}
+            returnKeyType="next"
+            className="bg-surface-2 text-white rounded-lg px-3 mb-2"
+            style={{ height: 44 }}
+          />
+          <TextInput
+            placeholder="Message body"
+            placeholderTextColor="#4b5563"
+            value={broadcastBody}
+            onChangeText={setBroadcastBody}
+            multiline
+            className="bg-surface-2 text-white rounded-lg px-3"
+            style={{ height: 80, paddingTop: 10, textAlignVertical: 'top' }}
+          />
+
+          {/* Audience toggle */}
+          <View className="flex-row bg-surface-2 rounded-xl p-1 mt-3 mb-3">
+            {[false, true].map(gridiron => (
+              <TouchableOpacity
+                key={String(gridiron)}
+                onPress={() => setBroadcastGridironsOnly(gridiron)}
+                className={`flex-1 py-2 rounded-lg items-center ${broadcastGridironsOnly === gridiron ? 'bg-primary' : ''}`}
+                activeOpacity={0.7}
+              >
+                <Text className={`text-sm font-semibold ${broadcastGridironsOnly === gridiron ? 'text-white' : 'text-muted'}`}>
+                  {gridiron ? 'Gridirons Only' : 'All Users'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              if (!broadcastTitle.trim() || !broadcastBody.trim()) {
+                Alert.alert('Missing fields', 'Title and message are required.');
+                return;
+              }
+              const audience = broadcastGridironsOnly ? 'Gridirons only' : 'all users';
+              Alert.alert(
+                'Send Broadcast',
+                `Send to ${audience}?\n\n"${broadcastTitle.trim()}"\n${broadcastBody.trim()}`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Send',
+                    onPress: () =>
+                      broadcast.mutate(
+                        { title: broadcastTitle.trim(), body: broadcastBody.trim(), gridirons_only: broadcastGridironsOnly },
+                        {
+                          onSuccess: (r) => {
+                            setResult('broadcast', `✓ Sent${r.sent != null ? ` to ${r.sent} users` : ''}`);
+                            setBroadcastTitle('');
+                            setBroadcastBody('');
+                          },
+                          onError: (e: any) => setResult('broadcast', `✗ ${e?.message ?? 'Send failed'}`),
+                        },
+                      ),
+                  },
+                ],
+              );
+            }}
+            disabled={broadcast.isPending}
+            activeOpacity={0.7}
+            className={`bg-primary rounded-xl py-3 items-center ${broadcast.isPending ? 'opacity-60' : ''}`}
+          >
+            {broadcast.isPending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text className="text-white font-semibold">Send Broadcast</Text>
+            }
+          </TouchableOpacity>
+
+          {results['broadcast'] ? (
+            <Text className={`text-xs mt-2 ${results['broadcast'].startsWith('✓') ? 'text-success' : 'text-danger'}`}>
+              {results['broadcast']}
+            </Text>
           ) : null}
         </View>
 

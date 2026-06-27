@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/queryClient';
 import { getCurrentNFLSeason } from '../lib/nflSeason';
@@ -86,5 +86,17 @@ export function useMyAchievements(season?: number) {
       apiFetch<Achievement[]>(`/api/trophies?userId=${user!.uid}&season=${effectiveSeason}`, undefined, user),
     enabled: !!user,
     staleTime: 120_000,
+  });
+}
+
+export function useSendFeedback() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ subject, message }: { subject?: string; message: string }) =>
+      apiFetch<{ ok: boolean }>(
+        '/api/feedback',
+        { method: 'POST', body: JSON.stringify({ subject, message }) },
+        user,
+      ),
   });
 }
