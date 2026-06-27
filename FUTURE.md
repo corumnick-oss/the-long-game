@@ -71,15 +71,17 @@ Commissioner, buy-in tracking, pool leaderboards, pool game modes.
 - Leaderboard, tiebreaker, and trophy queries need a `poolId` filter option added
 - Current architecture is clean enough to add pools without a rebuild — it's an addition, not a rewrite
 
-### Admin: Custom Push Broadcast — Target: 2026 Season
-Allow admins to send a custom push notification to all users or a subset from Admin Dashboard.
+### In-App Support / Feedback Threading
+Currently users submit feedback via the chat bubble icon → stored in DB → Nick gets a push notification and reads it in Admin → Feedback tab. No reply mechanism exists.
 
-**Scope when building:**
-- New "Broadcast" section in Admin → NFL Tools tab (or its own tab)
-- Input: message title + body text
-- Target selector: All Users / Gridirons Only / specific user(s)
-- Sends via existing `notificationService.ts` / Expo Push API infrastructure
-- Log sent broadcasts to `activity_log` for audit trail
+**When to build:** Once the app grows beyond a small friend group and email follow-up becomes unmanageable.
+
+**Recommended approach:** Integrate a third-party support SDK rather than building from scratch:
+- **Intercom** — industry standard, has a React Native SDK, supports threaded conversations, read receipts, and admin web dashboard
+- **Crisp** — lighter weight, free tier, also has React Native support
+- Either replaces the current feedback modal with the SDK's native chat UI
+
+**Current workaround:** Nick's email is visible on every feedback submission in the Admin → Feedback tab — reply directly via email or text.
 
 ### Game Modes
 - **Probability Mode** — points scale with win probability
@@ -104,6 +106,13 @@ March Madness brackets, FIFA World Cup brackets, NCAA Top 25.
 **All Tabs** — haptic feedback (expo-haptics, OTA-safe), custom tab bar icon set, consistent activeOpacity
 
 All are OTA-safe changes. Do as a dedicated polish session after core launch.
+
+### Light Mode / Dark Mode Toggle (Optional Pre-Launch)
+App is currently dark mode only (Rule #2). A user requested light mode support. Technically possible with NativeWind v4's `dark:` class variants, but it's a large undertaking — every screen has hardcoded dark hex colors that would each need a light equivalent defined.
+
+**Scope:** ~1 full session. Every screen and component needs to be audited and updated. A theme context + AsyncStorage preference toggle also needed.
+
+**Decision:** Nice-to-have before launch, not required. Revisit if time permits after core launch gates are cleared.
 
 ---
 
