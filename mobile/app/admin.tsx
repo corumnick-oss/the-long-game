@@ -734,6 +734,38 @@ function DataTab({ season }: { season: number }) {
 
 // ── Feedback Tab ──────────────────────────────────────────────────────────────
 
+function FeedbackCard({ item }: { item: FeedbackItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const message = item.metadata?.message ?? '';
+
+  return (
+    <TouchableOpacity
+      onPress={() => setExpanded(e => !e)}
+      activeOpacity={0.8}
+      className="bg-surface rounded-xl px-4 py-3 mb-3"
+    >
+      <View className="flex-row items-center justify-between mb-1">
+        <Text className="text-white font-semibold text-sm">{item.metadata?.teamName ?? 'Unknown'}</Text>
+        <Text className="text-muted text-xs">
+          {new Date(item.createdAt).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+          })}
+        </Text>
+      </View>
+      <Text className="text-muted text-xs mb-2">{item.metadata?.userEmail}</Text>
+      {item.metadata?.subject ? (
+        <Text className="text-primary text-sm font-semibold mb-1">{item.metadata.subject}</Text>
+      ) : null}
+      <Text className="text-white text-sm leading-5" numberOfLines={expanded ? undefined : 3}>
+        {message}
+      </Text>
+      {message.length > 120 ? (
+        <Text className="text-primary text-xs mt-1.5">{expanded ? 'Show less' : 'Read more'}</Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
 function FeedbackTab() {
   const { data: items = [], isLoading } = useFeedbackList();
 
@@ -751,23 +783,7 @@ function FeedbackTab() {
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
-      {items.map((item: FeedbackItem) => (
-        <View key={item.id} className="bg-surface rounded-xl px-4 py-3 mb-3">
-          <View className="flex-row items-center justify-between mb-1">
-            <Text className="text-white font-semibold text-sm">{item.metadata?.teamName ?? 'Unknown'}</Text>
-            <Text className="text-muted text-xs">
-              {new Date(item.createdAt).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-              })}
-            </Text>
-          </View>
-          <Text className="text-muted text-xs mb-2">{item.metadata?.userEmail}</Text>
-          {item.metadata?.subject ? (
-            <Text className="text-primary text-sm font-semibold mb-1">{item.metadata.subject}</Text>
-          ) : null}
-          <Text className="text-white text-sm leading-5">{item.metadata?.message}</Text>
-        </View>
-      ))}
+      {items.map((item: FeedbackItem) => <FeedbackCard key={item.id} item={item} />)}
       <View className="h-8" />
     </ScrollView>
   );
