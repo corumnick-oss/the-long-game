@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Switch, Alert, TextInput, KeyboardAvoidingView, Platform,
+  Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useGames } from '@/hooks/usePicksData';
@@ -734,40 +735,45 @@ function DataTab({ season }: { season: number }) {
 
 // ── Feedback Tab ──────────────────────────────────────────────────────────────
 
-function FeedbackCard({ item }: { item: FeedbackItem }) {
-  const [expanded, setExpanded] = useState(false);
-  const message = item.metadata?.message ?? '';
-
+function FeedbackDetailModal({ item, onClose }: { item: FeedbackItem | null; onClose: () => void }) {
+  if (!item) return null;
   return (
-    <TouchableOpacity
-      onPress={() => setExpanded(e => !e)}
-      activeOpacity={0.8}
-      className="bg-surface rounded-xl px-4 py-3 mb-3"
-    >
-      <View className="flex-row items-center justify-between mb-1">
-        <Text className="text-white font-semibold text-sm">{item.metadata?.teamName ?? 'Unknown'}</Text>
-        <Text className="text-muted text-xs">
-          {new Date(item.createdAt).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-          })}
-        </Text>
+    <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '80%' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>{item.metadata?.teamName ?? 'Unknown'}</Text>
+              <Text style={{ color: '#6b7280', fontSize: 13, marginTop: 2 }}>{item.metadata?.userEmail}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ color: '#6b7280', fontSize: 12, marginBottom: 12 }}>
+            {new Date(item.createdAt).toLocaleDateString('en-US', {
+              weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+            })}
+          </Text>
+          {item.metadata?.subject ? (
+            <Text style={{ color: '#3b82f6', fontSize: 15, fontWeight: '600', marginBottom: 10 }}>
+              {item.metadata.subject}
+            </Text>
+          ) : null}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={{ color: '#fff', fontSize: 16, lineHeight: 24 }}>{item.metadata?.message}</Text>
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        </View>
       </View>
-      <Text className="text-muted text-xs mb-2">{item.metadata?.userEmail}</Text>
-      {item.metadata?.subject ? (
-        <Text className="text-primary text-sm font-semibold mb-1">{item.metadata.subject}</Text>
-      ) : null}
-      <Text className="text-white text-sm leading-5" numberOfLines={expanded ? undefined : 3}>
-        {message}
-      </Text>
-      {message.length > 120 ? (
-        <Text className="text-primary text-xs mt-1.5">{expanded ? 'Show less' : 'Read more'}</Text>
-      ) : null}
-    </TouchableOpacity>
+    </Modal>
   );
 }
 
 function FeedbackTab() {
   const { data: items = [], isLoading } = useFeedbackList();
+  const [selected, setSelected] = useState<FeedbackItem | null>(null);
 
   if (isLoading) {
     return <View className="flex-1 items-center justify-center"><ActivityIndicator color="#3b82f6" /></View>;
@@ -782,10 +788,34 @@ function FeedbackTab() {
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
-      {items.map((item: FeedbackItem) => <FeedbackCard key={item.id} item={item} />)}
-      <View className="h-8" />
-    </ScrollView>
+    <>
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4">
+        {items.map((item: FeedbackItem) => (
+          <TouchableOpacity
+            key={item.id}
+            onPress={() => setSelected(item)}
+            activeOpacity={0.7}
+            className="bg-surface rounded-xl px-4 py-3 mb-3"
+          >
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-white font-semibold">{item.metadata?.teamName ?? 'Unknown'}</Text>
+              <Text className="text-muted text-xs">
+                {new Date(item.createdAt).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric',
+                })}
+              </Text>
+            </View>
+            {item.metadata?.subject ? (
+              <Text className="text-primary text-sm font-semibold mb-1">{item.metadata.subject}</Text>
+            ) : null}
+            <Text className="text-muted text-sm" numberOfLines={2}>{item.metadata?.message}</Text>
+            <Text className="text-primary text-xs mt-1.5">Tap to read →</Text>
+          </TouchableOpacity>
+        ))}
+        <View className="h-8" />
+      </ScrollView>
+      <FeedbackDetailModal item={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }
 
