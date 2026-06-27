@@ -33,9 +33,9 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ OTA update UX — Dark overlay with spinner shown before reload (no more jarring screen jump)
 
 ### ⚠️ PENDING — Do these next session:
-1. **Award 2025 season trophies (podium)** — Kevin Akers = 1st, Nicholas = 2nd, TheRidl3r = 3rd. Last place: Gmac and Purdy Mouths tied at 165-107 — ask Nick which gets it (or both). Trophy system not yet built — design with Nick first.
-2. **Feedback detail modal — needs full-screen treatment** — Currently slides up from the bottom (partial sheet). Nick wants it to fill the full screen so text is larger and more readable. Redesign as a full-screen modal, not a bottom sheet.
-3. **TestFlight push notifications for test users** — Two TestFlight users (not Nick) are not receiving push notifications. Most likely cause: they denied or dismissed the notification permission prompt. Fix: ask them to go to iPhone Settings → The Long Game → Notifications and enable. If already enabled, check Railway logs for their push token — may not be registered. See NotificationPrompt component.
+1. **🔴 FIRST TOPIC: TestFlight push notifications broken for test users** — Users have The Long Game in iOS Settings but NO Notifications entry appears there, meaning iOS never registered the app for push. Nick's friend is trying a reinstall from TestFlight — check if that fixed it at session start. If not, dig into why `NotificationPrompt` isn't triggering the iOS permission request. Likely culprit: the prompt fired but the `requestPermissionsAsync()` call failed silently, so iOS never showed the system dialog and never added the app to Notification settings. Nick's own install works because he didn't go through TestFlight.
+2. **Award 2025 season trophies (podium)** — Kevin Akers = 1st, Nicholas = 2nd, TheRidl3r = 3rd. Last place: Gmac and Purdy Mouths tied at 165-107 — ask Nick which gets it (or both). Trophy system not yet built — design with Nick first.
+3. **Feedback detail modal — needs full-screen treatment** — Currently slides up from the bottom (partial sheet). Nick wants it to fill the full screen so text is larger and more readable. Redesign as a full-screen modal, not a bottom sheet.
 4. **Achievement images** — All 5 images needed from ChatGPT. None exist yet. Drop in `mobile/assets/achievements/`. See Achievement section below.
 5. **Achievement display on public profiles** — Currently not shown on other users' profiles. Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered achievements.
 
