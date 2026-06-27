@@ -1,16 +1,19 @@
 import { Router } from 'express';
-import nodemailer from 'nodemailer';
+import nodemailer, { type TransportOptions } from 'nodemailer';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  family: 4,
   auth: {
     user: process.env['SMTP_USER'],
     pass: process.env['SMTP_PASS'],
   },
-});
+} as TransportOptions);
 
 router.post('/', requireAuth, async (req, res) => {
   const { subject, message } = req.body as { subject?: string; message: string };
