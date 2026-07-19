@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlockedWeeks = exports.pickAuditLog = exports.appSettings = exports.weekSettings = exports.tiebreakerPicks = exports.tiebreakerGames = exports.pushTokens = exports.activityLog = exports.playerStats = exports.teamGameStats = exports.trophies = exports.picks = exports.games = exports.users = void 0;
+exports.unlockedWeeks = exports.pickAuditLog = exports.appSettings = exports.weekSettings = exports.tiebreakerPicks = exports.tiebreakerGames = exports.pushTokens = exports.activityLog = exports.playerStats = exports.teamGameStats = exports.seasonTrophies = exports.trophies = exports.picks = exports.games = exports.users = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 exports.users = (0, pg_core_1.pgTable)('users', {
     id: (0, pg_core_1.text)('id').primaryKey(),
@@ -67,6 +67,16 @@ exports.trophies = (0, pg_core_1.pgTable)('trophies', {
     sport: (0, pg_core_1.text)('sport').notNull().default('nfl'),
     gameId: (0, pg_core_1.uuid)('game_id').references(() => exports.games.id),
     earnedAt: (0, pg_core_1.timestamp)('earned_at').notNull().defaultNow(),
+});
+exports.seasonTrophies = (0, pg_core_1.pgTable)('season_trophies', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    userId: (0, pg_core_1.text)('user_id').notNull().references(() => exports.users.id),
+    season: (0, pg_core_1.integer)('season').notNull(),
+    sport: (0, pg_core_1.text)('sport').notNull().default('nfl'),
+    placement: (0, pg_core_1.text)('placement').notNull(), // 'champion' | 'runner_up' | 'third_place' | 'last_place'
+    wins: (0, pg_core_1.integer)('wins').notNull(),
+    losses: (0, pg_core_1.integer)('losses').notNull(),
+    awardedAt: (0, pg_core_1.timestamp)('awarded_at').notNull().defaultNow(),
 });
 exports.teamGameStats = (0, pg_core_1.pgTable)('team_game_stats', {
     id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),

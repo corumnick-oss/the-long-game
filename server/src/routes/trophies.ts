@@ -25,4 +25,17 @@ router.get('/', optionalAuth, async (req, res) => {
   res.json(result);
 });
 
+// GET /api/trophies/season?userId=X — all-time season podium trophies for a user
+router.get('/season', optionalAuth, async (req, res) => {
+  const userId = req.query['userId'] as string | undefined;
+  if (!userId) { res.status(400).json({ error: 'userId required' }); return; }
+
+  const result = await db.query.seasonTrophies.findMany({
+    where: and(eq(schema.seasonTrophies.userId, userId), eq(schema.seasonTrophies.sport, 'nfl')),
+    orderBy: [desc(schema.seasonTrophies.season)],
+  });
+
+  res.json(result);
+});
+
 export default router;

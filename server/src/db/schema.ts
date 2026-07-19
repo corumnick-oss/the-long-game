@@ -79,6 +79,17 @@ export const trophies = pgTable('trophies', {
   earnedAt: timestamp('earned_at').notNull().defaultNow(),
 });
 
+export const seasonTrophies = pgTable('season_trophies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull().references(() => users.id),
+  season: integer('season').notNull(),
+  sport: text('sport').notNull().default('nfl'),
+  placement: text('placement').notNull(), // 'champion' | 'runner_up' | 'third_place' | 'last_place'
+  wins: integer('wins').notNull(),
+  losses: integer('losses').notNull(),
+  awardedAt: timestamp('awarded_at').notNull().defaultNow(),
+});
+
 export const teamGameStats = pgTable('team_game_stats', {
   id: uuid('id').primaryKey().defaultRandom(),
   gameId: uuid('game_id').notNull().references(() => games.id),

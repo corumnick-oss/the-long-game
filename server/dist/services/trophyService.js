@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.calculateWeeklyTrophies = calculateWeeklyTrophies;
 exports.awardWeeklyTrophies = awardWeeklyTrophies;
+exports.calculateSeasonStandings = calculateSeasonStandings;
+exports.awardSeasonTrophies = awardSeasonTrophies;
 const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
@@ -211,6 +213,70 @@ async function awardWeeklyTrophies(week, season, specificType) {
         }
     }
     console.log(`Awarded ${awarded} trophies for Week ${week}`);
+    return awarded;
+}
+// Gridirons-only, regular season standings — same ranking rule as the leaderboard (wins desc, losses asc).
+async function calculateSeasonStandings(season) {
+    const result = await db_1.db.execute((0, drizzle_orm_1.sql) `
+    SELECT
+      u.id AS user_id,
+      u.team_name,
+      COALESCE(CAST(COUNT(CASE WHEN p.is_correct = true  THEN 1 END) AS INTEGER), 0) AS wins,
+      COALESCE(CAST(COUNT(CASE WHEN p.is_correct = false THEN 1 END) AS INTEGER), 0) AS losses
+    FROM users u
+    LEFT JOIN games g ON g.season = ${season} AND g.sport = 'nfl' AND g.season_type = 'regular'
+    LEFT JOIN picks p ON p.user_id = u.id AND p.game_id = g.id
+    WHERE u.is_gridiron = true
+    GROUP BY u.id, u.team_name
+    HAVING COUNT(p.id) > 0
+    ORDER BY wins DESC, losses ASC
+  `);
+    const rows = result.rows ?? result;
+    return rows.map((row, idx) => ({
+        userId: row.user_id,
+        teamName: row.team_name,
+        wins: Number(row.wins),
+        losses: Number(row.losses),
+        rank: idx + 1,
+    }));
+}
+async function awardSeasonTrophies(season) {
+    const standings = await calculateSeasonStandings(season);
+    if (standings.length === 0)
+        return [];
+    const lastRank = standings[standings.length - 1].rank;
+    const toAward = [];
+    for (const entry of standings) {
+        let placement = null;
+        if (entry.rank === 1)
+            placement = 'champion';
+        else if (entry.rank === 2)
+            placement = 'runner_up';
+        else if (entry.rank === 3)
+            placement = 'third_place';
+        else if (entry.rank === lastRank && lastRank > 3)
+            placement = 'last_place';
+        if (placement) {
+            toAward.push({ userId: entry.userId, teamName: entry.teamName, placement, wins: entry.wins, losses: entry.losses });
+        }
+    }
+    const awarded = [];
+    for (const trophy of toAward) {
+        const existing = await db_1.db.query.seasonTrophies.findFirst({
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.seasonTrophies.userId, trophy.userId), (0, drizzle_orm_1.eq)(schema.seasonTrophies.season, season), (0, drizzle_orm_1.eq)(schema.seasonTrophies.placement, trophy.placement)),
+        });
+        if (!existing) {
+            await db_1.db.insert(schema.seasonTrophies).values({
+                userId: trophy.userId,
+                season,
+                sport: 'nfl',
+                placement: trophy.placement,
+                wins: trophy.wins,
+                losses: trophy.losses,
+            });
+            awarded.push(trophy);
+        }
+    }
     return awarded;
 }
 //# sourceMappingURL=trophyService.js.map

@@ -4,7 +4,7 @@ import * as schema from '../db/schema';
 import { sql, eq, and, desc, asc } from 'drizzle-orm';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { syncWeekGames, syncWeekScores, syncWinProbabilities, syncGamesByEventIds, backfillTeamStats } from '../services/espnService';
-import { awardWeeklyTrophies } from '../services/trophyService';
+import { awardWeeklyTrophies, calculateSeasonStandings, awardSeasonTrophies } from '../services/trophyService';
 import { getCurrentNFLSeason } from '../utils/season';
 import { logActivity } from './activity';
 import { sendPushToUsers, sendPushToAllUsers } from '../services/notificationService';
@@ -179,6 +179,19 @@ router.post('/trophies/award', async (req, res) => {
   const awarded = await awardWeeklyTrophies(week, season, type);
   await logActivity('trophies_awarded', `Trophies awarded for Week ${week}`, 'global', { metadata: { week, season, awarded } });
   res.json({ awarded, week, season });
+});
+
+router.get('/season-standings', async (req, res) => {
+  const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
+  const standings = await calculateSeasonStandings(season);
+  res.json({ season, standings });
+});
+
+router.post('/trophies/award-season', async (req, res) => {
+  const season = req.body.season ?? getCurrentNFLSeason();
+  const awarded = await awardSeasonTrophies(season);
+  await logActivity('season_trophies_awarded', `Season trophies awarded for ${season}`, 'global', { metadata: { season, awarded } });
+  res.json({ awarded, season });
 });
 
 // ── Picks (admin read + edit) ─────────────────────────────────────────────────

@@ -56,5 +56,18 @@ router.get('/', auth_1.optionalAuth, async (req, res) => {
     });
     res.json(result);
 });
+// GET /api/trophies/season?userId=X — all-time season podium trophies for a user
+router.get('/season', auth_1.optionalAuth, async (req, res) => {
+    const userId = req.query['userId'];
+    if (!userId) {
+        res.status(400).json({ error: 'userId required' });
+        return;
+    }
+    const result = await db_1.db.query.seasonTrophies.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.seasonTrophies.userId, userId), (0, drizzle_orm_1.eq)(schema.seasonTrophies.sport, 'nfl')),
+        orderBy: [(0, drizzle_orm_1.desc)(schema.seasonTrophies.season)],
+    });
+    res.json(result);
+});
 exports.default = router;
 //# sourceMappingURL=trophies.js.map

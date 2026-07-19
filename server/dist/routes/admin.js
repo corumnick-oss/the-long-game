@@ -216,6 +216,17 @@ router.post('/trophies/award', async (req, res) => {
     await (0, activity_1.logActivity)('trophies_awarded', `Trophies awarded for Week ${week}`, 'global', { metadata: { week, season, awarded } });
     res.json({ awarded, week, season });
 });
+router.get('/season-standings', async (req, res) => {
+    const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
+    const standings = await (0, trophyService_1.calculateSeasonStandings)(season);
+    res.json({ season, standings });
+});
+router.post('/trophies/award-season', async (req, res) => {
+    const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
+    const awarded = await (0, trophyService_1.awardSeasonTrophies)(season);
+    await (0, activity_1.logActivity)('season_trophies_awarded', `Season trophies awarded for ${season}`, 'global', { metadata: { season, awarded } });
+    res.json({ awarded, season });
+});
 // ── Picks (admin read + edit) ─────────────────────────────────────────────────
 router.get('/picks', async (req, res) => {
     const userId = req.query['userId'];

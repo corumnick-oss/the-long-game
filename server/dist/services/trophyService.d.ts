@@ -27,3 +27,19 @@ export interface WeeklyTrophyResults {
 }
 export declare function calculateWeeklyTrophies(week: number, season: number): Promise<WeeklyTrophyResults>;
 export declare function awardWeeklyTrophies(week: number, season: number, specificType?: string): Promise<number>;
+export interface SeasonStandingEntry {
+    userId: string;
+    teamName: string;
+    wins: number;
+    losses: number;
+    rank: number;
+}
+export declare function calculateSeasonStandings(season: number): Promise<SeasonStandingEntry[]>;
+export interface SeasonTrophyAward {
+    userId: string;
+    teamName: string;
+    placement: string;
+    wins: number;
+    losses: number;
+}
+export declare function awardSeasonTrophies(season: number): Promise<SeasonTrophyAward[]>;
