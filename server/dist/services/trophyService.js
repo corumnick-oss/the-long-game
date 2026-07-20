@@ -244,7 +244,9 @@ async function awardSeasonTrophies(season) {
     const standings = await calculateSeasonStandings(season);
     if (standings.length === 0)
         return [];
-    const lastRank = standings[standings.length - 1].rank;
+    // Last place: everyone tied with the bottom record (wins/losses), not just whichever
+    // row happened to land in the final sequential rank slot.
+    const last = standings[standings.length - 1];
     const toAward = [];
     for (const entry of standings) {
         let placement = null;
@@ -254,7 +256,7 @@ async function awardSeasonTrophies(season) {
             placement = 'runner_up';
         else if (entry.rank === 3)
             placement = 'third_place';
-        else if (entry.rank === lastRank && lastRank > 3)
+        else if (entry.rank > 3 && entry.wins === last.wins && entry.losses === last.losses)
             placement = 'last_place';
         if (placement) {
             toAward.push({ userId: entry.userId, teamName: entry.teamName, placement, wins: entry.wins, losses: entry.losses });
