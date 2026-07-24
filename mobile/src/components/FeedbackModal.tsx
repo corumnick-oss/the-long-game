@@ -10,7 +10,7 @@ export function FeedbackModal({ visible, onClose }: { visible: boolean; onClose:
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
-  const { mutate: sendFeedback, isPending, isError, reset } = useSendFeedback();
+  const { mutate: sendFeedback, isPending, isError, error, reset } = useSendFeedback();
 
   const resetForm = () => {
     setSubject('');
@@ -99,7 +99,7 @@ export function FeedbackModal({ visible, onClose }: { visible: boolean; onClose:
                 />
                 {isError ? (
                   <Text style={{ color: '#ef4444', fontSize: 12, marginBottom: 10 }}>
-                    Failed to send. Check your connection and try again.
+                    {(error as any)?.message || 'Failed to send. Check your connection and try again.'}
                   </Text>
                 ) : null}
                 <TouchableOpacity

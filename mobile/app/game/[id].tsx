@@ -6,6 +6,8 @@ import { getCurrentNFLSeason } from '@/lib/nflSeason';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+const nickname = (fullName: string) => fullName.split(' ').pop() ?? fullName;
+
 function formatRatio(raw: string | null | undefined): string {
   if (!raw) return '—';
   return raw.replace('-', '/');
@@ -169,7 +171,7 @@ export default function GameDetailScreen() {
         </TouchableOpacity>
         <View className="flex-1 items-center">
           <Text className="text-white font-bold text-sm" numberOfLines={1}>
-            {game.awayTeam} @ {game.homeTeam}
+            {nickname(game.awayTeam)} @ {nickname(game.homeTeam)}
           </Text>
           <Text className="text-muted text-xs">
             {isFinal ? 'Final' : isLive ? `Q${game.period ?? ''} · ${game.displayClock ?? ''}` : formatDate(game.gameTime)}
@@ -260,7 +262,7 @@ export default function GameDetailScreen() {
                 )}
               </View>
             ) : (
-              <Text className="text-muted text-base font-bold">vs</Text>
+              <Text className="text-muted text-base font-bold">@</Text>
             )}
           </View>
 

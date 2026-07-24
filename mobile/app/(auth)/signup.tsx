@@ -53,7 +53,8 @@ export default function SignupScreen() {
           flexGrow: 1,
           justifyContent: 'center',
           paddingHorizontal: 24,
-          paddingVertical: 48,
+          paddingTop: 72,
+          paddingBottom: 48,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

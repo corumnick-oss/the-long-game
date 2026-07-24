@@ -187,6 +187,27 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
   const canPick = !isLocked && game.isPicksOpen && (isPre || isLive);
 
   const hasPick = game.myPick !== null;
+
+  // Soft lock: once a pick exists, team rows stop responding to taps until
+  // the user explicitly taps "Edit Pick" — prevents accidental changes while scrolling.
+  const [unlockedForEdit, setUnlockedForEdit] = React.useState(false);
+  const [justSaved, setJustSaved] = React.useState(false);
+  const savedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => {
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+  }, []);
+
+  const showEditPickLink = hasPick && canPick && !unlockedForEdit && !justSaved;
+  const rowsDisabled = !canPick || (hasPick && !unlockedForEdit);
+
+  const handlePick = (pick: 'home' | 'away') => {
+    onPick(pick);
+    setUnlockedForEdit(false);
+    setJustSaved(true);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setJustSaved(false), 1200);
+  };
+
   const pickedOutcome = homePickOutcome ?? awayPickOutcome;
   const borderColor = !hasPick
     ? '#2a2a2a'
@@ -215,6 +236,22 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
         </View>
       )}
 
+      {/* Edit Pick control — top right, above away team row */}
+      {(showEditPickLink || unlockedForEdit || justSaved) && (
+        <View className="flex-row justify-end px-3 pt-2.5 pb-2">
+          <TouchableOpacity
+            onPress={() => setUnlockedForEdit(true)}
+            disabled={unlockedForEdit || justSaved}
+            activeOpacity={0.7}
+            className={`rounded-full px-3 py-1.5 border ${justSaved ? 'bg-success/20 border-success' : 'bg-primary/20 border-white'}`}
+          >
+            <Text className={`text-sm font-bold ${justSaved ? 'text-success' : 'text-white'}`}>
+              {justSaved ? '✓ Pick saved' : unlockedForEdit ? 'Tap a team to change' : '✎ Edit Pick'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Away team (top) */}
       <TeamRow
         team={game.awayTeam}
@@ -233,9 +270,9 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
         showPct={showPct}
         pickOutcome={awayPickOutcome}
         otherTeamPicked={homePicked}
-        onPress={() => onPick('away')}
+        onPress={() => handlePick('away')}
         onTeamPress={onTeamPress ? () => onTeamPress(game.awayTeam) : undefined}
-        disabled={!canPick}
+        disabled={rowsDisabled}
       />
 
       {/* Divider with game info */}
@@ -269,9 +306,9 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
         showPct={showPct}
         pickOutcome={homePickOutcome}
         otherTeamPicked={awayPicked}
-        onPress={() => onPick('home')}
+        onPress={() => handlePick('home')}
         onTeamPress={onTeamPress ? () => onTeamPress(game.homeTeam) : undefined}
-        disabled={!canPick}
+        disabled={rowsDisabled}
       />
 
       {/* Locked message if no pick yet — only for weeks that were open */}
