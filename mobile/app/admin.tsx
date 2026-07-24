@@ -15,6 +15,7 @@ import {
   useCorrectScore, useExportWeekPicks, useExportData,
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
   useSyncTeamStats, useBroadcastNotification, useFeedbackList, type FeedbackItem,
+  useSeasonStandingsPreview, useAwardSeasonTrophies,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
@@ -257,6 +258,8 @@ function ToolsTab({ season }: { season: number }) {
   const activeFullSync = isFutureSeason ? syncFullSeasonFuture : syncFullSeason;
   const syncTeamStats = useSyncTeamStats();
   const awardTrophies = useAwardTrophies();
+  const standingsPreview = useSeasonStandingsPreview();
+  const awardSeasonTrophies = useAwardSeasonTrophies();
   const unlockWeek = useUnlockWeek();
   const sendTest = useSendTestNotification();
   const scheduleTest = useScheduleTestNotification();
@@ -412,6 +415,46 @@ function ToolsTab({ season }: { season: number }) {
               },
             ])
           }
+        />
+        <ActionBtn
+          label={`Award ${season} Season Trophies`}
+          loading={standingsPreview.isPending || awardSeasonTrophies.isPending}
+          result={results['season_trophies']}
+          onPress={async () => {
+            try {
+              const { standings } = await standingsPreview.mutateAsync(season);
+              if (standings.length === 0) {
+                Alert.alert('No Standings', `No completed picks found for the ${season} regular season.`);
+                return;
+              }
+              const last = standings[standings.length - 1]!;
+              const placementLines = standings
+                .filter(s => s.rank <= 3 || (s.rank > 3 && s.wins === last.wins && s.losses === last.losses))
+                .map(s => {
+                  const label = s.rank === 1 ? '🥇 Champion' : s.rank === 2 ? '🥈 Runner-up' : s.rank === 3 ? '🥉 Third Place' : '🥄 Last Place';
+                  return `${label}: ${s.teamName} (${s.wins}-${s.losses})`;
+                })
+                .join('\n');
+
+              Alert.alert(
+                `Award ${season} Season Trophies`,
+                `${placementLines}\n\nAlready-awarded placements are skipped.`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Award',
+                    onPress: () =>
+                      awardSeasonTrophies.mutate(season, {
+                        onSuccess: (r) => setResult('season_trophies', `✓ Awarded ${r.awarded.length} season trophies for ${season}`),
+                        onError: () => setResult('season_trophies', '✗ Failed'),
+                      }),
+                  },
+                ],
+              );
+            } catch (e: any) {
+              setResult('season_trophies', `✗ ${e?.message ?? 'Failed to load standings'}`);
+            }
+          }}
         />
         <ActionBtn
           label="Unlock Week"
@@ -738,34 +781,33 @@ function DataTab({ season }: { season: number }) {
 function FeedbackDetailModal({ item, onClose }: { item: FeedbackItem | null; onClose: () => void }) {
   if (!item) return null;
   return (
-    <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '80%' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>{item.metadata?.teamName ?? 'Unknown'}</Text>
-              <Text style={{ color: '#6b7280', fontSize: 13, marginTop: 2 }}>{item.metadata?.userEmail}</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} hitSlop={8}>
-              <Ionicons name="close" size={24} color="#6b7280" />
-            </TouchableOpacity>
+    <Modal visible={!!item} animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 bg-background">
+        {/* Header */}
+        <View className="flex-row items-center px-4 pt-14 pb-4 border-b border-border">
+          <TouchableOpacity onPress={onClose} className="mr-3 py-1">
+            <Text className="text-primary text-base font-semibold">‹ Back</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text className="text-white text-base font-bold" numberOfLines={1}>
+              {item.metadata?.teamName ?? 'Unknown'}
+            </Text>
+            <Text className="text-muted text-xs mt-0.5" numberOfLines={1}>{item.metadata?.userEmail}</Text>
           </View>
-          <Text style={{ color: '#6b7280', fontSize: 12, marginBottom: 12 }}>
+        </View>
+
+        <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
+          <Text className="text-muted text-xs mt-5 mb-3">
             {new Date(item.createdAt).toLocaleDateString('en-US', {
-              weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+              weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
             })}
           </Text>
           {item.metadata?.subject ? (
-            <Text style={{ color: '#3b82f6', fontSize: 15, fontWeight: '600', marginBottom: 10 }}>
-              {item.metadata.subject}
-            </Text>
+            <Text className="text-primary text-lg font-bold mb-4">{item.metadata.subject}</Text>
           ) : null}
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={{ color: '#fff', fontSize: 16, lineHeight: 24 }}>{item.metadata?.message}</Text>
-            <View style={{ height: 24 }} />
-          </ScrollView>
-        </View>
+          <Text style={{ color: '#fff', fontSize: 18, lineHeight: 28 }}>{item.metadata?.message}</Text>
+          <View className="h-12" />
+        </ScrollView>
       </View>
     </Modal>
   );

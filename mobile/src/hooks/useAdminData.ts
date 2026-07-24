@@ -156,6 +156,33 @@ export function useAwardTrophies() {
   });
 }
 
+export type SeasonStandingEntry = { userId: string; teamName: string; wins: number; losses: number; rank: number };
+export type SeasonTrophyAward = { userId: string; teamName: string; placement: string; wins: number; losses: number };
+
+export function useSeasonStandingsPreview() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (season: number) =>
+      apiFetch<{ season: number; standings: SeasonStandingEntry[] }>(
+        `/api/admin/season-standings?season=${season}`,
+        undefined,
+        user,
+      ),
+  });
+}
+
+export function useAwardSeasonTrophies() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (season: number) =>
+      apiFetch<{ awarded: SeasonTrophyAward[]; season: number }>(
+        '/api/admin/trophies/award-season',
+        { method: 'POST', body: JSON.stringify({ season }) },
+        user,
+      ),
+  });
+}
+
 export function useUnlockWeek() {
   const { user } = useAuth();
   return useMutation({

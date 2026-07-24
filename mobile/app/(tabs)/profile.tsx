@@ -1,25 +1,53 @@
-import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
-import { useMyProfile, useMyAchievements, type H2HEntry, type WeekRecord, type Achievement } from '@/hooks/useProfile';
+import {
+  useMyProfile, useMyAchievements, useSeasonTrophies,
+  type H2HEntry, type WeekRecord, type Achievement, type SeasonTrophy,
+} from '@/hooks/useProfile';
 
 const FIRST_SEASON = 2025;
 
 // ── Achievement metadata ──────────────────────────────────────────────────────
 
-const ACHIEVEMENT_META: Record<string, { emoji: string; label: string }> = {
-  most_wins:   { emoji: '🏆', label: 'Top Picker' },
-  loser:       { emoji: '😢', label: 'Rough Week' },
-  upset_pick:  { emoji: '⚡', label: 'Upset Pick' },
-  lone_wolf:   { emoji: '🐺', label: 'Lone Wolf' },
-  contrarian:  { emoji: '🎯', label: 'Contrarian' },
+const ACHIEVEMENT_META: Record<string, { image: number | null; label: string }> = {
+  most_wins:   { image: require('../../assets/achievements/most_wins.png'), label: 'Top Picker' },
+  loser:       { image: require('../../assets/achievements/loser.png'), label: 'Rough Week' },
+  upset_pick:  { image: require('../../assets/achievements/upset_pick.png'), label: 'Upset Pick' },
+  lone_wolf:   { image: require('../../assets/achievements/lone_wolf.png'), label: 'Lone Wolf' },
+  contrarian:  { image: require('../../assets/achievements/contrarian.png'), label: 'Contrarian' },
 };
 
 function achievementMeta(type: string) {
-  return ACHIEVEMENT_META[type] ?? { emoji: '🏅', label: type };
+  return ACHIEVEMENT_META[type] ?? { image: null, label: type };
+}
+
+// ── Season trophy (podium) metadata ─────────────────────────────────────────────
+
+const PLACEMENT_META: Record<string, { emoji: string; label: string }> = {
+  champion:    { emoji: '🥇', label: 'Champion' },
+  runner_up:   { emoji: '🥈', label: 'Runner-up' },
+  third_place: { emoji: '🥉', label: 'Third Place' },
+  last_place:  { emoji: '🥄', label: 'Last Place' },
+};
+
+function placementMeta(placement: string) {
+  return PLACEMENT_META[placement] ?? { emoji: '🏅', label: placement };
+}
+
+function SeasonTrophyCard({ trophy }: { trophy: SeasonTrophy }) {
+  const meta = placementMeta(trophy.placement);
+  return (
+    <View className="flex-1 bg-surface rounded-2xl p-4 items-center">
+      <Text style={{ fontSize: 40 }}>{meta.emoji}</Text>
+      <Text className="text-white text-sm font-bold mt-1">{meta.label}</Text>
+      <Text className="text-muted text-xs mt-0.5">{trophy.season} Season</Text>
+      <Text className="text-muted text-xs">{trophy.wins}-{trophy.losses}</Text>
+    </View>
+  );
 }
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
@@ -101,37 +129,27 @@ function WeeklyHistory({ history }: { history: WeekRecord[] }) {
 
 function H2HRow({ entry, season }: { entry: H2HEntry; season: number }) {
   const router = useRouter();
-  const total = entry.wins + entry.losses + entry.ties;
+  const decisive = entry.wins + entry.losses;
+  const winPct = decisive > 0 ? Math.round((entry.wins / decisive) * 1000) / 10 : null;
   const initials = entry.teamName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   return (
     <TouchableOpacity
       onPress={() => router.push({ pathname: '/user/[id]' as any, params: { id: entry.opponentId, season: String(season) } })}
       activeOpacity={0.7}
-      className="flex-row items-center py-2.5 border-b border-border"
+      className="flex-row items-center py-3 border-b border-border"
     >
       <View className="w-8 h-8 rounded-full bg-surface-2 items-center justify-center mr-3">
         <Text className="text-white text-xs font-bold">{initials}</Text>
       </View>
       <Text className="flex-1 text-white text-sm font-medium">{entry.teamName}</Text>
-      <Text className="text-primary text-xs mr-3">›</Text>
-      {total === 0 ? (
-        <Text className="text-muted text-sm">No games</Text>
+      {winPct !== null ? (
+        <Text className={`font-bold text-sm mr-2 ${winPct >= 50 ? 'text-success' : 'text-danger'}`}>
+          {winPct}%
+        </Text>
       ) : (
-        <View className="flex-row items-center gap-3">
-          <View className="items-center">
-            <Text className="text-success font-bold text-sm">{entry.wins}</Text>
-            <Text className="text-muted text-xs">W</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-danger font-bold text-sm">{entry.losses}</Text>
-            <Text className="text-muted text-xs">L</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-muted font-bold text-sm">{entry.ties}</Text>
-            <Text className="text-muted text-xs">T</Text>
-          </View>
-        </View>
+        <Text className="text-muted text-sm mr-2">—</Text>
       )}
+      <Text className="text-primary text-xs">›</Text>
     </TouchableOpacity>
   );
 }
@@ -141,12 +159,19 @@ function H2HRow({ entry, season }: { entry: H2HEntry; season: number }) {
 function AchievementCard({ trophy }: { trophy: Achievement }) {
   const meta = achievementMeta(trophy.type);
   return (
-    <View className="flex-1 bg-surface rounded-xl p-3 m-1">
-      <Text style={{ fontSize: 24 }}>{meta.emoji}</Text>
-      <Text className="text-white text-xs font-semibold mt-1" numberOfLines={1}>
-        {meta.label}
+    <View className="bg-surface rounded-2xl overflow-hidden">
+      <View style={{ width: '100%', aspectRatio: 1 }}>
+        {meta.image ? (
+          <Image source={meta.image} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        ) : (
+          <View className="flex-1 bg-surface-2 items-center justify-center">
+            <Text style={{ fontSize: 40 }}>🏅</Text>
+          </View>
+        )}
+      </View>
+      <Text className="text-muted text-xs font-semibold text-center py-2">
+        Week {trophy.week}
       </Text>
-      <Text className="text-muted text-xs">Week {trophy.week}</Text>
     </View>
   );
 }
@@ -156,10 +181,11 @@ function AchievementCard({ trophy }: { trophy: Achievement }) {
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
-  const [season, setSeason] = useState(getCurrentNFLSeason());
-  const currentSeason = new Date().getFullYear();
+  const currentSeason = getCurrentNFLSeason();
+  const [season, setSeason] = useState(currentSeason);
   const { data: profile, isLoading } = useMyProfile(season);
   const { data: trophies = [] } = useMyAchievements(season);
+  const { data: seasonTrophies = [] } = useSeasonTrophies(profile?.id);
 
   if (isLoading) {
     return (
@@ -322,10 +348,23 @@ export default function ProfileScreen() {
 
       {/* ── H2H ── */}
       {profile.h2h && profile.h2h.length > 0 && (
-        <Section title="Head to Head">
+        <Section title="H2H Win Pct">
           <View className="bg-surface rounded-xl px-4">
             {profile.h2h.map(entry => (
               <H2HRow key={entry.opponentId} entry={entry} season={season} />
+            ))}
+          </View>
+        </Section>
+      )}
+
+      {/* ── Trophy Case ── */}
+      {seasonTrophies.length > 0 && (
+        <Section title="Trophy Case">
+          <View className="flex-row flex-wrap gap-3">
+            {seasonTrophies.map(trophy => (
+              <View key={trophy.id} style={{ width: '47%' }}>
+                <SeasonTrophyCard trophy={trophy} />
+              </View>
             ))}
           </View>
         </Section>
@@ -340,28 +379,27 @@ export default function ProfileScreen() {
               {trophyTypes.map(([type, count]) => {
                 const meta = achievementMeta(type);
                 return (
-                  <View key={type} className="flex-row items-center bg-surface rounded-full px-3 py-1.5 gap-1.5">
-                    <Text>{meta.emoji}</Text>
-                    <Text className="text-white text-xs font-semibold">{count}</Text>
+                  <View key={type} className="flex-row items-center bg-surface rounded-full pl-1.5 pr-3 py-1.5 gap-2">
+                    {meta.image ? (
+                      <Image source={meta.image} style={{ width: 28, height: 28, borderRadius: 7 }} resizeMode="cover" />
+                    ) : (
+                      <Text style={{ fontSize: 18 }}>🏅</Text>
+                    )}
+                    <Text className="text-white text-sm font-bold">{count}</Text>
                     <Text className="text-muted text-xs">{meta.label}</Text>
                   </View>
                 );
               })}
             </View>
           )}
-          {/* Grid — most recent 12 */}
-          <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
-            {trophies.slice(0, 12).map(trophy => (
-              <View key={trophy.id} style={{ width: '50%' }}>
+          {/* Grid — all achievements */}
+          <View className="flex-row flex-wrap gap-3">
+            {trophies.map(trophy => (
+              <View key={trophy.id} style={{ width: '47%' }}>
                 <AchievementCard trophy={trophy} />
               </View>
             ))}
           </View>
-          {trophies.length > 12 && (
-            <Text className="text-muted text-xs text-center mt-2">
-              +{trophies.length - 12} more
-            </Text>
-          )}
         </Section>
       )}
 

@@ -1,11 +1,39 @@
 import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useWeekPicks } from '@/hooks/useWeekPicks';
-import { useGames } from '@/hooks/usePicksData';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useAuth } from '@/context/AuthContext';
-import type { WeekRecord } from '@/hooks/useProfile';
+import { WeekSelector } from '@/components/WeekSelector';
+import { useSeasonTrophies, type WeekRecord, type SeasonTrophy } from '@/hooks/useProfile';
+
+const FIRST_SEASON = 2025;
+
+// ── Season trophy (podium) metadata ─────────────────────────────────────────────
+
+const PLACEMENT_META: Record<string, { emoji: string; label: string }> = {
+  champion:    { emoji: '🥇', label: 'Champion' },
+  runner_up:   { emoji: '🥈', label: 'Runner-up' },
+  third_place: { emoji: '🥉', label: 'Third Place' },
+  last_place:  { emoji: '🥄', label: 'Last Place' },
+};
+
+function placementMeta(placement: string) {
+  return PLACEMENT_META[placement] ?? { emoji: '🏅', label: placement };
+}
+
+function SeasonTrophyCard({ trophy }: { trophy: SeasonTrophy }) {
+  const meta = placementMeta(trophy.placement);
+  return (
+    <View className="flex-1 bg-surface rounded-2xl p-4 items-center">
+      <Text style={{ fontSize: 40 }}>{meta.emoji}</Text>
+      <Text className="text-white text-sm font-bold mt-1">{meta.label}</Text>
+      <Text className="text-muted text-xs mt-0.5">{trophy.season} Season</Text>
+      <Text className="text-muted text-xs">{trophy.wins}-{trophy.losses}</Text>
+    </View>
+  );
+}
 
 // ── Reusable pieces (kept local — no shared component file yet) ───────────────
 
@@ -50,128 +78,176 @@ function WeeklyHistory({ history }: { history: WeekRecord[] }) {
   );
 }
 
-// ── Pick comparison (Nick's favorite feature) ─────────────────────────────────
+// ── Pick comparison ───────────────────────────────────────────────────────────
 
 function PickComparison({
   targetId,
   targetName,
+  season,
+  isCurrentSeason,
 }: {
   targetId: string;
   targetName: string;
+  season: number;
+  isCurrentSeason: boolean;
 }) {
   const { user } = useAuth();
-  const week = getCurrentNFLWeek();
-  const { data: weekPicksData } = useWeekPicks(week, getCurrentNFLSeason());
-  const { data: myGames } = useGames(week, getCurrentNFLSeason());
+  const currentWeek = getCurrentNFLWeek();
+  const maxWeek = isCurrentSeason ? currentWeek : 18;
+  const [comparisonWeek, setComparisonWeek] = useState(maxWeek);
 
-  if (!weekPicksData?.locked) {
-    return (
-      <View className="bg-surface rounded-xl px-4 py-5 items-center">
-        <Text className="text-muted text-sm text-center">
-          Pick comparison appears here after Wednesday 9 PM lock.
-        </Text>
-      </View>
-    );
+  // Reset to latest week when season changes
+  useEffect(() => {
+    setComparisonWeek(isCurrentSeason ? getCurrentNFLWeek() : 18);
+  }, [season]);
+
+  const { data: weekPicksData } = useWeekPicks(comparisonWeek, season);
+
+  const myPicksMap = weekPicksData?.picksByUser[user!.uid] ?? {};
+  const theirPicksMap = weekPicksData?.picksByUser[targetId] ?? {};
+  const games = weekPicksData?.games ?? [];
+
+  // Compute H2H summary for this week
+  let h2hWins = 0, h2hLosses = 0, h2hTies = 0;
+  for (const game of games) {
+    const myEntry = myPicksMap[game.id];
+    const theirEntry = theirPicksMap[game.id];
+    if (!myEntry || !theirEntry) continue;
+    if (myEntry.isCorrect === null || theirEntry.isCorrect === null) continue;
+    if (myEntry.isCorrect && !theirEntry.isCorrect) h2hWins++;
+    else if (!myEntry.isCorrect && theirEntry.isCorrect) h2hLosses++;
+    else h2hTies++;
   }
 
-  const myPicksMap = Object.fromEntries(
-    (myGames ?? []).map(g => [g.id, g.myPick])
-  );
-  const theirPicksMap = weekPicksData.picksByUser[targetId] ?? {};
-  const games = weekPicksData.games;
-
   const diffCount = games.filter(g => {
-    const mine = myPicksMap[g.id];
+    const mine = myPicksMap[g.id]?.pick;
     const theirs = theirPicksMap[g.id]?.pick;
     return mine && theirs && mine !== theirs;
   }).length;
 
-  return (
-    <View>
-      <Text className="text-muted text-xs mb-2">
-        {diffCount > 0
-          ? `You picked differently on ${diffCount} game${diffCount === 1 ? '' : 's'} this week`
-          : 'You picked the same team on every game this week'}
-      </Text>
-      <View className="bg-surface rounded-xl overflow-hidden">
-        {/* Header */}
-        <View className="flex-row px-4 py-2 border-b border-border">
-          <Text className="flex-1 text-muted text-xs font-semibold">Game</Text>
-          <Text className="w-24 text-center text-muted text-xs font-semibold">You</Text>
-          <Text className="w-24 text-center text-muted text-xs font-semibold" numberOfLines={1}>
-            {targetName.split(' ')[0]}
+  const isPastWeek = !isCurrentSeason || comparisonWeek < currentWeek;
+  const canShow = weekPicksData?.locked || isPastWeek;
+
+  const weekSelector = (
+    <WeekSelector
+      currentWeek={isCurrentSeason ? getCurrentNFLWeek() : 0}
+      selectedWeek={comparisonWeek}
+      onSelect={setComparisonWeek}
+      totalWeeks={maxWeek}
+    />
+  );
+
+  if (!canShow) {
+    return (
+      <View>
+        {weekSelector}
+        <View className="bg-surface rounded-xl px-4 py-5 mt-3 items-center">
+          <Text className="text-muted text-sm text-center">
+            Pick comparison appears here after Wednesday 9 PM lock.
           </Text>
         </View>
-
-        {games.map(game => {
-          const myPick = myPicksMap[game.id];
-          const theirEntry = theirPicksMap[game.id];
-          const theirPick = theirEntry?.pick;
-          const differ = myPick && theirPick && myPick !== theirPick;
-
-          const pickLabel = (pick: 'home' | 'away' | null | undefined, isCorrect?: boolean | null) => {
-            if (!pick) return { text: '—', logo: null, correct: null };
-            const team = pick === 'home' ? game.homeTeam : game.awayTeam;
-            const logo = pick === 'home' ? game.homeTeamLogo : game.awayTeamLogo;
-            return { text: team.split(' ').pop() ?? team, logo, correct: isCorrect ?? null };
-          };
-
-          const mine = pickLabel(myPick as 'home' | 'away' | null);
-          const theirs = pickLabel(theirPick, theirEntry?.isCorrect);
-
-          const myCorrect = (myGames ?? []).find(g => g.id === game.id);
-          const myIsCorrect = myCorrect?.myPick
-            ? (myCorrect.myPick === 'home'
-              ? (game.homeScore ?? 0) > (game.awayScore ?? 0)
-              : (game.awayScore ?? 0) > (game.homeScore ?? 0))
-            : null;
-
-          return (
-            <View
-              key={game.id}
-              className={`flex-row items-center px-4 py-2.5 border-b border-border ${differ ? 'bg-primary/5' : ''}`}
-            >
-              {/* Game */}
-              <View className="flex-1">
-                <Text className="text-white text-xs" numberOfLines={1}>
-                  {game.awayTeam.split(' ').pop()} @ {game.homeTeam.split(' ').pop()}
-                </Text>
-                {differ && (
-                  <Text className="text-primary text-xs mt-0.5">different pick</Text>
-                )}
-              </View>
-
-              {/* My pick */}
-              <View className="w-24 items-center">
-                {mine.logo ? (
-                  <View className="flex-row items-center gap-1">
-                    <Image source={{ uri: mine.logo }} style={{ width: 20, height: 20 }} resizeMode="contain" />
-                    <Text className={`text-xs font-semibold ${myIsCorrect === true ? 'text-success' : myIsCorrect === false ? 'text-danger' : 'text-white'}`}>
-                      {mine.text}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text className="text-muted text-xs">{mine.text}</Text>
-                )}
-              </View>
-
-              {/* Their pick */}
-              <View className="w-24 items-center">
-                {theirs.logo ? (
-                  <View className="flex-row items-center gap-1">
-                    <Image source={{ uri: theirs.logo }} style={{ width: 20, height: 20 }} resizeMode="contain" />
-                    <Text className={`text-xs font-semibold ${theirs.correct === true ? 'text-success' : theirs.correct === false ? 'text-danger' : 'text-white'}`}>
-                      {theirs.text}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text className="text-muted text-xs">{theirs.text}</Text>
-                )}
-              </View>
-            </View>
-          );
-        })}
       </View>
+    );
+  }
+
+  return (
+    <View>
+      {weekSelector}
+
+      {/* H2H summary */}
+      <View className="bg-surface rounded-xl flex-row mb-3">
+        {([
+          { label: 'You win', value: h2hWins, color: 'text-success' },
+          { label: 'They win', value: h2hLosses, color: 'text-danger' },
+          { label: 'Tie', value: h2hTies, color: 'text-muted' },
+        ] as const).map(({ label, value, color }) => (
+          <View key={label} className="flex-1 items-center py-3">
+            <Text className={`text-xl font-bold ${color}`}>{value}</Text>
+            <Text className="text-muted text-xs mt-0.5">{label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Diff note */}
+      {games.length > 0 && (
+        <Text className="text-muted text-xs mb-2">
+          {diffCount > 0
+            ? `Different picks on ${diffCount} game${diffCount === 1 ? '' : 's'}`
+            : 'Same pick on every game this week'}
+        </Text>
+      )}
+
+      {/* Game-by-game */}
+      {games.length === 0 ? (
+        <View className="bg-surface rounded-xl px-4 py-5 items-center">
+          <Text className="text-muted text-sm">No games found for this week.</Text>
+        </View>
+      ) : (
+        <View className="bg-surface rounded-xl overflow-hidden">
+          <View className="flex-row px-4 py-2 border-b border-border">
+            <Text className="flex-1 text-muted text-xs font-semibold">Game</Text>
+            <Text className="w-24 text-center text-muted text-xs font-semibold">You</Text>
+            <Text className="w-24 text-center text-muted text-xs font-semibold" numberOfLines={1}>
+              {targetName.split(' ')[0]}
+            </Text>
+          </View>
+
+          {games.map(game => {
+            const myEntry = myPicksMap[game.id];
+            const theirEntry = theirPicksMap[game.id];
+            const differ = myEntry?.pick && theirEntry?.pick && myEntry.pick !== theirEntry.pick;
+
+            const pickLabel = (entry?: { pick: 'home' | 'away'; isCorrect: boolean | null }) => {
+              if (!entry) return { text: '—', logo: null, correct: null };
+              const team = entry.pick === 'home' ? game.homeTeam : game.awayTeam;
+              const logo = entry.pick === 'home' ? game.homeTeamLogo : game.awayTeamLogo;
+              return { text: team.split(' ').pop() ?? team, logo, correct: entry.isCorrect };
+            };
+
+            const mine = pickLabel(myEntry);
+            const theirs = pickLabel(theirEntry);
+
+            const pickColor = (correct: boolean | null) =>
+              correct === true ? 'text-success' : correct === false ? 'text-danger' : 'text-white';
+
+            return (
+              <View
+                key={game.id}
+                className={`flex-row items-center px-4 py-2.5 border-b border-border ${differ ? 'bg-primary/5' : ''}`}
+              >
+                <View className="flex-1">
+                  <Text className="text-white text-xs" numberOfLines={1}>
+                    {game.awayTeam.split(' ').pop()} @ {game.homeTeam.split(' ').pop()}
+                  </Text>
+                  {differ && <Text className="text-primary text-xs mt-0.5">different pick</Text>}
+                </View>
+
+                <View className="w-24 items-center">
+                  {mine.logo ? (
+                    <View className="flex-row items-center gap-1">
+                      <Image source={{ uri: mine.logo }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+                      <Text className={`text-xs font-semibold ${pickColor(mine.correct)}`}>{mine.text}</Text>
+                    </View>
+                  ) : (
+                    <Text className="text-muted text-xs">{mine.text}</Text>
+                  )}
+                </View>
+
+                <View className="w-24 items-center">
+                  {theirs.logo ? (
+                    <View className="flex-row items-center gap-1">
+                      <Image source={{ uri: theirs.logo }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+                      <Text className={`text-xs font-semibold ${pickColor(theirs.correct)}`}>{theirs.text}</Text>
+                    </View>
+                  ) : (
+                    <Text className="text-muted text-xs">{theirs.text}</Text>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -181,8 +257,11 @@ function PickComparison({
 export default function PublicProfileScreen() {
   const router = useRouter();
   const { id: userId, season: seasonParam } = useLocalSearchParams<{ id: string; season?: string }>();
-  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentNFLSeason();
+  const currentSeason = getCurrentNFLSeason();
+  const [season, setSeason] = useState(seasonParam ? parseInt(seasonParam, 10) : currentSeason);
+  const isCurrentSeason = season === currentSeason;
   const { data: profile, isLoading } = usePublicProfile(userId, season);
+  const { data: seasonTrophies = [] } = useSeasonTrophies(profile?.id);
 
   if (isLoading) {
     return (
@@ -206,8 +285,6 @@ export default function PublicProfileScreen() {
   const memberSince = new Date(profile.createdAt).toLocaleDateString('en-US', {
     month: 'long', year: 'numeric',
   });
-
-  const h2w = profile.h2hCurrentWeek;
 
   return (
     <View className="flex-1 bg-background">
@@ -238,8 +315,27 @@ export default function PublicProfileScreen() {
           </View>
         </View>
 
+        {/* Season selector */}
+        <View className="flex-row items-center justify-center py-3 border-b border-border">
+          <TouchableOpacity
+            onPress={() => setSeason(s => Math.max(FIRST_SEASON, s - 1))}
+            disabled={season <= FIRST_SEASON}
+            className="px-3 py-1"
+          >
+            <Text className={`text-xl font-bold ${season <= FIRST_SEASON ? 'text-border' : 'text-primary'}`}>−</Text>
+          </TouchableOpacity>
+          <Text className="text-white font-semibold text-sm mx-3">{season} Season</Text>
+          <TouchableOpacity
+            onPress={() => setSeason(s => Math.min(currentSeason, s + 1))}
+            disabled={season >= currentSeason}
+            className="px-3 py-1"
+          >
+            <Text className={`text-xl font-bold ${season >= currentSeason ? 'text-border' : 'text-primary'}`}>+</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Season stats */}
-        <View className="mx-4 mb-5">
+        <View className="mx-4 mb-5 mt-5">
           <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
             {season} Season
           </Text>
@@ -260,27 +356,6 @@ export default function PublicProfileScreen() {
           </View>
         </View>
 
-        {/* H2H this week summary */}
-        {h2w && (
-          <View className="mx-4 mb-5">
-            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
-              H2H vs You (current week)
-            </Text>
-            <View className="bg-surface rounded-xl flex-row">
-              {[
-                { label: 'You win', value: h2w.wins, color: 'text-success' },
-                { label: 'They win', value: h2w.losses, color: 'text-danger' },
-                { label: 'Tie', value: h2w.ties, color: 'text-muted' },
-              ].map(({ label, value, color }) => (
-                <View key={label} className="flex-1 items-center py-4">
-                  <Text className={`text-2xl font-bold ${color}`}>{value}</Text>
-                  <Text className="text-muted text-xs mt-1">{label}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Weekly history */}
         <View className="mx-4 mb-5">
           <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
@@ -289,12 +364,33 @@ export default function PublicProfileScreen() {
           <WeeklyHistory history={profile.weeklyHistory} />
         </View>
 
-        {/* Pick comparison */}
+        {/* Trophy Case */}
+        {seasonTrophies.length > 0 && (
+          <View className="mx-4 mb-5">
+            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
+              Trophy Case
+            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {seasonTrophies.map(trophy => (
+                <View key={trophy.id} style={{ width: '47%' }}>
+                  <SeasonTrophyCard trophy={trophy} />
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Pick comparison — all seasons, with week navigation */}
         <View className="mx-4 mb-5">
           <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
-            Pick Comparison — Week {getCurrentNFLWeek()}
+            Pick Comparison
           </Text>
-          <PickComparison targetId={profile.id} targetName={profile.teamName} />
+          <PickComparison
+            targetId={profile.id}
+            targetName={profile.teamName}
+            season={season}
+            isCurrentSeason={isCurrentSeason}
+          />
         </View>
 
         <View className="h-8" />

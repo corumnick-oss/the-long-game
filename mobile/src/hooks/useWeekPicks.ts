@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/queryClient';
 
@@ -39,5 +39,6 @@ export function useWeekPicks(week: number, season: number, seasonType: 'regular'
         user,
       ),
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }

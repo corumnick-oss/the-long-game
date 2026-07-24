@@ -89,6 +89,26 @@ export function useMyAchievements(season?: number) {
   });
 }
 
+export type SeasonTrophy = {
+  id: string;
+  userId: string;
+  season: number;
+  placement: 'champion' | 'runner_up' | 'third_place' | 'last_place';
+  wins: number;
+  losses: number;
+  awardedAt: string;
+};
+
+export function useSeasonTrophies(userId: string | undefined) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['trophies', 'season', userId ?? null],
+    queryFn: () => apiFetch<SeasonTrophy[]>(`/api/trophies/season?userId=${userId}`, undefined, user),
+    enabled: !!userId,
+    staleTime: 300_000,
+  });
+}
+
 export function useSendFeedback() {
   const { user } = useAuth();
   return useMutation({
