@@ -6,9 +6,43 @@ import { useWeekPicks } from '@/hooks/useWeekPicks';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useAuth } from '@/context/AuthContext';
 import { WeekSelector } from '@/components/WeekSelector';
-import { useSeasonTrophies, type WeekRecord, type SeasonTrophy } from '@/hooks/useProfile';
+import { useSeasonTrophies, usePublicAchievements, type WeekRecord, type SeasonTrophy, type Achievement } from '@/hooks/useProfile';
 
 const FIRST_SEASON = 2025;
+
+// ── Achievement metadata ──────────────────────────────────────────────────────
+
+const ACHIEVEMENT_META: Record<string, { image: number | null; label: string }> = {
+  most_wins:   { image: require('../../assets/achievements/most_wins.png'), label: 'Top Picker' },
+  loser:       { image: require('../../assets/achievements/loser.png'), label: 'Rough Week' },
+  upset_pick:  { image: require('../../assets/achievements/upset_pick.png'), label: 'Upset Pick' },
+  lone_wolf:   { image: require('../../assets/achievements/lone_wolf.png'), label: 'Lone Wolf' },
+  contrarian:  { image: require('../../assets/achievements/contrarian.png'), label: 'Contrarian' },
+};
+
+function achievementMeta(type: string) {
+  return ACHIEVEMENT_META[type] ?? { image: null, label: type };
+}
+
+function AchievementCard({ trophy }: { trophy: Achievement }) {
+  const meta = achievementMeta(trophy.type);
+  return (
+    <View className="bg-surface rounded-2xl overflow-hidden">
+      <View style={{ width: '100%', aspectRatio: 1 }}>
+        {meta.image ? (
+          <Image source={meta.image} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        ) : (
+          <View className="flex-1 bg-surface-2 items-center justify-center">
+            <Text style={{ fontSize: 40 }}>🏅</Text>
+          </View>
+        )}
+      </View>
+      <Text className="text-muted text-xs font-semibold text-center py-2">
+        Week {trophy.week}
+      </Text>
+    </View>
+  );
+}
 
 // ── Season trophy (podium) metadata ─────────────────────────────────────────────
 
@@ -262,6 +296,7 @@ export default function PublicProfileScreen() {
   const isCurrentSeason = season === currentSeason;
   const { data: profile, isLoading } = usePublicProfile(userId, season);
   const { data: seasonTrophies = [] } = useSeasonTrophies(profile?.id);
+  const { data: achievements = [] } = usePublicAchievements(profile?.id, season);
 
   if (isLoading) {
     return (
@@ -374,6 +409,22 @@ export default function PublicProfileScreen() {
               {seasonTrophies.map(trophy => (
                 <View key={trophy.id} style={{ width: '47%' }}>
                   <SeasonTrophyCard trophy={trophy} />
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Achievements — weekly, filtered to the selected season */}
+        {achievements.length > 0 && (
+          <View className="mx-4 mb-5">
+            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">
+              Achievements ({achievements.length})
+            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {achievements.map(trophy => (
+                <View key={trophy.id} style={{ width: '47%' }}>
+                  <AchievementCard trophy={trophy} />
                 </View>
               ))}
             </View>

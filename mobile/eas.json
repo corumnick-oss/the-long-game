@@ -15,9 +15,14 @@
       }
     },
     "preview": {
-      "distribution": "store",
       "autoIncrement": true,
       "channel": "preview",
+      "ios": {
+        "distribution": "store"
+      },
+      "android": {
+        "distribution": "internal"
+      },
       "env": {
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "309276847432-j5unna6kj6k780gsk6fksveoklv57673.apps.googleusercontent.com"
       }

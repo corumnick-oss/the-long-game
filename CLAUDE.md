@@ -42,23 +42,26 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ### ✅ Feedback detail modal — now full-screen (Admin → Feedback tab → tap a card). Was a bottom sheet capped at 80% height; now a full page with back-button header and larger text (18pt/28 line-height).
 
-### ⚠️ PENDING — Do these next session:
-1. **Weekly Achievements on public profiles** — Currently not shown on other users' profiles (only the season Trophy Case is, added this session). Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered weekly achievements on `user/[id].tsx`.
+### ✅ Weekly Achievements on public profiles — `usePublicAchievements(userId, season)` added to `useProfile.ts` (hits the existing `GET /api/trophies?userId=X&season=Y`, which already filtered server-side by season). `user/[id].tsx` now renders an Achievements section with the same badge-image cards as the owner's own profile. Because `season` is passed straight from the profile's season-selector state into the query, achievements strictly only show for the year they were earned — flipping the selector refetches and swaps the set.
 
-### Next priority items (after the above):
+### ✅ App icon shipped — Nick supplied `App_Icon_Updated.png` (full-bleed square logo, no pre-baked rounding). Resized to `icon.png` (1024×1024, iOS). Android's `adaptive-icon.png` and `splash-icon.png` were still Expo's default placeholder bullseye graphic (never customized) — fixed both: chroma-keyed the navy background out of the logo to a transparent cutout, then composited it into Android's safe zone (~60-65% fill, so circular/squircle launcher masks don't clip "THE"/"GAME"). Verified by compositing against the actual `#0f0f0f` background color both use.
+- **eas.json fix**: `preview` profile had `"distribution": "store"` for both platforms (from the earlier TestFlight fix) — this breaks Android since Google Play isn't set up and "store" distribution builds an AAB, not an installable APK. Split into platform-specific overrides: `ios.distribution: "store"` (TestFlight), `android.distribution: "internal"` (direct APK download link, matches how Nick tests on his dad's phone).
+- **Shipped**: iOS build 3 uploaded to App Store Connect (submitted manually by Nick — non-interactive `eas submit` needs `ascAppId` in eas.json which isn't set yet, and Apple ID/2FA can't be automated). Android build installed via direct APK link. Both confirmed looking good on-device.
+- Icon/splash changes are native — they do **not** ship via OTA (`eas update`). Only a full `eas build` + reinstall (TestFlight update / new APK) shows them.
+
+### Next priority items:
 1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile. **This is the final gate before App Store + Google Play submission.** (Activity panel was removed — replaced by feedback modal.)
-2. **App logo** — Needed before App Store + Google Play submission. Nick to supply artwork. Must be added to app.json (icon field) and EAS build assets before submitting to stores.
-3. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
-4. **Achievement display redesign** — see details below
-5. **Past seasons row on Profile** — W-L per season for historical context
-6. **Onboarding polish** — Nick wants redesign before launch
-7. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
+2. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
+3. **Past seasons row on Profile** — W-L per season for historical context
+4. **Onboarding polish** — Nick wants redesign before launch
+5. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
+6. **ascAppId for non-interactive TestFlight submits** — add to `eas.json` submit.preview profile so `eas submit --non-interactive` works without Nick's Apple ID/2FA each time. Find in App Store Connect → My Apps → The Long Game → General → App Information → Apple ID (10-digit number).
 
 ### Win Probability — weekly workflow
 Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`. Example: `npm run sync:winprobs 1 2026`. The admin "Sync Win Probabilities" button is blocked on Railway (ESPN IP block on /summary endpoint — see ESPN section below). Run locally once per week, ideally Wednesday afternoon before the 9PM lock.
 
 ### Achievement images + Profile display redesign — DONE
-All 5 images wired in (`mobile/assets/achievements/`), Achievement Case redesigned to full-bleed badge images with no item cap. See "Achievement & Trophy System" section above. Still open: weekly Achievement badges aren't shown on public profiles yet (only own Profile) — see PENDING list at top.
+All 5 images wired in (`mobile/assets/achievements/`), Achievement Case redesigned to full-bleed badge images with no item cap. Shown on both own Profile and public profiles, season-filtered. See "Achievement & Trophy System" section above.
 
 ### UID Reassignment Script
 When a Gridiron signs up fresh and needs their 2025 picks migrated from the old account:
@@ -88,7 +91,7 @@ Files that should exist but are NOT in git (verify manually):
 **App Name:** The Long Game  
 **Type:** iOS and Android mobile app (React Native / Expo)  
 **Purpose:** NFL picks app where users predict game winners and compete on leaderboards  
-**Status:** Phase 5 in progress. Preview build (`cfa11e3a`) on Nick's iPhone. OTA updates working on preview channel.  
+**Status:** Phase 5 in progress. Preview build 3 on Nick's iPhone (TestFlight) and Android (direct APK), both with the new branded app icon. OTA updates working on preview channel. All mobile/backend work that had been sitting uncommitted locally is now pushed to GitHub (was previously only reflected in the actual TestFlight/EAS build, not git history).  
 **Railway URL:** https://thelonggame-production.up.railway.app  
 **Target Launch:** App Store submission late July 2026. Regular season starts September 4, 2026.  
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone — Admin team name: Nicholas  

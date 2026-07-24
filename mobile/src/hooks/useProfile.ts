@@ -89,6 +89,17 @@ export function useMyAchievements(season?: number) {
   });
 }
 
+export function usePublicAchievements(userId: string | undefined, season: number) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['trophies', 'public', userId ?? null, season],
+    queryFn: () =>
+      apiFetch<Achievement[]>(`/api/trophies?userId=${userId}&season=${season}`, undefined, user),
+    enabled: !!userId,
+    staleTime: 120_000,
+  });
+}
+
 export type SeasonTrophy = {
   id: string;
   userId: string;
