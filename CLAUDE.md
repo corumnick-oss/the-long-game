@@ -32,12 +32,18 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ✅ In-app feedback — Chat bubble icon in header (replaces activity bell). Stored in activity_log, push notification to admins, viewable in Admin → Feedback tab
 ### ✅ OTA update UX — Dark overlay with spinner shown before reload (no more jarring screen jump)
 
+### ✅ TestFlight push notifications fixed — root cause was missing `expo-notifications` plugin in app.json. Without it, iOS never adds the `aps-environment` entitlement, so the app can't register for remote notifications at all (no Notifications entry in iOS Settings). Fix: added `"expo-notifications"` to plugins array in app.json. Also added `autoIncrement: true` + preview submit profile to eas.json, and set `appVersionSource: "remote"` (EAS now manages build numbers). New preview build submitted July 2026 — external testers update via TestFlight app.
+
+### ✅ Soft-lock on picks — GameCard.tsx: once a game has a pick, team rows stop responding to taps until the user taps the "✎ Edit Pick" pill (top-right of card, white outline). Tapping it unlocks the card for one change; after picking, a green "✓ Pick saved" pill shows briefly (1.2s) before reverting to the white Edit Pick state. Prevents accidental pick changes while scrolling.
+
+### ✅ Achievement images wired in — all 5 images (most_wins, loser, upset_pick, lone_wolf, contrarian) already existed in `mobile/assets/Achievements/` (Nick had generated them, CLAUDE.md just hadn't been updated). Renamed to lowercase `mobile/assets/achievements/{type}.png` (matches DB type keys, avoids case-sensitivity issues on EAS build servers) and wired into `profile.tsx`. Achievement Case redesigned: full-bleed square badge images (not tiny icons), no more 12-item cap (was showing "+N more" with no way to view them — now shows all), bigger summary count chips.
+
+### ✅ Season podium Trophies system — BUILT. New `season_trophies` DB table; `calculateSeasonStandings()`/`awardSeasonTrophies()` in `trophyService.ts` (Gridirons-only, regular season, reuses leaderboard ranking; ties for last place all get awarded, not just one). Admin → NFL Tools → "Award [Season] Season Trophies" previews computed standings before committing (reusable every year). "Trophy Case" section added to own Profile and public profiles (🥇🥈🥉🥄 emoji placeholders — real artwork can come later same as Achievements did). **2025 season awarded**: Kevin Akers = champion, Nicholas = runner-up, TheRidl3r = third place, Gmac + Purdy Mouths = last place (tied, both awarded per Nick's call).
+
+### ✅ Feedback detail modal — now full-screen (Admin → Feedback tab → tap a card). Was a bottom sheet capped at 80% height; now a full page with back-button header and larger text (18pt/28 line-height).
+
 ### ⚠️ PENDING — Do these next session:
-1. **🔴 FIRST TOPIC: TestFlight push notifications broken for test users** — Users have The Long Game in iOS Settings but NO Notifications entry appears there, meaning iOS never registered the app for push. Nick's friend is trying a reinstall from TestFlight — check if that fixed it at session start. If not, dig into why `NotificationPrompt` isn't triggering the iOS permission request. Likely culprit: the prompt fired but the `requestPermissionsAsync()` call failed silently, so iOS never showed the system dialog and never added the app to Notification settings. Nick's own install works because he didn't go through TestFlight.
-2. **Award 2025 season trophies (podium)** — Kevin Akers = 1st, Nicholas = 2nd, TheRidl3r = 3rd. Last place: Gmac and Purdy Mouths tied at 165-107 — ask Nick which gets it (or both). Trophy system not yet built — design with Nick first.
-3. **Feedback detail modal — needs full-screen treatment** — Currently slides up from the bottom (partial sheet). Nick wants it to fill the full screen so text is larger and more readable. Redesign as a full-screen modal, not a bottom sheet.
-4. **Achievement images** — All 5 images needed from ChatGPT. None exist yet. Drop in `mobile/assets/achievements/`. See Achievement section below.
-5. **Achievement display on public profiles** — Currently not shown on other users' profiles. Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered achievements.
+1. **Weekly Achievements on public profiles** — Currently not shown on other users' profiles (only the season Trophy Case is, added this session). Need to fetch `/api/trophies?userId=X&season=Y` and display season-filtered weekly achievements on `user/[id].tsx`.
 
 ### Next priority items (after the above):
 1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile. **This is the final gate before App Store + Google Play submission.** (Activity panel was removed — replaced by feedback modal.)
@@ -51,23 +57,8 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### Win Probability — weekly workflow
 Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`. Example: `npm run sync:winprobs 1 2026`. The admin "Sync Win Probabilities" button is blocked on Railway (ESPN IP block on /summary endpoint — see ESPN section below). Run locally once per week, ideally Wednesday afternoon before the 9PM lock.
 
-### Achievement images + Profile display redesign (discuss with Nick)
-Current state: Achievement case on Profile uses placeholder emojis. Nick wants real images and a better layout.
-
-**Images needed — ALL 5 must be generated by ChatGPT (none exist yet):**
-- `most_wins` — Top Picker
-- `loser` — Rough Week
-- `upset_pick` — Upset Pick
-- `lone_wolf` — Lone Wolf
-- `contrarian` — Contrarian
-
-Drop images in `mobile/assets/achievements/` once generated.
-
-**Profile display to redesign:**
-- Current: emoji grid in "Achievement Case" section, no visual hierarchy
-- Discuss with Nick: card-style layout? show count + most recent per type? show all earned vs. just types unlocked? trophy room aesthetic?
-- Also decide: does the Achievement Case show ALL-TIME achievements or just current season?
-- The public profile (`user/[id].tsx`) also shows `trophyCount` — may need updating once display is redesigned
+### Achievement images + Profile display redesign — DONE
+All 5 images wired in (`mobile/assets/achievements/`), Achievement Case redesigned to full-bleed badge images with no item cap. See "Achievement & Trophy System" section above. Still open: weekly Achievement badges aren't shown on public profiles yet (only own Profile) — see PENDING list at top.
 
 ### UID Reassignment Script
 When a Gridiron signs up fresh and needs their 2025 picks migrated from the old account:
@@ -374,8 +365,8 @@ Additional tables beyond the main ones: `tiebreaker_games`, `tiebreaker_picks`, 
 ## Achievement & Trophy System
 
 ### Terminology (IMPORTANT)
-- **Achievements** = Weekly awards. Stored in `trophies` DB table. Always say "Achievements" in UI.
-- **Trophies** = Season-end podium (1st/2nd/3rd/last). **NOT YET BUILT.** Design with Nick first.
+- **Achievements** = Weekly awards. Stored in `trophies` DB table. Always say "Achievements" in UI. All 5 have real images in `mobile/assets/achievements/`.
+- **Trophies** = Season-end podium (champion/runner_up/third_place/last_place). **BUILT** — stored in `season_trophies` DB table. Awarded via Admin → NFL Tools → "Award Season Trophies" (see below). Displayed as "Trophy Case" on Profile + public profiles, currently emoji placeholders (🥇🥈🥉🥄).
 
 ### Achievement Types
 - **most_wins** — Most correct picks that week (ties = multiple winners)
@@ -384,7 +375,14 @@ Additional tables beyond the main ones: `tiebreaker_games`, `tiebreaker_picks`, 
 - **lone_wolf** — ONLY player to correctly pick a winner
 - **contrarian** — Correctly picked winner when ≤20% of players chose that team
 
-Trophy images: most_wins, loser, upset_pick, lone_wolf have images. **contrarian needs new image** — placeholder now.
+All 5 achievement images done, in `mobile/assets/achievements/{most_wins,loser,upset_pick,lone_wolf,contrarian}.png`.
+
+### Season Trophies (podium)
+- Table: `season_trophies` (userId, season, sport, placement, wins, losses, awardedAt)
+- Logic: `calculateSeasonStandings(season)` + `awardSeasonTrophies(season)` in `server/src/services/trophyService.ts` — Gridirons-only, regular season, same ranking as leaderboard (wins desc, losses asc). Idempotent — re-running skips already-awarded placements.
+- Last place: ties on wins/losses both get awarded (not just whichever row lands in the last sequential rank slot — rank numbers are always sequential 1..N even when records tie).
+- Admin endpoints: `GET /api/admin/season-standings?season=X` (preview), `POST /api/admin/trophies/award-season` (commit). Public: `GET /api/trophies/season?userId=X` (all seasons, for profile display).
+- Mobile: Admin → NFL Tools → Actions → "Award [Season] Season Trophies" — shows computed standings in a confirm dialog before committing. Run this every year after the regular season ends.
 
 ---
 
@@ -546,12 +544,10 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 
 - Preseason season flip: change `getCurrentNFLSeason()` to flip on Aug 7, or use app_settings `preseasonStartDate`?
 - Past seasons: how many years back to support in season selector?
-- Trophies (podium) system design — 1st/2nd/3rd/last place, prize details
-- Contrarian trophy artwork
+- Season trophy (podium) real artwork — currently emoji placeholders (🥇🥈🥉🥄), same path as Achievements (ChatGPT-generated images later)
 - Premium pricing and features
 - Google Play account setup timing
 - Domain name decision
-- In-app feedback: `mailto:` deep link vs. in-app form with nodemailer/SendGrid?
 
 ---
 
