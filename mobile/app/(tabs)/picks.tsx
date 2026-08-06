@@ -8,7 +8,6 @@ import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker, type Game 
 import { WeekSelector } from '@/components/WeekSelector';
 import { GameCard } from '@/components/GameCard';
 import { TiebreakerCard } from '@/components/TiebreakerCard';
-import { isWeekCurrentlyLocked } from '@/lib/lockTime';
 
 const CURRENT_SEASON = getCurrentNFLSeason();
 const CURRENT_WEEK = getCurrentNFLWeek();
@@ -56,7 +55,9 @@ export default function PicksScreen() {
   }, [games, queryClient]);
   const submitTiebreaker = useSubmitTiebreaker();
 
-  const isLocked = seasonType === 'preseason' ? false : isWeekCurrentlyLocked();
+  // Authoritative lock state comes from the server (same value it enforces on
+  // pick submission) — every game in a week shares the same lock status.
+  const isLocked = games?.[0]?.isLocked ?? false;
 
   const handlePick = useCallback(async (game: Game, pick: 'home' | 'away') => {
     if (game.myPick === pick) return;

@@ -198,6 +198,7 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
   }, []);
 
   const showEditPickLink = hasPick && canPick && !unlockedForEdit && !justSaved;
+  const showLockedPill = hasPick && isLocked;
   const rowsDisabled = !canPick || (hasPick && !unlockedForEdit);
 
   const handlePick = (pick: 'home' | 'away') => {
@@ -249,6 +250,15 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
               {justSaved ? '✓ Pick saved' : unlockedForEdit ? 'Tap a team to change' : '✎ Edit Pick'}
             </Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Locked indicator — shown in place of Edit Pick once the week has locked */}
+      {showLockedPill && (
+        <View className="flex-row justify-end px-3 pt-2.5 pb-2">
+          <View className="rounded-full px-3 py-1.5 border bg-zinc-800 border-zinc-600">
+            <Text className="text-muted text-sm font-bold">🔒 Picks locked</Text>
+          </View>
         </View>
       )}
 

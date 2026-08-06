@@ -2306,6 +2306,23 @@ export declare const weekSettings: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        seasonType: import("drizzle-orm/pg-core").PgColumn<{
+            name: "season_type";
+            tableName: "week_settings";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         lockTime: import("drizzle-orm/pg-core").PgColumn<{
             name: "lock_time";
             tableName: "week_settings";

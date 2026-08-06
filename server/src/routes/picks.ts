@@ -36,7 +36,7 @@ router.get('/week', requireAuth, async (req, res) => {
 
   if (!week) { res.status(400).json({ error: 'week is required' }); return; }
 
-  const locked = await isWeekLocked(week, season);
+  const locked = await isWeekLocked(week, season, seasonType);
 
   const weekGames = await db.query.games.findMany({
     where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
@@ -148,7 +148,7 @@ router.post('/', requireAuth, async (req, res) => {
   const game = await db.query.games.findFirst({ where: eq(schema.games.id, gameId) });
   if (!game) { res.status(404).json({ error: 'Game not found' }); return; }
 
-  const locked = await isWeekLocked(game.week, game.season);
+  const locked = await isWeekLocked(game.week, game.season, game.seasonType);
   if (locked) { res.status(403).json({ error: 'Picks are locked for this week' }); return; }
 
   const unlocked = await db.query.unlockedWeeks.findFirst({
@@ -189,7 +189,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   const game = await db.query.games.findFirst({ where: eq(schema.games.id, pick.gameId) });
   if (!game) { res.status(404).json({ error: 'Game not found' }); return; }
 
-  const locked = await isWeekLocked(game.week, game.season);
+  const locked = await isWeekLocked(game.week, game.season, game.seasonType);
   if (locked) { res.status(403).json({ error: 'Picks are locked' }); return; }
 
   await db.delete(schema.picks).where(eq(schema.picks.id, pick.id));

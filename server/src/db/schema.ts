@@ -174,6 +174,7 @@ export const weekSettings = pgTable('week_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
   week: integer('week').notNull(),
   season: integer('season').notNull(),
+  seasonType: text('season_type').notNull().default('regular'),
   lockTime: timestamp('lock_time'),
   notes: text('notes'),
 });

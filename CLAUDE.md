@@ -142,6 +142,7 @@ All core infrastructure, screens, stats, and push notifications are complete. Pr
 11. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
 12. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
 13. **Leaderboard Season Selector** — all users (currently admin only)
+14. **Weekly picks summary email** — After picks lock on Wednesday 9PM, send each user an email summarizing their picks for the week using Resend. Include each game they picked with the team name. Use a clean dark-themed HTML email template matching the app's style.
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isGridiron=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.

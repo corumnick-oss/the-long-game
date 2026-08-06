@@ -156,6 +156,7 @@ exports.weekSettings = (0, pg_core_1.pgTable)('week_settings', {
     id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
     week: (0, pg_core_1.integer)('week').notNull(),
     season: (0, pg_core_1.integer)('season').notNull(),
+    seasonType: (0, pg_core_1.text)('season_type').notNull().default('regular'),
     lockTime: (0, pg_core_1.timestamp)('lock_time'),
     notes: (0, pg_core_1.text)('notes'),
 });

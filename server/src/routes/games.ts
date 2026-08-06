@@ -153,8 +153,9 @@ router.get('/', optionalAuth, async (req, res) => {
 
   // Compute pick % after lock
   let pickPctMap: Record<string, { homePickPct: number | null; awayPickPct: number | null }> = {};
+  let locked = false;
   if (week && gameList.length > 0) {
-    const locked = await isWeekLocked(week, season);
+    locked = await isWeekLocked(week, season, seasonType);
     if (locked) {
       const gameIds = gameList.map(g => g.id);
       const allPicks = await db.query.picks.findMany({
@@ -189,6 +190,7 @@ router.get('/', optionalAuth, async (req, res) => {
   res.json(gameList.map(game => ({
     ...game,
     isPicksOpen: unlockedWeekNums.has(game.week),
+    isLocked: locked,
     myPick: myPicksMap[game.id] ?? null,
     homePickPct: pickPctMap[game.id]?.homePickPct ?? null,
     awayPickPct: pickPctMap[game.id]?.awayPickPct ?? null,
@@ -224,7 +226,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   if (!game) { res.status(404).json({ error: 'Game not found' }); return; }
 
-  const locked = await isWeekLocked(game.week, game.season);
+  const locked = await isWeekLocked(game.week, game.season, game.seasonType);
 
   let pickBreakdown = null;
   if (locked) {
