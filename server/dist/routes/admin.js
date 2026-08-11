@@ -288,6 +288,39 @@ router.patch('/picks/:id', async (req, res) => {
     const [updated] = await db_1.db.update(schema.picks).set({ pick }).where((0, drizzle_orm_1.eq)(schema.picks.id, existing.id)).returning();
     res.json(updated);
 });
+// GET /api/admin/pick-audit-log?userId=X&week=Y&season=Z&seasonType=regular
+// Every pick action (create/update/delete/default_applied/admin_edit) with an exact
+// timestamp, resolved to readable team names -- for dispute resolution ("I never picked
+// that" / "I didn't change it"). Not paginated; capped at 300 rows, newest first.
+router.get('/pick-audit-log', async (req, res) => {
+    const userId = req.query['userId'];
+    const week = req.query['week'] ? parseInt(req.query['week'], 10) : undefined;
+    const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.query['seasonType'] ?? 'regular';
+    const conditions = [(0, drizzle_orm_1.sql) `g.season = ${season}`, (0, drizzle_orm_1.sql) `g.sport = 'nfl'`, (0, drizzle_orm_1.sql) `g.season_type = ${seasonType}`];
+    if (week)
+        conditions.push((0, drizzle_orm_1.sql) `g.week = ${week}`);
+    if (userId)
+        conditions.push((0, drizzle_orm_1.sql) `pal.user_id = ${userId}`);
+    const whereClause = conditions.reduce((acc, c) => (0, drizzle_orm_1.sql) `${acc} AND ${c}`);
+    const result = await db_1.db.execute((0, drizzle_orm_1.sql) `
+    SELECT
+      pal.id, pal.created_at, pal.action,
+      u.team_name AS player_name,
+      admin_u.team_name AS admin_name,
+      g.away_team, g.home_team, g.week, g.season_type,
+      CASE WHEN pal.previous_pick = 'home' THEN g.home_team WHEN pal.previous_pick = 'away' THEN g.away_team END AS previous_team,
+      CASE WHEN pal.new_pick = 'home' THEN g.home_team WHEN pal.new_pick = 'away' THEN g.away_team END AS new_team
+    FROM pick_audit_log pal
+    JOIN users u ON u.id = pal.user_id
+    JOIN games g ON g.id = pal.game_id
+    LEFT JOIN users admin_u ON admin_u.id = pal.admin_id
+    WHERE ${whereClause}
+    ORDER BY pal.created_at DESC
+    LIMIT 300
+  `);
+    res.json(result.rows ?? result);
+});
 // ── Unlock Week ───────────────────────────────────────────────────────────────
 router.post('/unlock-week', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();

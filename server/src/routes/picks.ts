@@ -176,6 +176,12 @@ router.post('/', requireAuth, async (req, res) => {
   });
 
   if (existing) {
+    if (existing.pick !== pick) {
+      await db.insert(schema.pickAuditLog).values({
+        userId: req.currentUser!.id, gameId, action: 'update',
+        previousPick: existing.pick, newPick: pick,
+      });
+    }
     await db.update(schema.picks).set({ pick }).where(eq(schema.picks.id, existing.id));
     res.json({ ...existing, pick });
   } else {
@@ -185,6 +191,10 @@ router.post('/', requireAuth, async (req, res) => {
       pick,
       pickWinProbability: pick === 'home' ? game.homeTeamFPI : game.awayTeamFPI,
     }).returning();
+    await db.insert(schema.pickAuditLog).values({
+      userId: req.currentUser!.id, gameId, action: 'create',
+      previousPick: null, newPick: pick,
+    });
     res.status(201).json(newPick);
   }
 });
@@ -202,6 +212,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
   const locked = await isWeekLocked(game.week, game.season, game.seasonType);
   if (locked) { res.status(403).json({ error: 'Picks are locked' }); return; }
 
+  await db.insert(schema.pickAuditLog).values({
+    userId: pick.userId, gameId: pick.gameId, action: 'delete',
+    previousPick: pick.pick, newPick: null,
+  });
   await db.delete(schema.picks).where(eq(schema.picks.id, pick.id));
   res.status(204).send();
 });

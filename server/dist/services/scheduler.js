@@ -187,6 +187,10 @@ async function applyDefaultPicks(week, season) {
                     pick,
                     pickWinProbability: game.winningTeamWinProb,
                 }).onConflictDoNothing();
+                await db_1.db.insert(schema.pickAuditLog).values({
+                    userId: user.id, gameId: game.id, action: 'default_applied',
+                    previousPick: null, newPick: pick,
+                });
             }
             (0, notificationService_1.notifyDefaultPicksApplied)(user.id, missing.length, week).catch(err => console.error('[Scheduler] notifyDefaultPicksApplied failed for user', user.id, err));
             console.log(`[Scheduler] Applied ${missing.length} default pick(s) for user ${user.id} (${seasonType})`);

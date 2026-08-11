@@ -16,10 +16,11 @@ import {
   useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
   useSyncTeamStats, useBroadcastNotification, useFeedbackList, type FeedbackItem,
   useSeasonStandingsPreview, useAwardSeasonTrophies,
+  usePickAuditLog, type PickAuditLogEntry,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
-type Tab = 'users' | 'tools' | 'data' | 'feedback';
+type Tab = 'users' | 'tools' | 'data' | 'feedback' | 'activity';
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
@@ -861,6 +862,90 @@ function FeedbackTab() {
   );
 }
 
+function actionLabel(e: PickAuditLogEntry): string {
+  switch (e.action) {
+    case 'create': return `Picked ${e.new_team}`;
+    case 'update': return `Changed pick from ${e.previous_team} to ${e.new_team}`;
+    case 'delete': return `Removed pick (was ${e.previous_team})`;
+    case 'default_applied': return `Auto-assigned ${e.new_team} (missed deadline)`;
+    case 'admin_edit': return `Admin (${e.admin_name ?? '?'}) changed pick to ${e.new_team}`;
+    default: return e.action;
+  }
+}
+
+function ActivityTab({ season }: { season: number }) {
+  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
+  const [week, setWeek] = useState(getCurrentNFLWeek());
+  const maxWeek = seasonType === 'preseason' ? 4 : 22;
+  const { data: entries = [], isLoading } = usePickAuditLog({ season, seasonType, week });
+
+  return (
+    <View className="flex-1">
+      {/* Season type toggle */}
+      <View className="flex-row bg-surface rounded-xl p-1 mx-4 mt-4 mb-3">
+        {(['regular', 'preseason'] as const).map(st => (
+          <TouchableOpacity
+            key={st}
+            onPress={() => { setSeasonType(st); setWeek(1); }}
+            className={`flex-1 py-2 rounded-lg items-center ${seasonType === st ? 'bg-primary' : ''}`}
+          >
+            <Text className={`text-sm font-semibold ${seasonType === st ? 'text-white' : 'text-muted'}`}>
+              {st === 'regular' ? 'Regular Season' : 'Preseason'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Week picker */}
+      <View className="mb-3 flex-row items-center justify-center" style={{ gap: 24 }}>
+        <TouchableOpacity
+          onPress={() => setWeek(w => Math.max(1, w - 1))}
+          className="w-9 h-9 bg-surface rounded-full items-center justify-center"
+        >
+          <Text className="text-white text-xl leading-6">−</Text>
+        </TouchableOpacity>
+        <Text className="text-white font-semibold" style={{ minWidth: 90, textAlign: 'center' }}>
+          {seasonType === 'preseason' ? `Pre ${week}` : `Week ${week}`}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setWeek(w => Math.min(maxWeek, w + 1))}
+          className="w-9 h-9 bg-surface rounded-full items-center justify-center"
+        >
+          <Text className="text-white text-xl leading-6">+</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center"><ActivityIndicator color="#3b82f6" /></View>
+      ) : entries.length === 0 ? (
+        <View className="flex-1 items-center justify-center px-8">
+          <Text className="text-muted text-sm text-center">No pick activity for this week</Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4">
+          {entries.map(e => (
+            <View key={e.id} className="bg-surface rounded-xl px-4 py-3 mb-2.5">
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-white font-semibold text-sm">{e.player_name}</Text>
+                <Text className="text-muted text-xs">
+                  {new Date(e.created_at).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+              <Text className="text-muted text-xs mb-1">{e.away_team} @ {e.home_team}</Text>
+              <Text className={`text-sm ${e.action === 'admin_edit' ? 'text-primary' : e.action === 'default_applied' ? 'text-amber-400' : 'text-white'}`}>
+                {actionLabel(e)}
+              </Text>
+            </View>
+          ))}
+          <View className="h-8" />
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
@@ -868,6 +953,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'tools', label: 'NFL Tools' },
   { id: 'data', label: 'Data' },
   { id: 'feedback', label: 'Feedback' },
+  { id: 'activity', label: 'Activity' },
 ];
 
 export default function AdminScreen() {
@@ -933,6 +1019,7 @@ export default function AdminScreen() {
         {tab === 'tools' && <ToolsTab season={adminSeason} />}
         {tab === 'data' && <DataTab season={adminSeason} />}
         {tab === 'feedback' && <FeedbackTab />}
+        {tab === 'activity' && <ActivityTab season={adminSeason} />}
       </View>
     </View>
   );

@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGameDetail, type PickEntry, type RecentGameEntry, type BoxScore } from '@/hooks/useGameDetail';
-import { useGames } from '@/hooks/usePicksData';
+import { useGames, useSubmitPick } from '@/hooks/usePicksData';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,6 +54,33 @@ function SplitBar({ leftPct, rightPct, leftLabel, rightLabel, title }: {
         <View style={{ flex: rightPct, backgroundColor: '#f59e0b' }} />
       </View>
     </View>
+  );
+}
+
+// ── Pick to win button ────────────────────────────────────────────────────────
+
+function PickButton({ picked, onPress, disabled, justSaved }: {
+  picked: boolean;
+  onPress: () => void;
+  disabled: boolean;
+  justSaved: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+      className={`flex-1 rounded-xl py-2.5 items-center border ${
+        justSaved ? 'bg-success/20 border-success'
+        : picked ? 'bg-primary/20 border-primary'
+        : 'bg-surface border-border'
+      }`}
+      style={{ opacity: disabled && !picked ? 0.4 : 1 }}
+    >
+      <Text className={`text-xs font-bold ${justSaved ? 'text-success' : picked ? 'text-primary' : 'text-muted'}`}>
+        {justSaved ? '✓ Saved' : picked ? '✓ Picked to win' : 'Pick to win'}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -118,6 +146,8 @@ export default function GameDetailScreen() {
 
   const { data: game, isLoading, isError } = useGameDetail(gameId);
   const { data: weekGames } = useGames(week, season);
+  const submitPick = useSubmitPick();
+  const [justSavedPick, setJustSavedPick] = useState<'home' | 'away' | null>(null);
 
   // Prev / Next within the week
   const orderedIds = weekGames?.map(g => g.id) ?? [];
@@ -158,6 +188,19 @@ export default function GameDetailScreen() {
   const hasPick = game.myPick !== null;
   const iWon = (myPickedHome && homeWins) || (myPickedAway && awayWins);
   const iLost = hasPick && isFinal && !iWon;
+
+  // Same eligibility rule as GameCard's canPick
+  const canPick = !game.isLocked && game.isPicksOpen && (isPre || isLive);
+
+  const handlePick = (pick: 'home' | 'away') => {
+    if (game.myPick === pick) return;
+    submitPick.mutate({ gameId, pick, week, season, seasonType }, {
+      onSuccess: () => {
+        setJustSavedPick(pick);
+        setTimeout(() => setJustSavedPick(null), 1200);
+      },
+    });
+  };
 
   const homePicks = game.pickBreakdown?.picks.filter(p => p.pick === 'home') ?? [];
   const awayPicks = game.pickBreakdown?.picks.filter(p => p.pick === 'away') ?? [];
@@ -298,6 +341,24 @@ export default function GameDetailScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* ── Pick buttons — separate tap targets from the team blocks above, which navigate to Team Detail ── */}
+        {canPick && (
+          <View className="flex-row px-4 mb-4" style={{ gap: 10 }}>
+            <PickButton
+              picked={myPickedAway}
+              disabled={submitPick.isPending}
+              justSaved={justSavedPick === 'away'}
+              onPress={() => handlePick('away')}
+            />
+            <PickButton
+              picked={myPickedHome}
+              disabled={submitPick.isPending}
+              justSaved={justSavedPick === 'home'}
+              onPress={() => handlePick('home')}
+            />
+          </View>
+        )}
 
         {/* ── Pre-game stats (season averages) ── */}
         {isPre && !game.isLocked && (game.awayPPG !== null || game.homeYPG !== null || game.homeTeamFPI !== null) && (

@@ -198,6 +198,12 @@ router.post('/', auth_1.requireAuth, async (req, res) => {
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.picks.userId, req.currentUser.id), (0, drizzle_orm_1.eq)(schema.picks.gameId, gameId)),
     });
     if (existing) {
+        if (existing.pick !== pick) {
+            await db_1.db.insert(schema.pickAuditLog).values({
+                userId: req.currentUser.id, gameId, action: 'update',
+                previousPick: existing.pick, newPick: pick,
+            });
+        }
         await db_1.db.update(schema.picks).set({ pick }).where((0, drizzle_orm_1.eq)(schema.picks.id, existing.id));
         res.json({ ...existing, pick });
     }
@@ -208,6 +214,10 @@ router.post('/', auth_1.requireAuth, async (req, res) => {
             pick,
             pickWinProbability: pick === 'home' ? game.homeTeamFPI : game.awayTeamFPI,
         }).returning();
+        await db_1.db.insert(schema.pickAuditLog).values({
+            userId: req.currentUser.id, gameId, action: 'create',
+            previousPick: null, newPick: pick,
+        });
         res.status(201).json(newPick);
     }
 });
@@ -232,6 +242,10 @@ router.delete('/:id', auth_1.requireAuth, async (req, res) => {
         res.status(403).json({ error: 'Picks are locked' });
         return;
     }
+    await db_1.db.insert(schema.pickAuditLog).values({
+        userId: pick.userId, gameId: pick.gameId, action: 'delete',
+        previousPick: pick.pick, newPick: null,
+    });
     await db_1.db.delete(schema.picks).where((0, drizzle_orm_1.eq)(schema.picks.id, pick.id));
     res.status(204).send();
 });

@@ -272,6 +272,33 @@ export type FeedbackItem = {
   createdAt: string;
 };
 
+export type PickAuditLogEntry = {
+  id: string;
+  created_at: string;
+  action: 'create' | 'update' | 'delete' | 'default_applied' | 'admin_edit';
+  player_name: string;
+  admin_name: string | null;
+  away_team: string;
+  home_team: string;
+  week: number;
+  season_type: string;
+  previous_team: string | null;
+  new_team: string | null;
+};
+
+export function usePickAuditLog(params: { season: number; seasonType: string; week?: number; userId?: string }) {
+  const { user } = useAuth();
+  const qs = new URLSearchParams({ season: String(params.season), seasonType: params.seasonType });
+  if (params.week) qs.set('week', String(params.week));
+  if (params.userId) qs.set('userId', params.userId);
+  return useQuery({
+    queryKey: ['admin', 'pick-audit-log', params.season, params.seasonType, params.week ?? null, params.userId ?? null, user?.uid ?? null],
+    queryFn: () => apiFetch<PickAuditLogEntry[]>(`/api/admin/pick-audit-log?${qs}`, undefined, user),
+    enabled: !!user,
+    staleTime: 15_000,
+  });
+}
+
 export function useFeedbackList() {
   const { user } = useAuth();
   return useQuery({

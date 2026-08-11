@@ -172,6 +172,10 @@ async function applyDefaultPicks(week: number, season: number): Promise<void> {
           pick,
           pickWinProbability: game.winningTeamWinProb,
         }).onConflictDoNothing();
+        await db.insert(schema.pickAuditLog).values({
+          userId: user.id, gameId: game.id, action: 'default_applied',
+          previousPick: null, newPick: pick,
+        });
       }
 
       notifyDefaultPicksApplied(user.id, missing.length, week).catch(err =>

@@ -253,6 +253,41 @@ router.patch('/picks/:id', async (req, res) => {
   res.json(updated);
 });
 
+// GET /api/admin/pick-audit-log?userId=X&week=Y&season=Z&seasonType=regular
+// Every pick action (create/update/delete/default_applied/admin_edit) with an exact
+// timestamp, resolved to readable team names -- for dispute resolution ("I never picked
+// that" / "I didn't change it"). Not paginated; capped at 300 rows, newest first.
+router.get('/pick-audit-log', async (req, res) => {
+  const userId = req.query['userId'] as string | undefined;
+  const week = req.query['week'] ? parseInt(req.query['week'] as string, 10) : undefined;
+  const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
+
+  const conditions = [sql`g.season = ${season}`, sql`g.sport = 'nfl'`, sql`g.season_type = ${seasonType}`];
+  if (week) conditions.push(sql`g.week = ${week}`);
+  if (userId) conditions.push(sql`pal.user_id = ${userId}`);
+  const whereClause = conditions.reduce((acc, c) => sql`${acc} AND ${c}`);
+
+  const result = await db.execute(sql`
+    SELECT
+      pal.id, pal.created_at, pal.action,
+      u.team_name AS player_name,
+      admin_u.team_name AS admin_name,
+      g.away_team, g.home_team, g.week, g.season_type,
+      CASE WHEN pal.previous_pick = 'home' THEN g.home_team WHEN pal.previous_pick = 'away' THEN g.away_team END AS previous_team,
+      CASE WHEN pal.new_pick = 'home' THEN g.home_team WHEN pal.new_pick = 'away' THEN g.away_team END AS new_team
+    FROM pick_audit_log pal
+    JOIN users u ON u.id = pal.user_id
+    JOIN games g ON g.id = pal.game_id
+    LEFT JOIN users admin_u ON admin_u.id = pal.admin_id
+    WHERE ${whereClause}
+    ORDER BY pal.created_at DESC
+    LIMIT 300
+  `);
+
+  res.json((result as any).rows ?? result);
+});
+
 // ── Unlock Week ───────────────────────────────────────────────────────────────
 
 router.post('/unlock-week', async (req, res) => {

@@ -228,6 +228,11 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   const locked = await isWeekLocked(game.week, game.season, game.seasonType);
 
+  const unlockedRow = await db.query.unlockedWeeks.findFirst({
+    where: and(eq(schema.unlockedWeeks.week, game.week), eq(schema.unlockedWeeks.season, game.season), eq(schema.unlockedWeeks.seasonType, game.seasonType)),
+  });
+  const isPicksOpen = !!unlockedRow;
+
   let pickBreakdown = null;
   if (locked) {
     const gamePicks = await db.query.picks.findMany({
@@ -341,6 +346,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     pickBreakdown,
     myPick,
     isLocked: locked,
+    isPicksOpen,
     homePPG:          statsMap[game.homeTeam]?.ppg ?? null,
     homePPGA:         statsMap[game.homeTeam]?.ppga ?? null,
     homeYPG:          statsMap[game.homeTeam]?.ypg ?? null,
