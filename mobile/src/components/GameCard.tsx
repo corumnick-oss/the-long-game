@@ -198,7 +198,9 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
   }, []);
 
   const showEditPickLink = hasPick && canPick && !unlockedForEdit && !justSaved;
-  const showLockedPill = hasPick && isLocked;
+  // Only pre-kickoff — once live/final the badge above (quarter+clock, or FINAL) already
+  // covers it, so "Picks locked" would just be a redundant second pill on the same card.
+  const showLockedPill = hasPick && isLocked && isPre;
   const rowsDisabled = !canPick || (hasPick && !unlockedForEdit);
 
   const handlePick = (pick: 'home' | 'away') => {
