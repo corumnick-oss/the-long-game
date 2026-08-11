@@ -73,6 +73,20 @@ For dispute resolution ("I never picked that" / "I didn't change it"):
 - New read-only Postgres view **`picks_readable`** (created via `server/src/scripts/create-picks-readable-view.ts`, already run against production — re-run anytime with `npx tsx --require dotenv/config src/scripts/create-picks-readable-view.ts` from `server/`, it's `CREATE OR REPLACE` so always safe) — lets Railway's DB browser show the matchup + actual picked team name next to each pick row instead of just raw game/user IDs. Not part of the app's query path, purely for manual inspection: `SELECT * FROM picks_readable ORDER BY created_at DESC;`
 - Game Detail screen (`game/[id].tsx`) now has a "Pick to win" button under each team — a separate tap target from the existing team blocks (which still navigate to Team Detail on tap, unchanged). Reuses the same `useSubmitPick` hook/eligibility rule (`canPick = !isLocked && isPicksOpen && (isPre || isLive)`) as the Picks tab's `GameCard`. `GET /api/games/:id` now also returns `isPicksOpen` (previously only the list route did) so this eligibility check works correctly on Game Detail.
 
+### ✅ Current-week/season-type detection fixed (root cause of "Week 18" notifications during preseason) — DONE (Aug 10 2026)
+Nick noticed weekly push notifications still said "make your Week 18 picks" during preseason. Root cause: `getCurrentNFLWeek()` derived "current week" by taking the max week number across ALL games for the season with no `seasonType` filter — once the full 2026 regular-season schedule (weeks 1-18) got synced ahead of time, it always won that comparison. Confirmed in `activity_log`: the Wednesday lock notification said "Week 18 picks are locked" every week since June regardless of what was actually happening.
+- Replaced with `getCurrentWeekAndType()` in `server/src/utils/season.ts` — **data-driven, not calendar-guessed** (calendar math doesn't work here: 2026's preseason "week 1" was a lone standalone Hall of Fame Game a full week before the real 16-game "week 2" slate). Regular season is considered active once its first game's kickoff has passed; otherwise preseason. Within whichever is active, current week = the first one whose picks aren't locked yet, so it auto-advances week to week and rolls from preseason into regular season the moment the latter's opening kickoff passes. `getCurrentNFLSeason()` itself was already correct (flips in March, not the September CLAUDE.md previously and incorrectly documented — fixed that too).
+- Threaded `seasonType` through every scheduler cron job and all push-notification text (`notificationService.ts`) — now says "Preseason Week X" during preseason instead of a bare "Week X". Tuesday's weekly-transition job no longer bails via the effectively-always-off `isPreseasonMode()` toggle; it now runs correctly for whichever season type is actually current. Win-prob sync crons skip preseason entirely (ESPN has no predictor data for it, confirmed directly against their API).
+- Added `GET /api/games/current-week` + mobile `useCurrentWeek()` hook so the Picks tab corrects its default landing week/season-type using the same data-driven answer, instead of guessing with calendar math (`getDefaultSeasonType()` in `picks.tsx` still exists as the fast initial paint, corrected once the real value loads).
+
+### ✅ Weekly picks proof-of-record email — SHIPPED (Aug 10 2026)
+Sends every user their own locked-in picks for the week as a private, individual email (dark-themed HTML matching app style) right after Wednesday 9PM lock, once default picks are applied so it reflects each user's final state. **One separate email per user, containing only that user's own picks — never anyone else's.**
+- `server/src/services/emailService.ts` — `sendWeeklyPicksEmails(week, season, seasonType, onlyUserId?)`, wired into the Wednesday 9PM cron in `scheduler.ts`. Uses [Resend](https://resend.com); `RESEND_API_KEY` in `server/.env` and Railway variables (**note: Nick regenerated this key once already — Resend only shows a key's value once at creation, so "Add API Key" again creates a new one, doesn't reveal the old one. If email stops working, check whether the key was regenerated and Railway wasn't updated to match.**)
+- **Domain**: `gridironsports.net` (bought and verified in Resend, DNS records added at registrar). Sender is `The Long Game <picks@gridironsports.net>`, set via `EMAIL_FROM` in Railway variables (falls back to Resend's shared `onboarding@resend.dev` if unset — **that shared sender can ONLY deliver to the Resend account's own verified email, not to real users, so `EMAIL_FROM` must stay set on Railway or the feature silently stops reaching anyone but the account owner**).
+- Testing tools: `sendPreviewEmail(toEmail, teamName)` in `emailService.ts` sends the real template with dummy picks (no real data needed) — use this to check template changes. Admin → NFL Tools → "Send Test Picks Email (to yourself)" button (`POST /api/admin/email/test`) sends the calling admin their own real current-week picks. `GET /api/admin/email/status` returns `{resendConfigured: boolean}` to unambiguously check whether `RESEND_API_KEY` reached the deployment (a 0-sent test result is otherwise ambiguous between "no picks" and "key missing").
+- Found and fixed a silent-failure bug while testing: the Resend SDK returns API errors as `{ error }` instead of throwing, so a rejected send was resolving "successfully" and getting counted as delivered. Now checked explicitly — see `sendWeeklyPicksEmails`'s per-user try block.
+- **Verified fully end-to-end against production** (Aug 10 2026): real `POST /api/admin/email/test` call against Railway returned `{ sent: 1, week: 2, season: 2026, seasonType: 'preseason' }` using Nicholas's actual current picks, delivered via the verified domain to his real app-account email (`nickcorum@gmail.com`, which is NOT the same address his Resend account is registered under — proving the shared-sender restriction is fully resolved). Wednesday 9PM lock should now email everyone automatically going forward.
+
 ### Next priority items:
 1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile. **This is the final gate before App Store + Google Play submission.** (Activity panel was removed — replaced by feedback modal.)
 2. **Rules/instructions page** — Before launch, add a rules page accessible from (a) onboarding (first-time user flow) and (b) somewhere in the app (Profile or Settings). Rules: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team, weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm copy + placement with Nick before building.
@@ -166,7 +180,6 @@ All core infrastructure, screens, stats, and push notifications are complete. Pr
 11. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
 12. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
 13. **Leaderboard Season Selector** — all users (currently admin only)
-14. **Weekly picks summary email** — After picks lock on Wednesday 9PM, send each user an email summarizing their picks for the week using Resend. Include each game they picked with the team name. Use a clean dark-themed HTML email template matching the app's style.
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isGridiron=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
@@ -177,10 +190,11 @@ export function getCurrentNFLSeason(): number {
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
-  return month >= 9 ? year : year - 1;
+  // Flip to new season in March — after the Super Bowl, before preseason
+  return month >= 3 ? year : year - 1;
 }
 ```
-NEVER hardcode 2025 or any year. Lives in `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts`.
+NEVER hardcode 2025 or any year. Lives in `server/src/utils/season.ts` and `mobile/src/lib/nflSeason.ts` (identical logic, kept in sync manually). This snippet previously said `month >= 9` here, which was stale/wrong — the actual code has flipped at March for a while; the doc just never got updated to match, which caused real confusion during the Aug 10 2026 "Week 18" bug investigation. **For "what week is it," don't use `getCurrentNFLSeason()` alone** — use `getCurrentWeekAndType()` (server) / `useCurrentWeek()` (mobile), which are data-driven and season-type-aware. See the Aug 10 2026 entries above.
 
 ---
 
@@ -579,12 +593,10 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 
 ## Open Questions — Ask Nick Before Deciding
 
-- Preseason season flip: change `getCurrentNFLSeason()` to flip on Aug 7, or use app_settings `preseasonStartDate`?
 - Past seasons: how many years back to support in season selector?
 - Season trophy (podium) real artwork — currently emoji placeholders (🥇🥈🥉🥄), same path as Achievements (ChatGPT-generated images later)
 - Premium pricing and features
 - Google Play account setup timing
-- Domain name decision
 
 ---
 
