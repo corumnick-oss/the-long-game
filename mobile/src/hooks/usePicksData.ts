@@ -80,6 +80,17 @@ export function useGames(week: number, season: number, seasonType: 'regular' | '
   });
 }
 
+// Data-driven current week/season type — same logic the server's cron jobs use, not client
+// calendar-math guessing (which doesn't reliably track ESPN's actual week numbering, e.g.
+// 2026's preseason "week 1" was a lone standalone game a week before the real "week 2" slate).
+export function useCurrentWeek() {
+  return useQuery({
+    queryKey: ['current-week'],
+    queryFn: () => apiFetch<{ week: number; season: number; seasonType: 'regular' | 'preseason' }>('/api/games/current-week'),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useTiebreaker(week: number, season: number) {
   const { user } = useAuth();
   return useQuery({

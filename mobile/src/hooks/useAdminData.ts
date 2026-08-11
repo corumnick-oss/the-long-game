@@ -240,6 +240,13 @@ export function useSendTestNotification() {
   });
 }
 
+export function useSendTestEmail() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: () => apiFetch<{ sent: number; week: number; season: number; seasonType: string }>('/api/admin/email/test', { method: 'POST' }, user),
+  });
+}
+
 export function useScheduleTestNotification() {
   const { user } = useAuth();
   return useMutation({

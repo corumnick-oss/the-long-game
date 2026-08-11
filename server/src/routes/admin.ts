@@ -398,6 +398,26 @@ router.post('/notifications/test', async (req, res) => {
   }
 });
 
+// Send the calling admin their own current-week picks as a test email, without waiting
+// for Wednesday 9PM. Falls back to whatever week actually has games for the admin's picks.
+router.post('/email/test', async (req, res) => {
+  try {
+    const { sendWeeklyPicksEmails } = await import('../services/emailService');
+    const { getCurrentWeekAndType, getCurrentNFLSeason } = await import('../utils/season');
+    const { week, seasonType } = await getCurrentWeekAndType();
+    const season = getCurrentNFLSeason();
+    const sent = await sendWeeklyPicksEmails(week, season, seasonType, req.currentUser!.id);
+    if (sent === 0) {
+      res.status(400).json({ error: `No picks found for you in ${seasonType} week ${week} — make a pick first, or check RESEND_API_KEY is set.` });
+      return;
+    }
+    res.json({ sent, week, season, seasonType });
+  } catch (err: any) {
+    console.error('[Admin] email/test error:', err);
+    res.status(500).json({ error: err?.message ?? 'Unknown error' });
+  }
+});
+
 let scheduledTestTimeout: ReturnType<typeof setTimeout> | null = null;
 let scheduledTestUserId: string | null = null;
 

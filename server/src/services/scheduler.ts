@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { syncWeekGames, updateLiveScores, syncWinProbabilities, backfillTeamStats } from './espnService';
 import { awardWeeklyTrophies } from './trophyService';
 import { notifyWeekUnlocked, notifyDeadlineApproaching, notifyPicksLocked, notifyDefaultPicksApplied } from './notificationService';
+import { sendWeeklyPicksEmails } from './emailService';
 import { getCurrentNFLSeason, getCurrentWeekAndType } from '../utils/season';
 import { db } from '../db';
 import { games } from '../db/schema';
@@ -108,6 +109,11 @@ cron.schedule('0 21 * * 3', async () => {
     await notifyPicksLocked(week, seasonType);
     await logActivity('picks_locked', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are locked. Good luck!`, 'global', { metadata: { week, season, seasonType } });
     await applyDefaultPicks(week, season, seasonType);
+
+    // Proof-of-picks email, sent after default picks so it reflects each user's final state.
+    sendWeeklyPicksEmails(week, season, seasonType).catch(err =>
+      console.error('[Scheduler] sendWeeklyPicksEmails failed:', err)
+    );
   } catch (err) {
     console.error('[Scheduler] Wednesday 9PM lock notification failed:', err);
   }

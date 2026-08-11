@@ -40,6 +40,7 @@ const node_cron_1 = __importDefault(require("node-cron"));
 const espnService_1 = require("./espnService");
 const trophyService_1 = require("./trophyService");
 const notificationService_1 = require("./notificationService");
+const emailService_1 = require("./emailService");
 const season_1 = require("../utils/season");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
@@ -141,6 +142,8 @@ node_cron_1.default.schedule('0 21 * * 3', async () => {
         await (0, notificationService_1.notifyPicksLocked)(week, seasonType);
         await (0, activity_1.logActivity)('picks_locked', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are locked. Good luck!`, 'global', { metadata: { week, season, seasonType } });
         await applyDefaultPicks(week, season, seasonType);
+        // Proof-of-picks email, sent after default picks so it reflects each user's final state.
+        (0, emailService_1.sendWeeklyPicksEmails)(week, season, seasonType).catch(err => console.error('[Scheduler] sendWeeklyPicksEmails failed:', err));
     }
     catch (err) {
         console.error('[Scheduler] Wednesday 9PM lock notification failed:', err);

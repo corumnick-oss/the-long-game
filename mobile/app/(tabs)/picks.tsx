@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { getCurrentNFLWeek, getCurrentNFLSeason } from '@/lib/nflSeason';
-import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker, type Game } from '@/hooks/usePicksData';
+import { useGames, useTiebreaker, useSubmitPick, useSubmitTiebreaker, useCurrentWeek, type Game } from '@/hooks/usePicksData';
 import { WeekSelector } from '@/components/WeekSelector';
 import { GameCard } from '@/components/GameCard';
 import { TiebreakerCard } from '@/components/TiebreakerCard';
@@ -25,6 +25,20 @@ export default function PicksScreen() {
   const [season, setSeason] = useState(MAX_SEASON);
   const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>(getDefaultSeasonType);
   const [selectedWeek, setSelectedWeek] = useState(CURRENT_WEEK);
+
+  // Client-side guesses above are just a fast initial paint — correct them once with the
+  // server's data-driven answer (same logic the lock/notification cron uses) as soon as it
+  // loads, but only if the user hasn't already navigated away from the current season.
+  const { data: currentWeekData } = useCurrentWeek();
+  const appliedServerDefault = useRef(false);
+  useEffect(() => {
+    if (!currentWeekData || appliedServerDefault.current) return;
+    appliedServerDefault.current = true;
+    if (season === MAX_SEASON) {
+      setSeasonType(currentWeekData.seasonType);
+      setSelectedWeek(currentWeekData.week);
+    }
+  }, [currentWeekData, season]);
 
   // Batch season/type + week changes in one call so React renders
   // the new season and week=1 together — prevents a brief flash of

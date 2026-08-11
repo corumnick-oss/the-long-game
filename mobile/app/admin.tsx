@@ -13,7 +13,7 @@ import {
   useSyncGamesForFutureSeason, useSyncFullSeasonForFutureSeason,
   useAwardTrophies, useUnlockWeek,
   useCorrectScore, useExportWeekPicks, useExportData,
-  useSendTestNotification, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
+  useSendTestNotification, useSendTestEmail, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
   useSyncTeamStats, useBroadcastNotification, useFeedbackList, type FeedbackItem,
   useSeasonStandingsPreview, useAwardSeasonTrophies,
   usePickAuditLog, type PickAuditLogEntry,
@@ -263,6 +263,7 @@ function ToolsTab({ season }: { season: number }) {
   const awardSeasonTrophies = useAwardSeasonTrophies();
   const unlockWeek = useUnlockWeek();
   const sendTest = useSendTestNotification();
+  const sendTestEmail = useSendTestEmail();
   const scheduleTest = useScheduleTestNotification();
   const cancelScheduled = useCancelScheduledTest();
   const tokenStatus = useTokenStatus();
@@ -505,6 +506,18 @@ function ToolsTab({ season }: { season: number }) {
                 }
               },
               onError: (err: any) => setResult('notif_test', `✗ ${err?.message ?? 'Send failed'}`),
+            })
+          }
+        />
+
+        <ActionBtn
+          label="Send Test Picks Email (to yourself)"
+          loading={sendTestEmail.isPending}
+          result={results['email_test']}
+          onPress={() =>
+            sendTestEmail.mutate(undefined, {
+              onSuccess: (r) => setResult('email_test', `✓ Sent — check your inbox (${r.seasonType} week ${r.week})`),
+              onError: (err: any) => setResult('email_test', `✗ ${err?.message ?? 'Send failed'}`),
             })
           }
         />
