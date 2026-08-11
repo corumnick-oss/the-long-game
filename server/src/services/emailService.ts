@@ -39,11 +39,6 @@ function buildEmailHtml(teamName: string, weekLabel: string, season: number, pic
           <span style="color:#6b7280;"> @ </span>
           <span style="${p.pickedHome ? 'color:#ffffff;font-weight:600;' : 'color:#6b7280;'}">${p.homeTeam}</span>
         </div>
-        <div style="margin-top:6px;">
-          <span style="display:inline-block;background:rgba(59,130,246,0.15);border:1px solid #3b82f6;color:#3b82f6;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;">
-            ✓ ${p.pickedTeam}
-          </span>
-        </div>
       </td>
     </tr>
   `).join('');
