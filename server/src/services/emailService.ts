@@ -86,6 +86,29 @@ function buildEmailHtml(teamName: string, weekLabel: string, season: number, pic
 </html>`;
 }
 
+const DUMMY_PICKS: PickRow[] = [
+  { awayTeam: 'Dallas Cowboys', homeTeam: 'Seattle Seahawks', awayTeamLogo: null, homeTeamLogo: null, pickedTeam: 'Dallas Cowboys', pickedHome: false, gameTime: new Date('2026-08-15T17:00:00Z') },
+  { awayTeam: 'Philadelphia Eagles', homeTeam: 'Baltimore Ravens', awayTeamLogo: null, homeTeamLogo: null, pickedTeam: 'Baltimore Ravens', pickedHome: true, gameTime: new Date('2026-08-15T23:00:00Z') },
+  { awayTeam: 'Los Angeles Rams', homeTeam: 'Kansas City Chiefs', awayTeamLogo: null, homeTeamLogo: null, pickedTeam: 'Kansas City Chiefs', pickedHome: true, gameTime: new Date('2026-08-16T00:00:00Z') },
+  { awayTeam: 'Green Bay Packers', homeTeam: 'Pittsburgh Steelers', awayTeamLogo: null, homeTeamLogo: null, pickedTeam: 'Green Bay Packers', pickedHome: false, gameTime: new Date('2026-08-16T02:30:00Z') },
+];
+
+// Preview/testing only — sends the real template with made-up picks so the design can be
+// checked without needing real locked-in data for the current week.
+export async function sendPreviewEmail(toEmail: string, teamName = 'Preview'): Promise<{ ok: boolean; error?: string }> {
+  const client = getClient();
+  if (!client) return { ok: false, error: 'RESEND_API_KEY not set' };
+
+  const { error } = await client.emails.send({
+    from: FROM_ADDRESS,
+    to: toEmail,
+    subject: 'Preview: Your Preseason Week 2 picks — The Long Game',
+    html: buildEmailHtml(teamName, 'Preseason Week 2', 2026, DUMMY_PICKS),
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 // Sends every user their locked-in picks for the week as a proof-of-record email.
 // Called right after picks lock (and after default picks are applied), so it reflects
 // each user's final state including any auto-assigned picks.
