@@ -59,7 +59,19 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 - Also fixed: mobile's `useSyncScores` hook never sent `seasonType` at all (silently requested regular-season data during preseason and failed — this was the proximate cause of the "Sync Scores Only" button failure Nick hit); removed the dead-end duplicate `syncWeekScores` function (no fallback, no grading) in favor of routing through the fixed `syncWeekGames`; added `npm run sync:games -- <week> <season> <seasonType>` as a reusable local backfill script (matches the `sync:winprobs`/`backfill:stats` pattern).
 - **Verified against production**: the Aug 6 game now shows `status=post`, `homeScore=30`, `awayScore=33`, `period=4`, `STATUS_FINAL`; all 6 picks on it graded correctly. This week's real 16-game preseason slate (ESPN's own "week 1" turned out to be just the standalone Hall of Fame Game — the main slate is "week 2", kicking off Thu Aug 13) didn't even exist in the DB yet and has been synced in with correct kickoff times, picks open and unlocked.
 - **Small UI fix in the same pass**: the "🔒 Picks locked" pill (added in the Aug 5 lock-time fix above) was showing even once a game went live or final, sitting redundantly next to the quarter/clock or FINAL badge. Now gated to pre-kickoff only (`GameCard.tsx`).
-- **Still pending**: the mobile-side changes (Sync Scores fix, locked-pill fix) are committed to git but need an OTA publish (`eas update --branch preview`) to reach the TestFlight build — not yet run, pending Nick's go-ahead.
+- **OTA published Aug 10 2026** — the mobile-side changes (Sync Scores fix, locked-pill fix) shipped via `eas update --branch preview`, confirmed working on Nick's device (close + reopen app to pick up).
+
+### ✅ Week Picks Gridirons/Global filter — DONE (Aug 10 2026). `GET /api/picks/week` was hardcoded to Gridirons-only for every viewer, no selector at all. Now mirrors `/api/leaderboard`'s filter pattern exactly: Gridirons default to seeing Gridirons and can toggle to Global (same `Toggle` UI as the Leaderboard tab); everyone else is always forced to `'global'` server-side regardless of what's requested, and the toggle is only rendered for Gridirons in the first place. `useWeekPicks` hook and `week-picks.tsx` updated to match.
+
+### Preseason win probability — CONFIRMED: no data, not a bug
+Nick asked why preseason games don't show win probability on Game Detail. Tested directly against ESPN's `/summary` for an actual 2026 preseason game — the `predictor` field (FPI-based projection the app reads) is simply absent for preseason games; ESPN doesn't publish it (FPI is a season-strength model, preseason rosters/lineups aren't representative). Also, `syncWinProbabilities()` in `espnService.ts` is hardcoded to `seasonType='regular'` anyway. Nothing to fix — this is an ESPN data-availability limit, not a sync bug. Don't "fix" this again without first re-checking whether ESPN has started publishing preseason predictor data.
+
+### ✅ Admin pick-activity audit trail + readable DB view + pick-from-Game-Detail — DONE (Aug 10 2026)
+For dispute resolution ("I never picked that" / "I didn't change it"):
+- `pick_audit_log` (already existed in schema, but was only written to on admin overrides) now logs **every** pick action — `create`, `update`, `delete` (in `picks.ts`), `default_applied` (in `scheduler.ts`'s `applyDefaultPicks`), and `admin_edit` (unchanged) — each with an exact server timestamp.
+- New `GET /api/admin/pick-audit-log?season=&seasonType=&week=&userId=` resolves entries to readable team names (joins `users`/`games`). New Admin → **Activity** tab (5th tab) browses it by season type + week, showing player, matchup, exact timestamp, and a plain-English action description (e.g. "Changed pick from Seahawks to Cowboys").
+- New read-only Postgres view **`picks_readable`** (created via `server/src/scripts/create-picks-readable-view.ts`, already run against production — re-run anytime with `npx tsx --require dotenv/config src/scripts/create-picks-readable-view.ts` from `server/`, it's `CREATE OR REPLACE` so always safe) — lets Railway's DB browser show the matchup + actual picked team name next to each pick row instead of just raw game/user IDs. Not part of the app's query path, purely for manual inspection: `SELECT * FROM picks_readable ORDER BY created_at DESC;`
+- Game Detail screen (`game/[id].tsx`) now has a "Pick to win" button under each team — a separate tap target from the existing team blocks (which still navigate to Team Detail on tap, unchanged). Reuses the same `useSubmitPick` hook/eligibility rule (`canPick = !isLocked && isPicksOpen && (isPre || isLive)`) as the Picks tab's `GameCard`. `GET /api/games/:id` now also returns `isPicksOpen` (previously only the list route did) so this eligibility check works correctly on Game Detail.
 
 ### Next priority items:
 1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile. **This is the final gate before App Store + Google Play submission.** (Activity panel was removed — replaced by feedback modal.)
@@ -453,7 +465,7 @@ The 2026 preseason (Aug 7–Sept 3) is a REAL picks period:
 
 **Bottom Tabs:** Picks 🏈 | Leaderboard 🏆 | Week Picks 👥 | Profile 👤  
 **Bell icon** (header top-right) — Activity panel: Global Feed | Your Activity, paginated 20/load  
-**Admin** — Profile → ⚙️ Settings → Admin Dashboard (admins only). Tabs: Users | NFL Tools | Data
+**Admin** — Profile → ⚙️ Settings → Admin Dashboard (admins only). Tabs: Users | NFL Tools | Data | Feedback | Activity (pick-action audit trail, added Aug 10 2026)
 
 ---
 
