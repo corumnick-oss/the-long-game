@@ -60,7 +60,7 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 6. **ascAppId for non-interactive TestFlight submits** — add to `eas.json` submit.preview profile so `eas submit --non-interactive` works without Nick's Apple ID/2FA each time. Find in App Store Connect → My Apps → The Long Game → General → App Information → Apple ID (10-digit number).
 
 ### Win Probability — weekly workflow
-Before each week's games: run `npm run sync:winprobs <week> 2026` from `server/`. Example: `npm run sync:winprobs 1 2026`. The admin "Sync Win Probabilities" button is blocked on Railway (ESPN IP block on /summary endpoint — see ESPN section below). Run locally once per week, ideally Wednesday afternoon before the 9PM lock.
+As of Aug 10 2026 the Admin → NFL Tools → "Sync Win Probabilities" button should work directly from Railway (the old "IP block" was actually a bad User-Agent header, now fixed — see ESPN section below). If it ever fails again, fall back to running locally: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 9PM lock.
 
 ### Achievement images + Profile display redesign — DONE
 All 5 images wired in (`mobile/assets/achievements/`), Achievement Case redesigned to full-bleed badge images with no item cap. Shown on both own Profile and public profiles, season-filtered. See "Achievement & Trophy System" section above.
@@ -406,15 +406,25 @@ All 5 achievement images done, in `mobile/assets/achievements/{most_wins,loser,u
 
 All 5 push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`.
 
-### ESPN `/summary` Endpoint — Railway IP Block
-ESPN returns 400 for any `/summary?event=` request from Railway's server IP (confirmed — even with browser User-Agent headers). This affects two things:
+### ✅ RESOLVED (Aug 10 2026) — "Railway IP Block" on ESPN was actually a bad User-Agent header
+Every ESPN call in `espnService.ts` (and `sync-2026-local.ts`) sent a hardcoded desktop-Chrome
+`User-Agent` string on every request. Tested directly against `site.api.espn.com` from multiple
+networks: that header alone — with none of a real browser's other fingerprint headers — gets
+403'd by Akamai's bot detection on **every** endpoint (`/scoreboard`, `/summary`, `/teams/*/schedule`),
+including requests that otherwise succeed fine. This was never Railway-specific; a request with no
+UA override (axios/curl default) succeeds from anywhere, including Railway. Removed the UA override
+entirely (`ESPN_HEADERS` now just sends `Accept: application/json`). Confirmed against production
+that live scores, quarter/clock, and pick grading now flow automatically via the 30-second cron —
+no manual sync should be needed most weeks going forward.
 
-1. **Stats backfill** — must run locally: `npm run backfill:stats` in server/
-2. **Win probability sync** — must run locally: `npm run sync:winprobs <week> <season>` in server/
-   - Example before week 1: `npm run sync:winprobs 1 2026`
-   - The Tuesday/Wednesday cron jobs attempt this automatically but will fail if Railway is still blocked. The Admin → NFL Tools → "Sync Win Probabilities" button also fails for the same reason.
-   - **Workaround:** run the local script before each week's games. Re-run if you see `homeTeamFPI`/`awayTeamFPI` null on GameCards.
-   - Live score updates are NOT affected (they use the scoreboard endpoint, not /summary).
+The section below describing the old workaround is kept for reference / in case Akamai's rules
+change again, but as of this fix the local-script requirement should no longer apply:
+
+1. Stats backfill: `npm run backfill:stats` in server/ (should now also work via Admin → NFL Tools button)
+2. Win probability sync: `npm run sync:winprobs <week> <season>` in server/ (should now also work via the admin button / Tuesday-Wednesday crons)
+3. New: `npm run sync:games -- <week> <season> <seasonType>` — reusable local wrapper around `syncWeekGames`, for manual backfill if a week's automatic sync ever misses (e.g. `npm run sync:games -- 1 2026 preseason`).
+
+If any of these start failing with 403s again, re-run the diagnostic: `curl -A "axios/1.7.9" -H "Accept: application/json" "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=1&season=2026&limit=50"` — a plain/no-UA request succeeding while the app's requests fail would point back at a header/fingerprint issue, not an IP block.
 
 ### Lock Times
 - Default: Wednesday 9PM PST
@@ -473,8 +483,7 @@ Rule 12 is now expanded: H2H pick comparison on public profiles shows current we
 - **Game Detail** — pre-game: season averages (PPG, YPG, 3rd Down %, Red Zone %, Sacks, Turnovers); post-game: actual box score; live: neither
 - **Team Detail** — PPG, YPG, efficiency stats (3rd Down %, Red Zone %, Sacks/G, Turnovers/G). Stats fall back to 2025 when no 2026 games played.
 - **Public Profile** — Season selector (past seasons viewable). Pick comparison with `WeekSelector` for browsing any past week's H2H. Comparison hidden before lock for current week, always visible for past weeks/seasons. Profile stats (record, week history, H2H, insights) filter to regular season only — preseason excluded.
-- **Admin Sync Team Stats button** — hits Railway (blocked) — use `npm run backfill:stats` locally instead
-- **Admin Sync Win Probabilities button** — hits Railway (blocked) — use `npm run sync:winprobs <week> <season>` locally instead
+- **Admin Sync Team Stats / Win Probabilities buttons** — should now work directly from Railway (Aug 10 2026 fix, see ESPN section). If either ever 403s again, fall back to `npm run backfill:stats` / `npm run sync:winprobs <week> <season>` locally.
 
 ---
 
