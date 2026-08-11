@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useWeekPicks, type WeekPicksGame, type WeekPicksUser } from '@/hooks/useWeekPicks';
+import { useCurrentWeek } from '@/hooks/usePicksData';
 import { useMyProfile } from '@/hooks/useProfile';
 import { WeekSelector } from '@/components/WeekSelector';
 
@@ -147,6 +148,19 @@ export default function WeekPicksScreen() {
 
   useEffect(() => { setSelectedWeek(1); }, [entryIdx]);
   useEffect(() => { if (profile?.isGridiron) setFilter('gridirons'); }, [profile?.isGridiron]);
+
+  // currentWeek above is a fast calendar-math guess that can't compute past "week 1" for
+  // the whole preseason window — correct it once with the server's data-driven answer,
+  // but only while still viewing the default (current) season/type entry.
+  const { data: currentWeekData } = useCurrentWeek();
+  const appliedServerDefault = useRef(false);
+  useEffect(() => {
+    if (!currentWeekData || appliedServerDefault.current) return;
+    appliedServerDefault.current = true;
+    if (entry.year === currentWeekData.season && entry.seasonType === currentWeekData.seasonType) {
+      setSelectedWeek(currentWeekData.week);
+    }
+  }, [currentWeekData, entry]);
 
   // Synchronized horizontal scroll across header + all user rows.
   // isSyncing blocks echo events: scrollTo fires onScroll on the target view,
