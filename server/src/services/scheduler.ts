@@ -15,11 +15,12 @@ async function getActiveWeek(): Promise<number> {
   return getCurrentNFLWeek();
 }
 
-// Every 30 seconds — live score updates (only during active games)
+// Every 30 seconds — live score updates. updateLiveScores() itself finds games that should
+// have started but aren't final yet, so this must run unconditionally — it's what bootstraps
+// the pre→in transition in the first place, not just what keeps an already-live game updated.
 cron.schedule('*/30 * * * * *', async () => {
   try {
-    const liveGames = await db.query.games.findMany({ where: eq(games.status, 'in') });
-    if (liveGames.length > 0) await updateLiveScores();
+    await updateLiveScores();
   } catch (err) {
     console.error('[Scheduler] Live score update failed:', err);
   }

@@ -16,9 +16,12 @@ export interface WeeklyTrophyResults {
   contrarian: ContrarianCandidate[];
 }
 
-export async function calculateWeeklyTrophies(week: number, season: number): Promise<WeeklyTrophyResults> {
+// seasonType matters here: preseason and regular season both number their weeks 1-4/1-18,
+// so without this filter a regular-season Week 1 calculation would also pull in preseason
+// Week 1's games (same week + season), double-counting/misattributing picks across the two.
+export async function calculateWeeklyTrophies(week: number, season: number, seasonType: string = 'regular'): Promise<WeeklyTrophyResults> {
   const weekGames = await db.query.games.findMany({
-    where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl')),
+    where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
   });
 
   const completedGames = weekGames.filter(g => g.status === 'post');
@@ -159,9 +162,9 @@ export async function calculateWeeklyTrophies(week: number, season: number): Pro
   return { mostWins, mostLosses, upsetPick, loneWolf, contrarian };
 }
 
-export async function awardWeeklyTrophies(week: number, season: number, specificType?: string): Promise<number> {
+export async function awardWeeklyTrophies(week: number, season: number, specificType?: string, seasonType: string = 'regular'): Promise<number> {
   console.log(`Awarding trophies for Week ${week}, Season ${season}${specificType ? ` (${specificType})` : ''}...`);
-  const results = await calculateWeeklyTrophies(week, season);
+  const results = await calculateWeeklyTrophies(week, season, seasonType);
 
   type TrophyInsert = typeof schema.trophies.$inferInsert;
   const toAward: TrophyInsert[] = [];

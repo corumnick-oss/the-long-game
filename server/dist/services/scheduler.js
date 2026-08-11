@@ -50,12 +50,12 @@ const PT = { timezone: 'America/Los_Angeles' };
 async function getActiveWeek() {
     return (0, season_1.getCurrentNFLWeek)();
 }
-// Every 30 seconds — live score updates (only during active games)
+// Every 30 seconds — live score updates. updateLiveScores() itself finds games that should
+// have started but aren't final yet, so this must run unconditionally — it's what bootstraps
+// the pre→in transition in the first place, not just what keeps an already-live game updated.
 node_cron_1.default.schedule('*/30 * * * * *', async () => {
     try {
-        const liveGames = await db_1.db.query.games.findMany({ where: (0, drizzle_orm_1.eq)(schema_1.games.status, 'in') });
-        if (liveGames.length > 0)
-            await (0, espnService_1.updateLiveScores)();
+        await (0, espnService_1.updateLiveScores)();
     }
     catch (err) {
         console.error('[Scheduler] Live score update failed:', err);

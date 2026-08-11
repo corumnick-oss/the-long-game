@@ -169,6 +169,9 @@ router.patch('/games/:id', async (req, res) => {
     await (0, activity_1.logActivity)('score_correction', `Score corrected: ${updated.awayTeam} @ ${updated.homeTeam}`, 'global', { metadata: { gameId: updated.id } });
     res.json(updated);
 });
+// "Sync Scores" is now just syncWeekGames — it already tries /scoreboard first and falls
+// back to the team-schedule path, grades finished picks, and fires notifications, all of
+// which the old syncWeekScores (plain /scoreboard, no fallback) didn't do.
 router.post('/games/sync-scores', async (req, res) => {
     const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
     const week = parseInt(req.body.week, 10);
@@ -177,8 +180,15 @@ router.post('/games/sync-scores', async (req, res) => {
         res.status(400).json({ error: 'week required' });
         return;
     }
-    const count = await (0, espnService_1.syncWeekScores)(week, season, seasonType);
-    res.json({ updated: count, week, season });
+    try {
+        const count = await (0, espnService_1.syncWeekGames)(week, season, seasonType);
+        await (0, activity_1.logActivity)('admin_sync', `Admin synced scores for ${count} games in Week ${week}`, 'admin', { metadata: { week, season, seasonType } });
+        res.json({ updated: count, week, season });
+    }
+    catch (err) {
+        const msg = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message ?? 'Unknown error');
+        res.status(500).json({ error: `Score sync failed: ${msg}` });
+    }
 });
 // ── Team Stats Backfill ───────────────────────────────────────────────────────
 router.post('/sync-team-stats', async (req, res) => {

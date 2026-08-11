@@ -194,10 +194,10 @@ export function useUnlockWeek() {
 export function useSyncScores() {
   const { user } = useAuth();
   return useMutation({
-    mutationFn: ({ week, season }: { week: number; season: number }) =>
+    mutationFn: ({ week, season, seasonType = 'regular' }: { week: number; season: number; seasonType?: string }) =>
       apiFetch<{ updated: number; week: number; season: number }>(
         '/api/admin/games/sync-scores',
-        { method: 'POST', body: JSON.stringify({ week, season }) },
+        { method: 'POST', body: JSON.stringify({ week, season, seasonType }) },
         user,
       ),
   });

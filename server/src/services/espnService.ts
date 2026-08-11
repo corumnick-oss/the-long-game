@@ -1,8 +1,7 @@
 import axios from 'axios';
 import { db } from '../db';
 import { games, picks, teamGameStats } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
-import { getCurrentNFLSeason } from '../utils/season';
+import { eq, and, ne, lte, sql } from 'drizzle-orm';
 import { notifyGameFinal } from './notificationService';
 
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
@@ -55,6 +54,18 @@ function parseStatus(state: string): 'pre' | 'in' | 'post' {
 
 function totalRecord(comp: ESPNCompetitor): string | null {
   return comp.records?.find(r => r.type === 'total')?.summary ?? null;
+}
+
+// Grades every pick for a finished game (sets picks.isCorrect). This is the only place that
+// writes isCorrect for live (non-migrated) games — leaderboard/H2H/achievements all read it,
+// so if a sync path adds a game without calling this, results for that game silently never count.
+// Ties are left ungraded (null) — not a win or a loss for either side.
+async function gradeGamePicks(gameId: string, homeScore: number, awayScore: number): Promise<void> {
+  if (homeScore === awayScore) return;
+  const homeWon = homeScore > awayScore;
+  await db.update(picks)
+    .set({ isCorrect: sql`(${picks.pick} = 'home') = ${homeWon}` })
+    .where(eq(picks.gameId, gameId));
 }
 
 // Sync for future seasons: ESPN's scoreboard and core API are blocked from server-side
@@ -154,7 +165,7 @@ export async function syncGamesByEventIds(
         isScoreLocked: false,
       };
 
-      await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
+      const [savedGame] = await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
         target: games.espnId,
         set: {
           status: row.status, homeScore: row.homeScore, awayScore: row.awayScore,
@@ -163,8 +174,14 @@ export async function syncGamesByEventIds(
           homeTeamLogo: row.homeTeamLogo, awayTeamLogo: row.awayTeamLogo,
           spread: row.spread, favoriteTeam: row.favoriteTeam, gameTime: row.gameTime,
         },
-      });
+      }).returning({ id: games.id });
       upserted++;
+
+      if (savedGame && row.status === 'post' && row.homeScore != null && row.awayScore != null) {
+        await gradeGamePicks(savedGame.id, row.homeScore, row.awayScore).catch(err =>
+          console.error(`[ESPN] gradeGamePicks failed for game ${savedGame.id}:`, err)
+        );
+      }
     } catch (err: any) {
       console.warn(`[ESPN] failed to sync event ${eventId}: ${err?.message}`);
     }
@@ -173,19 +190,26 @@ export async function syncGamesByEventIds(
 }
 
 export async function syncWeekGames(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
-  // For future seasons ESPN's scoreboard returns 400 or wrong-year data from server-side requests.
-  // Skip it entirely and use the core API which has the actual schedule.
-  if (season > getCurrentNFLSeason()) {
-    return syncWeekGamesFromTeamSchedules(week, season, seasonType);
-  }
-
+  // ESPN's /scoreboard has historically 400'd (or returned wrong-year data) for requests
+  // Railway considers "future" — try it first (it's the richer, single-call endpoint), and
+  // fall back to the team-schedule + per-event /summary path (syncWeekGamesFromTeamSchedules)
+  // on any failure or empty result. Deliberately not gated on season > getCurrentNFLSeason():
+  // that comparison doesn't flip until Sept 1 and would otherwise misclassify live preseason
+  // weeks as "future" all August.
   const st = SEASON_TYPE_MAP[seasonType] ?? 2;
   const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
 
-  const { data } = await axios.get<{ events?: ESPNEvent[] }>(url, { headers: ESPN_HEADERS });
-  const events = data.events ?? [];
+  let events: ESPNEvent[] = [];
+  try {
+    const { data } = await axios.get<{ events?: ESPNEvent[] }>(url, { headers: ESPN_HEADERS });
+    events = data.events ?? [];
+  } catch (err: any) {
+    console.warn(`[ESPN] /scoreboard failed for ${seasonType} ${season} week ${week} (${err?.response?.status ?? err?.message}) — falling back to team-schedule sync`);
+  }
 
-  if (events.length === 0) return 0;
+  if (events.length === 0) {
+    return syncWeekGamesFromTeamSchedules(week, season, seasonType);
+  }
 
   // Pre-fetch existing games to detect in→post transitions for notifications
   const existingGames = await db.query.games.findMany({ where: eq(games.week, week) });
@@ -240,7 +264,7 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
       justFinished.push({ id: existing.id, espnId: event.id, homeTeam: row.homeTeam, awayTeam: row.awayTeam, homeScore, awayScore });
     }
 
-    await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
+    const [savedGame] = await db.insert(games).values({ id: undefined as any, ...row }).onConflictDoUpdate({
       target: games.espnId,
       set: {
         status: row.status,
@@ -257,12 +281,22 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
         favoriteTeam: row.favoriteTeam,
         gameTime: row.gameTime,
       },
-    });
+    }).returning({ id: games.id });
     upserted++;
+
+    // Grade every pick tied to this game whenever it's final with a score — not just on the
+    // in→post transition below, so a game that arrives already-final on its first-ever sync
+    // (e.g. catching up after the app missed the live window) still gets its picks graded.
+    if (savedGame && row.status === 'post' && row.homeScore != null && row.awayScore != null) {
+      await gradeGamePicks(savedGame.id, row.homeScore, row.awayScore).catch(err =>
+        console.error(`[ESPN] gradeGamePicks failed for game ${savedGame.id}:`, err)
+      );
+    }
   }
 
   // Fire game-final notifications and sync box score stats for just-finished games
   for (const game of justFinished) {
+    if (game.homeScore === game.awayScore) continue; // tie — no clear correct/incorrect to report
     const homeWon = game.homeScore > game.awayScore;
 
     // Write winningTeamWinProb/losingTeamWinProb now that we know who won.
@@ -294,48 +328,26 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
   return upserted;
 }
 
+// Live update pass: re-syncs every game that should have started (by scheduled kickoff) but
+// isn't marked final yet. This is what actually flips a game pre→in→post — nothing else does,
+// so this must not be gated on games already being 'in' (that was the original bug: nothing
+// ever bootstrapped the first pre→in transition for a week automatically).
 export async function updateLiveScores(): Promise<void> {
-  const season = getCurrentNFLSeason();
-  const liveGames = await db.query.games.findMany({
-    where: eq(games.status, 'in'),
+  const now = new Date();
+  const activeGames = await db.query.games.findMany({
+    where: and(ne(games.status, 'post'), lte(games.gameTime, now)),
   });
 
-  // Group by week + seasonType so preseason games hit the right scoreboard endpoint
+  // Group by season + week + seasonType (using each game's own fields, not a globally
+  // recomputed "current season" — getCurrentNFLSeason() doesn't flip to 2026 until Sept 1,
+  // so during preseason it would silently resync the wrong season's week).
   const seen = new Set<string>();
-  for (const game of liveGames) {
-    const key = `${game.week}:${game.seasonType}`;
+  for (const game of activeGames) {
+    const key = `${game.season}:${game.seasonType}:${game.week}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    await syncWeekGames(game.week, season, game.seasonType as 'regular' | 'preseason' | 'postseason');
+    await syncWeekGames(game.week, game.season, game.seasonType as 'regular' | 'preseason' | 'postseason');
   }
-}
-
-export async function syncWeekScores(week: number, season: number, seasonType: 'regular' | 'preseason' | 'postseason' = 'regular'): Promise<number> {
-  const st = SEASON_TYPE_MAP[seasonType] ?? 2;
-  const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
-
-  const { data } = await axios.get<{ events: ESPNEvent[] }>(url, { headers: ESPN_HEADERS });
-  const events = data.events ?? [];
-
-  let updated = 0;
-  for (const event of events) {
-    const comp = event.competitions[0];
-    if (!comp) continue;
-    const home = comp.competitors.find(c => c.homeAway === 'home');
-    const away = comp.competitors.find(c => c.homeAway === 'away');
-    if (!home || !away) continue;
-
-    await db.update(games).set({
-      status: parseStatus(comp.status.type.state),
-      homeScore: home.score ? parseInt(home.score, 10) : null,
-      awayScore: away.score ? parseInt(away.score, 10) : null,
-      period: comp.status.period ?? null,
-      displayClock: comp.status.displayClock ?? null,
-      statusType: comp.status.type.name ?? null,
-    }).where(eq(games.espnId, event.id));
-    updated++;
-  }
-  return updated;
 }
 
 export async function syncWinProbabilities(week: number, season: number): Promise<number> {

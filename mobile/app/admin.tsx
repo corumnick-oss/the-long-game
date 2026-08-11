@@ -355,7 +355,7 @@ function ToolsTab({ season }: { season: number }) {
           loading={syncScores.isPending}
           result={results['scores']}
           onPress={() =>
-            syncScores.mutate({ week, season }, {
+            syncScores.mutate({ week, season, seasonType }, {
               onSuccess: (r) => setResult('scores', `✓ Updated scores for ${r.updated} games`),
               onError: () => setResult('scores', '✗ Score sync failed'),
             })

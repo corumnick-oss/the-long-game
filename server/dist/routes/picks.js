@@ -117,10 +117,13 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
     });
 });
 // GET /api/picks/by-team?season=X  — caller's W-L record grouped by team picked
+// seasonType defaults to 'regular' (like every other stats endpoint) so preseason picks
+// don't blend into the regular-season record shown here.
 router.get('/by-team', auth_1.requireAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.query['seasonType'] ?? 'regular';
     const seasonGames = await db_1.db.query.games.findMany({
-        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
     });
     if (!seasonGames.length) {
         res.json([]);

@@ -25,8 +25,8 @@ export interface WeeklyTrophyResults {
     loneWolf: LoneWolfCandidate[];
     contrarian: ContrarianCandidate[];
 }
-export declare function calculateWeeklyTrophies(week: number, season: number): Promise<WeeklyTrophyResults>;
-export declare function awardWeeklyTrophies(week: number, season: number, specificType?: string): Promise<number>;
+export declare function calculateWeeklyTrophies(week: number, season: number, seasonType?: string): Promise<WeeklyTrophyResults>;
+export declare function awardWeeklyTrophies(week: number, season: number, specificType?: string, seasonType?: string): Promise<number>;
 export interface SeasonStandingEntry {
     userId: string;
     teamName: string;

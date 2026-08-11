@@ -41,9 +41,12 @@ const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
 const notificationService_1 = require("./notificationService");
-async function calculateWeeklyTrophies(week, season) {
+// seasonType matters here: preseason and regular season both number their weeks 1-4/1-18,
+// so without this filter a regular-season Week 1 calculation would also pull in preseason
+// Week 1's games (same week + season), double-counting/misattributing picks across the two.
+async function calculateWeeklyTrophies(week, season, seasonType = 'regular') {
     const weekGames = await db_1.db.query.games.findMany({
-        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
     });
     const completedGames = weekGames.filter(g => g.status === 'post');
     if (completedGames.length === 0)
@@ -174,9 +177,9 @@ async function calculateWeeklyTrophies(week, season) {
     }
     return { mostWins, mostLosses, upsetPick, loneWolf, contrarian };
 }
-async function awardWeeklyTrophies(week, season, specificType) {
+async function awardWeeklyTrophies(week, season, specificType, seasonType = 'regular') {
     console.log(`Awarding trophies for Week ${week}, Season ${season}${specificType ? ` (${specificType})` : ''}...`);
-    const results = await calculateWeeklyTrophies(week, season);
+    const results = await calculateWeeklyTrophies(week, season, seasonType);
     const toAward = [];
     if (!specificType || specificType === 'most_wins') {
         for (const c of results.mostWins)
