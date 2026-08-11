@@ -58,11 +58,17 @@ router.get('/', auth_1.requireAuth, async (req, res) => {
     const myPicks = await db_1.db.query.picks.findMany({ where: (0, drizzle_orm_1.and)(...conditions) });
     res.json(myPicks);
 });
-// GET /api/picks/week — full grid of all Longie picks (only after lock)
+// GET /api/picks/week — full grid of picks (only after lock)
+// filter mirrors /api/leaderboard: Gridirons default to seeing Gridirons, everyone else always
+// sees the global (nflAccess) set. Non-Gridirons can't request 'gridirons' -- they're forced to
+// 'global' regardless of what's passed, matching the mobile UI only showing the toggle to Gridirons.
 router.get('/week', auth_1.requireAuth, async (req, res) => {
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
     const week = parseInt(req.query['week'], 10);
     const seasonType = req.query['seasonType'] ?? 'regular';
+    const isGridiron = req.currentUser.isGridiron;
+    const requestedFilter = req.query['filter'] ?? (isGridiron ? 'gridirons' : 'global');
+    const filter = isGridiron && requestedFilter === 'gridirons' ? 'gridirons' : 'global';
     if (!week) {
         res.status(400).json({ error: 'week is required' });
         return;
@@ -81,8 +87,8 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
         return;
     }
     const gameIds = weekGames.map(g => g.id);
-    const [gridirons, allPicks] = await Promise.all([
-        db_1.db.query.users.findMany({ where: (0, drizzle_orm_1.eq)(schema.users.isGridiron, true) }),
+    const [weekUsers, allPicks] = await Promise.all([
+        db_1.db.query.users.findMany({ where: (0, drizzle_orm_1.eq)(filter === 'gridirons' ? schema.users.isGridiron : schema.users.nflAccess, true) }),
         gameIds.length
             ? db_1.db.query.picks.findMany({ where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds) })
             : Promise.resolve([]),
@@ -98,6 +104,7 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
         locked: true,
         week,
         season,
+        filter,
         games: weekGames.map(g => ({
             id: g.id,
             homeTeam: g.homeTeam,
@@ -108,7 +115,7 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
             awayScore: g.awayScore,
             status: g.status,
         })),
-        users: gridirons.map(u => ({
+        users: weekUsers.map(u => ({
             id: u.id,
             teamName: u.teamName,
             profileImageUrl: u.profileImageUrl,

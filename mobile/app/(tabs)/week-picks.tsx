@@ -6,7 +6,33 @@ import {
 import { useRouter } from 'expo-router';
 import { getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useWeekPicks, type WeekPicksGame, type WeekPicksUser } from '@/hooks/useWeekPicks';
+import { useMyProfile } from '@/hooks/useProfile';
 import { WeekSelector } from '@/components/WeekSelector';
+
+type Filter = 'gridirons' | 'global';
+
+// Same pattern as the Leaderboard tab's toggle — Gridirons only, everyone else always sees global.
+function FilterToggle({ value, onChange }: { value: Filter; onChange: (v: Filter) => void }) {
+  const options: { label: string; value: Filter }[] = [
+    { label: 'Gridirons', value: 'gridirons' },
+    { label: 'Global', value: 'global' },
+  ];
+  return (
+    <View className="flex-row bg-surface rounded-xl p-1 mx-4 mb-2">
+      {options.map(opt => (
+        <TouchableOpacity
+          key={opt.value}
+          onPress={() => onChange(opt.value)}
+          className={`flex-1 py-2 rounded-lg items-center ${value === opt.value ? 'bg-primary' : ''}`}
+        >
+          <Text className={`text-sm font-semibold ${value === opt.value ? 'text-white' : 'text-muted'}`}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
 
 type SeasonEntry = { year: number; seasonType: 'regular' | 'preseason'; label: string };
 const SEASON_ENTRIES: SeasonEntry[] = [
@@ -111,12 +137,16 @@ function PickCell({
 export default function WeekPicksScreen() {
   const router = useRouter();
   const currentWeek = getCurrentNFLWeek();
+  const { data: profile } = useMyProfile();
+  const isGridiron = profile?.isGridiron ?? false;
   const [entryIdx, setEntryIdx] = useState(DEFAULT_IDX);
   const entry = SEASON_ENTRIES[entryIdx]!;
   const [selectedWeek, setSelectedWeek] = useState(currentWeek);
-  const { data, isLoading, isError, refetch } = useWeekPicks(selectedWeek, entry.year, entry.seasonType);
+  const [filter, setFilter] = useState<Filter>('global');
+  const { data, isLoading, isError, refetch } = useWeekPicks(selectedWeek, entry.year, entry.seasonType, filter);
 
   useEffect(() => { setSelectedWeek(1); }, [entryIdx]);
+  useEffect(() => { if (profile?.isGridiron) setFilter('gridirons'); }, [profile?.isGridiron]);
 
   // Synchronized horizontal scroll across header + all user rows.
   // isSyncing blocks echo events: scrollTo fires onScroll on the target view,
@@ -195,6 +225,8 @@ export default function WeekPicksScreen() {
         onSelect={setSelectedWeek}
         seasonType={entry.seasonType}
       />
+
+      {isGridiron && <FilterToggle value={filter} onChange={setFilter} />}
 
       {/* Before lock: show message for current week, allow browsing past weeks */}
       {!locked ? (
