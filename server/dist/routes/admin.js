@@ -426,6 +426,12 @@ router.post('/notifications/test', async (req, res) => {
         res.status(500).json({ error: err?.message ?? 'Unknown error' });
     }
 });
+// Unambiguous check for whether RESEND_API_KEY actually reached this deployment -- never
+// returns the key itself, just whether it's present, so "no email sent" can be diagnosed
+// without guessing whether it's a missing-picks issue or a missing-env-var issue.
+router.get('/email/status', async (req, res) => {
+    res.json({ resendConfigured: !!process.env['RESEND_API_KEY'] });
+});
 // Send the calling admin their own current-week picks as a test email, without waiting
 // for Wednesday 9PM. Falls back to whatever week actually has games for the admin's picks.
 router.post('/email/test', async (req, res) => {
