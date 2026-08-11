@@ -24,9 +24,12 @@ const NFL_TEAM_IDS = [
     '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
     '33', '34', // Ravens (33), Texans (34) — IDs 31/32 unused
 ];
-// ESPN blocks server-side requests without a browser UA on some endpoints
+// Akamai (ESPN's edge/WAF) 403s any request carrying a spoofed desktop-browser User-Agent
+// with none of a real browser's other fingerprint headers (sec-ch-ua, sec-fetch-*, etc.) --
+// that combination reads as a bot signature and gets blocked outright, confirmed against
+// site.api.espn.com from multiple networks (not just Railway). A generic/no UA sails through
+// fine, so don't spoof one here.
 const ESPN_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     'Accept': 'application/json',
 };
 // 1=preseason, 2=regular, 3=postseason

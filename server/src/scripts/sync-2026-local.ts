@@ -26,8 +26,8 @@ const NFL_TEAM_IDS = [
 ];
 
 const BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+// A spoofed desktop-browser UA gets 403'd by Akamai's bot detection — see espnService.ts.
 const ESPN_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
   'Accept': 'application/json',
 };
 
