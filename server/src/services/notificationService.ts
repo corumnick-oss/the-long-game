@@ -60,27 +60,31 @@ export async function sendPushToAllUsers(title: string, body: string, data?: Rec
   await sendPushToUsers(userIds, title, body, data);
 }
 
-export async function notifyWeekUnlocked(week: number): Promise<void> {
+function weekLabel(week: number, seasonType: 'regular' | 'preseason'): string {
+  return seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
+}
+
+export async function notifyWeekUnlocked(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
   await sendPushToAllUsers(
-    "Week " + week + " is now open!",
+    weekLabel(week, seasonType) + " is now open!",
     "Make your picks before Wednesday 9PM PST.",
-    { type: 'week_unlocked', week }
+    { type: 'week_unlocked', week, seasonType }
   );
 }
 
-export async function notifyDeadlineApproaching(week: number): Promise<void> {
+export async function notifyDeadlineApproaching(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
   await sendPushToAllUsers(
-    "1 hour left for Week " + week + " picks!",
+    "1 hour left for " + weekLabel(week, seasonType) + " picks!",
     "Lock in your picks before they close.",
-    { type: 'deadline', week }
+    { type: 'deadline', week, seasonType }
   );
 }
 
-export async function notifyPicksLocked(week: number): Promise<void> {
+export async function notifyPicksLocked(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
   await sendPushToAllUsers(
     "Picks locked. Good luck!",
-    "Week " + week + " picks are locked. Games start soon.",
-    { type: 'picks_locked', week }
+    weekLabel(week, seasonType) + " picks are locked. Games start soon.",
+    { type: 'picks_locked', week, seasonType }
   );
 }
 
@@ -93,12 +97,12 @@ export async function notifyAchievementEarned(userId: string, achievementName: s
   );
 }
 
-export async function notifyDefaultPicksApplied(userId: string, count: number, week: number): Promise<void> {
+export async function notifyDefaultPicksApplied(userId: string, count: number, week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
   await sendPushToUsers(
     [userId],
     "Your picks were filled in",
-    `You had ${count} unpicked game${count === 1 ? '' : 's'} for Week ${week}. We defaulted to the Raiders (or away team).`,
-    { type: 'default_picks', week }
+    `You had ${count} unpicked game${count === 1 ? '' : 's'} for ${weekLabel(week, seasonType)}. We defaulted to the Raiders (or away team).`,
+    { type: 'default_picks', week, seasonType }
   );
 }
 

@@ -56,20 +56,23 @@ async function sendPushToAllUsers(title, body, data) {
     const userIds = allUsers.map(u => u.id);
     await sendPushToUsers(userIds, title, body, data);
 }
-async function notifyWeekUnlocked(week) {
-    await sendPushToAllUsers("Week " + week + " is now open!", "Make your picks before Wednesday 9PM PST.", { type: 'week_unlocked', week });
+function weekLabel(week, seasonType) {
+    return seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
 }
-async function notifyDeadlineApproaching(week) {
-    await sendPushToAllUsers("1 hour left for Week " + week + " picks!", "Lock in your picks before they close.", { type: 'deadline', week });
+async function notifyWeekUnlocked(week, seasonType = 'regular') {
+    await sendPushToAllUsers(weekLabel(week, seasonType) + " is now open!", "Make your picks before Wednesday 9PM PST.", { type: 'week_unlocked', week, seasonType });
 }
-async function notifyPicksLocked(week) {
-    await sendPushToAllUsers("Picks locked. Good luck!", "Week " + week + " picks are locked. Games start soon.", { type: 'picks_locked', week });
+async function notifyDeadlineApproaching(week, seasonType = 'regular') {
+    await sendPushToAllUsers("1 hour left for " + weekLabel(week, seasonType) + " picks!", "Lock in your picks before they close.", { type: 'deadline', week, seasonType });
+}
+async function notifyPicksLocked(week, seasonType = 'regular') {
+    await sendPushToAllUsers("Picks locked. Good luck!", weekLabel(week, seasonType) + " picks are locked. Games start soon.", { type: 'picks_locked', week, seasonType });
 }
 async function notifyAchievementEarned(userId, achievementName, week) {
     await sendPushToUsers([userId], "You earned " + achievementName + "! 🏅", "Week " + week + " achievement unlocked.", { type: 'achievement', week });
 }
-async function notifyDefaultPicksApplied(userId, count, week) {
-    await sendPushToUsers([userId], "Your picks were filled in", `You had ${count} unpicked game${count === 1 ? '' : 's'} for Week ${week}. We defaulted to the Raiders (or away team).`, { type: 'default_picks', week });
+async function notifyDefaultPicksApplied(userId, count, week, seasonType = 'regular') {
+    await sendPushToUsers([userId], "Your picks were filled in", `You had ${count} unpicked game${count === 1 ? '' : 's'} for ${weekLabel(week, seasonType)}. We defaulted to the Raiders (or away team).`, { type: 'default_picks', week, seasonType });
 }
 async function notifyGameFinal(userId, homeTeam, awayTeam, homeScore, awayScore, isCorrect) {
     const result = isCorrect ? 'correct ✓' : 'wrong ✗';

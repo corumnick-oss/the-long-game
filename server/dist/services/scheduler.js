@@ -47,9 +47,6 @@ const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
 const activity_1 = require("../routes/activity");
 const PT = { timezone: 'America/Los_Angeles' };
-async function getActiveWeek() {
-    return (0, season_1.getCurrentNFLWeek)();
-}
 // Every 30 seconds — live score updates. updateLiveScores() itself finds games that should
 // have started but aren't final yet, so this must run unconditionally — it's what bootstraps
 // the pre→in transition in the first place, not just what keeps an already-live game updated.
@@ -61,39 +58,42 @@ node_cron_1.default.schedule('*/30 * * * * *', async () => {
         console.error('[Scheduler] Live score update failed:', err);
     }
 });
-// Tuesday 6AM PT — weekly transition: award trophies, sync new week games
+// Tuesday 6AM PT — weekly transition: award trophies, sync new week games.
+// seasonType is whatever getCurrentWeekAndType() actually finds active (preseason or
+// regular) -- this now runs unconditionally instead of bailing on an admin toggle that
+// was effectively always off, so preseason weeks advance automatically same as regular ones.
 node_cron_1.default.schedule('0 6 * * 2', async () => {
     try {
-        if (await (0, season_1.isPreseasonMode)())
-            return;
         const season = (0, season_1.getCurrentNFLSeason)();
-        const week = await getActiveWeek();
-        console.log(`[Scheduler] Tuesday 6AM: weekly transition for Week ${week}`);
-        // Award trophies for completed week
-        if (week > 1)
+        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        console.log(`[Scheduler] Tuesday 6AM: weekly transition for ${seasonType} Week ${week}`);
+        // Weekly Achievements ("trophies") are regular-season only for now.
+        if (seasonType === 'regular' && week > 1)
             await (0, trophyService_1.awardWeeklyTrophies)(week - 1, season);
         // Sync new week's games from ESPN
-        await (0, espnService_1.syncWeekGames)(week, season, 'regular');
+        await (0, espnService_1.syncWeekGames)(week, season, seasonType);
         // Backfill box score stats for all completed games in the prior week
-        await (0, espnService_1.backfillTeamStats)(season, 'regular');
+        await (0, espnService_1.backfillTeamStats)(season, seasonType);
         // Auto-unlock week in DB so the picks gate opens
         await db_1.db.insert(schema.unlockedWeeks)
-            .values({ week, season, seasonType: 'regular', unlockedBy: 'scheduler' })
+            .values({ week, season, seasonType, unlockedBy: 'scheduler' })
             .onConflictDoNothing();
         // Notify users week is open
-        await (0, notificationService_1.notifyWeekUnlocked)(week);
-        await (0, activity_1.logActivity)('week_opened', `Week ${week} picks are now open!`, 'global', { metadata: { week, season } });
+        await (0, notificationService_1.notifyWeekUnlocked)(week, seasonType);
+        await (0, activity_1.logActivity)('week_opened', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are now open!`, 'global', { metadata: { week, season, seasonType } });
     }
     catch (err) {
         console.error('[Scheduler] Tuesday 6AM job failed:', err);
     }
 }, PT);
-// Tuesday 9PM PT — win probability refresh
+// Tuesday 9PM PT — win probability refresh (regular season only; ESPN doesn't publish
+// predictor data for preseason games at all, confirmed directly against their API)
 node_cron_1.default.schedule('0 21 * * 2', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
-        const week = await getActiveWeek();
-        await (0, espnService_1.syncWinProbabilities)(week, season);
+        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        if (seasonType === 'regular')
+            await (0, espnService_1.syncWinProbabilities)(week, season);
     }
     catch (err) {
         console.error('[Scheduler] Tuesday 9PM prob sync failed:', err);
@@ -103,8 +103,9 @@ node_cron_1.default.schedule('0 21 * * 2', async () => {
 node_cron_1.default.schedule('0 6 * * 3', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
-        const week = await getActiveWeek();
-        await (0, espnService_1.syncWinProbabilities)(week, season);
+        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        if (seasonType === 'regular')
+            await (0, espnService_1.syncWinProbabilities)(week, season);
     }
     catch (err) {
         console.error('[Scheduler] Wednesday 6AM prob sync failed:', err);
@@ -114,8 +115,9 @@ node_cron_1.default.schedule('0 6 * * 3', async () => {
 node_cron_1.default.schedule('0 17 * * 3', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
-        const week = await getActiveWeek();
-        await (0, espnService_1.syncWinProbabilities)(week, season);
+        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        if (seasonType === 'regular')
+            await (0, espnService_1.syncWinProbabilities)(week, season);
     }
     catch (err) {
         console.error('[Scheduler] Wednesday 5PM prob sync failed:', err);
@@ -124,8 +126,8 @@ node_cron_1.default.schedule('0 17 * * 3', async () => {
 // Wednesday 8PM PT — 1 hour warning
 node_cron_1.default.schedule('0 20 * * 3', async () => {
     try {
-        const week = await getActiveWeek();
-        await (0, notificationService_1.notifyDeadlineApproaching)(week);
+        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        await (0, notificationService_1.notifyDeadlineApproaching)(week, seasonType);
     }
     catch (err) {
         console.error('[Scheduler] Wednesday 8PM warning failed:', err);
@@ -135,10 +137,10 @@ node_cron_1.default.schedule('0 20 * * 3', async () => {
 node_cron_1.default.schedule('0 21 * * 3', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
-        const week = await getActiveWeek();
-        await (0, notificationService_1.notifyPicksLocked)(week);
-        await (0, activity_1.logActivity)('picks_locked', `Week ${week} picks are locked. Good luck!`, 'global', { metadata: { week, season } });
-        await applyDefaultPicks(week, season);
+        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        await (0, notificationService_1.notifyPicksLocked)(week, seasonType);
+        await (0, activity_1.logActivity)('picks_locked', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are locked. Good luck!`, 'global', { metadata: { week, season, seasonType } });
+        await applyDefaultPicks(week, season, seasonType);
     }
     catch (err) {
         console.error('[Scheduler] Wednesday 9PM lock notification failed:', err);
@@ -146,18 +148,17 @@ node_cron_1.default.schedule('0 21 * * 3', async () => {
 }, PT);
 // Apply default picks for users who didn't pick all games.
 // Default: Raiders if playing, otherwise away team.
-// Only runs if the week is unlocked; reads seasonType from unlocked_weeks instead of hardcoding.
-async function applyDefaultPicks(week, season) {
+// Only runs if the week is unlocked for the given seasonType.
+async function applyDefaultPicks(week, season, seasonType) {
     const RAIDERS_NAMES = new Set(['Las Vegas Raiders', 'LV']);
     try {
         const unlocked = await db_1.db.query.unlockedWeeks.findFirst({
-            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.week, week), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, season)),
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.week, week), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, season), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.seasonType, seasonType)),
         });
         if (!unlocked) {
-            console.log(`[Scheduler] applyDefaultPicks: week ${week} season ${season} not unlocked — skipping`);
+            console.log(`[Scheduler] applyDefaultPicks: ${seasonType} week ${week} season ${season} not unlocked — skipping`);
             return;
         }
-        const seasonType = unlocked.seasonType;
         const weekGames = await db_1.db.query.games.findMany({
             where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.games.week, week), (0, drizzle_orm_1.eq)(schema_1.games.season, season), (0, drizzle_orm_1.eq)(schema_1.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema_1.games.seasonType, seasonType)),
         });
@@ -192,7 +193,7 @@ async function applyDefaultPicks(week, season) {
                     previousPick: null, newPick: pick,
                 });
             }
-            (0, notificationService_1.notifyDefaultPicksApplied)(user.id, missing.length, week).catch(err => console.error('[Scheduler] notifyDefaultPicksApplied failed for user', user.id, err));
+            (0, notificationService_1.notifyDefaultPicksApplied)(user.id, missing.length, week, seasonType).catch(err => console.error('[Scheduler] notifyDefaultPicksApplied failed for user', user.id, err));
             console.log(`[Scheduler] Applied ${missing.length} default pick(s) for user ${user.id} (${seasonType})`);
         }
     }

@@ -34,11 +34,13 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCurrentNFLSeason = getCurrentNFLSeason;
+exports.getCurrentWeekAndType = getCurrentWeekAndType;
 exports.getCurrentNFLWeek = getCurrentNFLWeek;
 exports.isPreseasonMode = isPreseasonMode;
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const lockTime_1 = require("./lockTime");
 function getCurrentNFLSeason() {
     const now = new Date();
     const month = now.getMonth() + 1;
@@ -46,22 +48,54 @@ function getCurrentNFLSeason() {
     // Flip to new season in March — after the Super Bowl, before preseason
     return month >= 3 ? year : year - 1;
 }
-async function getCurrentNFLWeek() {
-    const setting = await db_1.db.query.appSettings.findFirst({
-        where: (0, drizzle_orm_1.eq)(schema_1.appSettings.key, 'currentWeek'),
-    });
-    if (setting)
-        return parseInt(setting.value, 10);
-    // Derive from most recent game data
+async function firstGameTime(season, seasonType) {
     const { games } = await Promise.resolve().then(() => __importStar(require('../db/schema')));
-    const { desc, and } = await Promise.resolve().then(() => __importStar(require('drizzle-orm')));
+    const { and, eq: eqOp, asc } = await Promise.resolve().then(() => __importStar(require('drizzle-orm')));
+    const g = await db_1.db.query.games.findFirst({
+        where: and(eqOp(games.season, season), eqOp(games.seasonType, seasonType), eqOp(games.sport, 'nfl')),
+        orderBy: [asc(games.gameTime)],
+    });
+    return g?.gameTime ?? null;
+}
+// The current week for a season type is the first one whose picks aren't locked yet (still
+// open, or about to open) -- naturally advances 1, 2, 3... as each week's Wednesday 9PM lock
+// passes. If every known week is already locked, stay on the last one rather than erroring.
+async function firstUnlockedOrLastWeek(season, seasonType) {
+    const { games } = await Promise.resolve().then(() => __importStar(require('../db/schema')));
+    const { and, eq: eqOp } = await Promise.resolve().then(() => __importStar(require('drizzle-orm')));
+    const rows = await db_1.db.query.games.findMany({
+        where: and(eqOp(games.season, season), eqOp(games.seasonType, seasonType), eqOp(games.sport, 'nfl')),
+        columns: { week: true },
+    });
+    if (rows.length === 0)
+        return null;
+    const weeks = [...new Set(rows.map(r => r.week))].sort((a, b) => a - b);
+    for (const w of weeks) {
+        if (!(await (0, lockTime_1.isWeekLocked)(w, season, seasonType)))
+            return w;
+    }
+    return weeks[weeks.length - 1];
+}
+// Data-driven, not calendar-guessed: preseason week numbering doesn't line up with a fixed
+// "first Thursday of August" rule (e.g. 2026's preseason "week 1" was a lone standalone Hall
+// of Fame Game a full week before the real 16-game slate) -- so this reads whatever's actually
+// synced into the DB instead of assuming a schedule shape.
+async function getCurrentWeekAndType() {
+    // Manual admin override (Admin -> app settings) always wins.
+    const override = await db_1.db.query.appSettings.findFirst({ where: (0, drizzle_orm_1.eq)(schema_1.appSettings.key, 'currentWeek') });
+    if (override)
+        return { week: parseInt(override.value, 10), seasonType: 'regular' };
     const season = getCurrentNFLSeason();
     const now = new Date();
-    const game = await db_1.db.query.games.findFirst({
-        where: and((0, drizzle_orm_1.eq)(games.season, season), (0, drizzle_orm_1.eq)(games.sport, 'nfl')),
-        orderBy: [desc(games.week)],
-    });
-    return game?.week ?? 1;
+    const regularStart = await firstGameTime(season, 'regular');
+    const regularHasBegun = !!regularStart && regularStart.getTime() <= now.getTime();
+    const seasonType = regularHasBegun ? 'regular' : 'preseason';
+    const week = (await firstUnlockedOrLastWeek(season, seasonType)) ?? 1;
+    return { week, seasonType };
+}
+// Backward-compatible wrapper for callers that only need the number.
+async function getCurrentNFLWeek() {
+    return (await getCurrentWeekAndType()).week;
 }
 async function isPreseasonMode() {
     const setting = await db_1.db.query.appSettings.findFirst({

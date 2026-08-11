@@ -4,9 +4,16 @@ import * as schema from '../db/schema';
 import { eq, and, asc, inArray } from 'drizzle-orm';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { isWeekLocked } from '../utils/lockTime';
-import { getCurrentNFLSeason } from '../utils/season';
+import { getCurrentNFLSeason, getCurrentWeekAndType } from '../utils/season';
 
 const router = Router();
+
+// GET /api/games/current-week — data-driven current week + season type (same logic the
+// scheduler uses), so mobile doesn't have to guess with client-side calendar math.
+router.get('/current-week', optionalAuth, async (req, res) => {
+  const { week, seasonType } = await getCurrentWeekAndType();
+  res.json({ week, season: getCurrentNFLSeason(), seasonType });
+});
 
 // Average over nullable numbers
 const avgOf = (nums: (number | null | undefined)[]): number | null => {

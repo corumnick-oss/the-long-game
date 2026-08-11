@@ -41,6 +41,12 @@ const auth_1 = require("../middleware/auth");
 const lockTime_1 = require("../utils/lockTime");
 const season_1 = require("../utils/season");
 const router = (0, express_1.Router)();
+// GET /api/games/current-week — data-driven current week + season type (same logic the
+// scheduler uses), so mobile doesn't have to guess with client-side calendar math.
+router.get('/current-week', auth_1.optionalAuth, async (req, res) => {
+    const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+    res.json({ week, season: (0, season_1.getCurrentNFLSeason)(), seasonType });
+});
 // Average over nullable numbers
 const avgOf = (nums) => {
     const valid = nums.filter((v) => v != null && typeof v === 'number' && !isNaN(v));
