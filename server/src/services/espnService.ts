@@ -22,14 +22,42 @@ const NFL_TEAM_IDS = [
 // because axios's own default UA was still there underneath). The original Replit
 // implementation never had this problem because it used the runtime's native fetch(), which
 // doesn't inject a library-identifying header. Use fetch() here too — no custom headers at all.
+//
+// Backoff: if ESPN starts rejecting us, the 30-second live-score cron must not just keep
+// hammering it at full volume forever — a single failed /scoreboard call cascades into up to
+// 32 more requests via the team-schedule fallback, every 30 seconds, indefinitely. If ESPN's
+// block is a rate-based temporary one, that nonstop retry traffic can keep re-triggering/
+// extending it and it never gets a chance to expire. Track failures here; updateLiveScores()
+// (the automatic cron) checks this and skips entirely while backed off. Manual admin-triggered
+// syncs (the "Sync Scores Only" button) bypass the skip and always attempt a fresh request —
+// but still feed their result back into this same state, so a successful manual sync clears
+// the backoff immediately and a failed one extends it too.
+let consecutiveEspnFailures = 0;
+let espnBackoffUntil = 0;
+
+function isEspnBackedOff(): boolean {
+  return Date.now() < espnBackoffUntil;
+}
+
 async function espnFetch<T = any>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err: any = new Error(`ESPN request failed: ${res.status} ${res.statusText}`);
-    err.status = res.status;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err: any = new Error(`ESPN request failed: ${res.status} ${res.statusText}`);
+      err.status = res.status;
+      throw err;
+    }
+    const data = await res.json();
+    consecutiveEspnFailures = 0;
+    espnBackoffUntil = 0;
+    return data as T;
+  } catch (err) {
+    consecutiveEspnFailures++;
+    // 1m, 2m, 4m, 8m, ... capped at 20m so a real recovery isn't missed for too long.
+    const backoffMs = Math.min(60_000 * 2 ** (consecutiveEspnFailures - 1), 20 * 60_000);
+    espnBackoffUntil = Date.now() + backoffMs;
     throw err;
   }
-  return res.json() as Promise<T>;
 }
 
 // 1=preseason, 2=regular, 3=postseason
@@ -342,6 +370,12 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
 // so this must not be gated on games already being 'in' (that was the original bug: nothing
 // ever bootstrapped the first pre→in transition for a week automatically).
 export async function updateLiveScores(): Promise<void> {
+  if (isEspnBackedOff()) {
+    const secondsLeft = Math.ceil((espnBackoffUntil - Date.now()) / 1000);
+    console.warn(`[ESPN] Backed off after repeated failures — skipping this cycle (${secondsLeft}s left)`);
+    return;
+  }
+
   const now = new Date();
   const activeGames = await db.query.games.findMany({
     where: and(ne(games.status, 'post'), lte(games.gameTime, now)),
