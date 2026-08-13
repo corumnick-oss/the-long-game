@@ -3,7 +3,7 @@ import { syncWeekGames, updateLiveScores, syncWinProbabilities, backfillTeamStat
 import { awardWeeklyTrophies } from './trophyService';
 import { notifyWeekUnlocked, notifyDeadlineApproaching, notifyPicksLocked, notifyDefaultPicksApplied } from './notificationService';
 import { sendWeeklyPicksEmails } from './emailService';
-import { getCurrentNFLSeason, getCurrentWeekAndType } from '../utils/season';
+import { getCurrentNFLSeason, getCurrentWeekAndType, getNextWeekToUnlock } from '../utils/season';
 import { db } from '../db';
 import { games } from '../db/schema';
 import * as schema from '../db/schema';
@@ -30,7 +30,7 @@ cron.schedule('*/30 * * * * *', async () => {
 cron.schedule('0 6 * * 2', async () => {
   try {
     const season = getCurrentNFLSeason();
-    const { week, seasonType } = await getCurrentWeekAndType();
+    const { week, seasonType } = await getNextWeekToUnlock();
 
     console.log(`[Scheduler] Tuesday 6AM: weekly transition for ${seasonType} Week ${week}`);
 
@@ -122,7 +122,7 @@ cron.schedule('0 21 * * 3', async () => {
 // Apply default picks for users who didn't pick all games.
 // Default: Raiders if playing, otherwise away team.
 // Only runs if the week is unlocked for the given seasonType.
-async function applyDefaultPicks(week: number, season: number, seasonType: 'regular' | 'preseason'): Promise<void> {
+export async function applyDefaultPicks(week: number, season: number, seasonType: 'regular' | 'preseason'): Promise<void> {
   const RAIDERS_NAMES = new Set(['Las Vegas Raiders', 'LV']);
 
   try {
@@ -160,7 +160,21 @@ async function applyDefaultPicks(week: number, season: number, seasonType: 'regu
       pickMap.get(pick.userId)!.add(pick.gameId);
     }
 
+    // Only default-pick users who already completed at least one OTHER week this season --
+    // a brand-new player's very first active week never gets auto-filled, even for games they
+    // forgot, so someone who never picks anything doesn't get carried along all year on
+    // Raiders/away-team defaults alone.
+    const seasonPicks = await db.select({ userId: schema.picks.userId, week: games.week, seasonType: games.seasonType })
+      .from(schema.picks)
+      .innerJoin(games, eq(games.id, schema.picks.gameId))
+      .where(and(eq(games.season, season), eq(games.sport, 'nfl')));
+    const priorWeekPickUserIds = new Set(
+      seasonPicks.filter(p => !(p.week === week && p.seasonType === seasonType)).map(p => p.userId)
+    );
+
     for (const user of allUsers) {
+      if (!priorWeekPickUserIds.has(user.id)) continue;
+
       const userPicked = pickMap.get(user.id) ?? new Set();
       const missing = weekGames.filter(g => !userPicked.has(g.id));
       if (missing.length === 0) continue;

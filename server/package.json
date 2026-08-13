@@ -19,7 +19,8 @@
     "migrate:unlocked-weeks": "tsx --require dotenv/config src/scripts/migrate-unlocked-weeks.ts",
     "sync:winprobs": "tsx --require dotenv/config src/scripts/sync-winprobs-local.ts",
     "sync:games": "tsx --require dotenv/config src/scripts/sync-games-local.ts",
-    "reassign:user": "tsx --require dotenv/config src/scripts/reassign-user.ts"
+    "reassign:user": "tsx --require dotenv/config src/scripts/reassign-user.ts",
+    "backfill:week-lock": "tsx --require dotenv/config src/scripts/backfill-week-lock.ts"
   },
   "keywords": [],
   "author": "",

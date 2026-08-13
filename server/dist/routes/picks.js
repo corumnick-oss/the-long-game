@@ -87,12 +87,20 @@ router.get('/week', auth_1.requireAuth, async (req, res) => {
         return;
     }
     const gameIds = weekGames.map(g => g.id);
-    const [weekUsers, allPicks] = await Promise.all([
+    const [weekUsersRaw, allPicks, seasonPickers] = await Promise.all([
         db_1.db.query.users.findMany({ where: (0, drizzle_orm_1.eq)(filter === 'gridirons' ? schema.users.isGridiron : schema.users.nflAccess, true) }),
         gameIds.length
             ? db_1.db.query.picks.findMany({ where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds) })
             : Promise.resolve([]),
+        // Same membership rule as the leaderboard (HAVING COUNT(picks) > 0 for the season+type) --
+        // someone who's never made a pick this season/type shouldn't show up with a blank row.
+        db_1.db.select({ userId: schema.picks.userId })
+            .from(schema.picks)
+            .innerJoin(schema.games, (0, drizzle_orm_1.eq)(schema.games.id, schema.picks.gameId))
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType))),
     ]);
+    const activeUserIds = new Set(seasonPickers.map(p => p.userId));
+    const weekUsers = weekUsersRaw.filter(u => activeUserIds.has(u.id));
     // picksByUser[userId][gameId] = { pick, isCorrect }
     const picksByUser = {};
     for (const p of allPicks) {

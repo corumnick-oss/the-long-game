@@ -36,6 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.applyDefaultPicks = applyDefaultPicks;
 const node_cron_1 = __importDefault(require("node-cron"));
 const espnService_1 = require("./espnService");
 const trophyService_1 = require("./trophyService");
@@ -66,7 +67,7 @@ node_cron_1.default.schedule('*/30 * * * * *', async () => {
 node_cron_1.default.schedule('0 6 * * 2', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
-        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
+        const { week, seasonType } = await (0, season_1.getNextWeekToUnlock)();
         console.log(`[Scheduler] Tuesday 6AM: weekly transition for ${seasonType} Week ${week}`);
         // Weekly Achievements ("trophies") are regular-season only for now.
         if (seasonType === 'regular' && week > 1)
@@ -176,7 +177,18 @@ async function applyDefaultPicks(week, season, seasonType) {
                 pickMap.set(pick.userId, new Set());
             pickMap.get(pick.userId).add(pick.gameId);
         }
+        // Only default-pick users who already completed at least one OTHER week this season --
+        // a brand-new player's very first active week never gets auto-filled, even for games they
+        // forgot, so someone who never picks anything doesn't get carried along all year on
+        // Raiders/away-team defaults alone.
+        const seasonPicks = await db_1.db.select({ userId: schema.picks.userId, week: schema_1.games.week, seasonType: schema_1.games.seasonType })
+            .from(schema.picks)
+            .innerJoin(schema_1.games, (0, drizzle_orm_1.eq)(schema_1.games.id, schema.picks.gameId))
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.games.season, season), (0, drizzle_orm_1.eq)(schema_1.games.sport, 'nfl')));
+        const priorWeekPickUserIds = new Set(seasonPicks.filter(p => !(p.week === week && p.seasonType === seasonType)).map(p => p.userId));
         for (const user of allUsers) {
+            if (!priorWeekPickUserIds.has(user.id))
+                continue;
             const userPicked = pickMap.get(user.id) ?? new Set();
             const missing = weekGames.filter(g => !userPicked.has(g.id));
             if (missing.length === 0)

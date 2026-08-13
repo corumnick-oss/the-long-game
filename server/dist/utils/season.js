@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCurrentNFLSeason = getCurrentNFLSeason;
 exports.getCurrentWeekAndType = getCurrentWeekAndType;
+exports.getNextWeekToUnlock = getNextWeekToUnlock;
 exports.getCurrentNFLWeek = getCurrentNFLWeek;
 exports.isPreseasonMode = isPreseasonMode;
 const db_1 = require("../db");
@@ -76,21 +77,75 @@ async function firstUnlockedOrLastWeek(season, seasonType) {
     }
     return weeks[weeks.length - 1];
 }
+// The week the scheduler's Tuesday 6AM job has most recently unlocked for a season type --
+// this is the single source of truth for "current week" below. Using it (instead of raw
+// lock-time math against whatever weeks' games happen to already be synced) is what keeps
+// the current week from jumping to next week the instant the current one's Wednesday 9PM
+// lock passes -- since the full season schedule is pre-synced ahead of time, next week's
+// games already exist with a computable (future) lock time well before Tuesday actually
+// opens it, and lock-time math alone can't tell "not locked yet" apart from "not open yet".
+async function maxUnlockedWeek(season, seasonType) {
+    const rows = await db_1.db.query.unlockedWeeks.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.unlockedWeeks.season, season), (0, drizzle_orm_1.eq)(schema_1.unlockedWeeks.seasonType, seasonType)),
+        columns: { week: true },
+    });
+    if (rows.length === 0)
+        return null;
+    return Math.max(...rows.map(r => r.week));
+}
+// Next week for the Tuesday 6AM job to sync/unlock: the earliest week (by number) that has
+// games synced but isn't in unlocked_weeks yet. Falls back to staying on the last known week
+// if every synced week is already unlocked (re-sync is harmless).
+async function nextWeekToUnlock(season, seasonType) {
+    const { games } = await Promise.resolve().then(() => __importStar(require('../db/schema')));
+    const { eq: eqOp } = await Promise.resolve().then(() => __importStar(require('drizzle-orm')));
+    const rows = await db_1.db.query.games.findMany({
+        where: (0, drizzle_orm_1.and)(eqOp(games.season, season), eqOp(games.seasonType, seasonType), eqOp(games.sport, 'nfl')),
+        columns: { week: true },
+    });
+    if (rows.length === 0)
+        return null;
+    const weeks = [...new Set(rows.map(r => r.week))].sort((a, b) => a - b);
+    const unlockedRows = await db_1.db.query.unlockedWeeks.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.unlockedWeeks.season, season), (0, drizzle_orm_1.eq)(schema_1.unlockedWeeks.seasonType, seasonType)),
+        columns: { week: true },
+    });
+    const unlockedSet = new Set(unlockedRows.map(r => r.week));
+    for (const w of weeks)
+        if (!unlockedSet.has(w))
+            return w;
+    return weeks[weeks.length - 1];
+}
+function determineSeasonType(season, now) {
+    return firstGameTime(season, 'regular').then(regularStart => {
+        const regularHasBegun = !!regularStart && regularStart.getTime() <= now.getTime();
+        return regularHasBegun ? 'regular' : 'preseason';
+    });
+}
 // Data-driven, not calendar-guessed: preseason week numbering doesn't line up with a fixed
 // "first Thursday of August" rule (e.g. 2026's preseason "week 1" was a lone standalone Hall
 // of Fame Game a full week before the real 16-game slate) -- so this reads whatever's actually
 // synced into the DB instead of assuming a schedule shape.
+//
+// "Current week" only advances when the scheduler's Tuesday 6AM job formally unlocks the next
+// one (see maxUnlockedWeek above) -- never merely because the previous week's Wednesday 9PM
+// lock passed.
 async function getCurrentWeekAndType() {
     // Manual admin override (Admin -> app settings) always wins.
     const override = await db_1.db.query.appSettings.findFirst({ where: (0, drizzle_orm_1.eq)(schema_1.appSettings.key, 'currentWeek') });
     if (override)
         return { week: parseInt(override.value, 10), seasonType: 'regular' };
     const season = getCurrentNFLSeason();
-    const now = new Date();
-    const regularStart = await firstGameTime(season, 'regular');
-    const regularHasBegun = !!regularStart && regularStart.getTime() <= now.getTime();
-    const seasonType = regularHasBegun ? 'regular' : 'preseason';
-    const week = (await firstUnlockedOrLastWeek(season, seasonType)) ?? 1;
+    const seasonType = await determineSeasonType(season, new Date());
+    const week = (await maxUnlockedWeek(season, seasonType)) ?? (await firstUnlockedOrLastWeek(season, seasonType)) ?? 1;
+    return { week, seasonType };
+}
+// Used only by the Tuesday 6AM scheduler job to determine which week to sync + unlock next --
+// distinct from getCurrentWeekAndType() above, which reports whatever week is already open.
+async function getNextWeekToUnlock() {
+    const season = getCurrentNFLSeason();
+    const seasonType = await determineSeasonType(season, new Date());
+    const week = (await nextWeekToUnlock(season, seasonType)) ?? 1;
     return { week, seasonType };
 }
 // Backward-compatible wrapper for callers that only need the number.

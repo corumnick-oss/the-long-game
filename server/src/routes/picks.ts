@@ -60,12 +60,20 @@ router.get('/week', requireAuth, async (req, res) => {
 
   const gameIds = weekGames.map(g => g.id);
 
-  const [weekUsers, allPicks] = await Promise.all([
+  const [weekUsersRaw, allPicks, seasonPickers] = await Promise.all([
     db.query.users.findMany({ where: eq(filter === 'gridirons' ? schema.users.isGridiron : schema.users.nflAccess, true) }),
     gameIds.length
       ? db.query.picks.findMany({ where: inArray(schema.picks.gameId, gameIds) })
       : Promise.resolve([]),
+    // Same membership rule as the leaderboard (HAVING COUNT(picks) > 0 for the season+type) --
+    // someone who's never made a pick this season/type shouldn't show up with a blank row.
+    db.select({ userId: schema.picks.userId })
+      .from(schema.picks)
+      .innerJoin(schema.games, eq(schema.games.id, schema.picks.gameId))
+      .where(and(eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType))),
   ]);
+  const activeUserIds = new Set(seasonPickers.map(p => p.userId));
+  const weekUsers = weekUsersRaw.filter(u => activeUserIds.has(u.id));
 
   // picksByUser[userId][gameId] = { pick, isCorrect }
   const picksByUser: Record<string, Record<string, { pick: string; isCorrect: boolean | null }>> = {};
