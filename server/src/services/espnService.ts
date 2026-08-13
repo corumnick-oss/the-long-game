@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { db } from '../db';
 import { games, picks, teamGameStats } from '../db/schema';
 import { eq, and, ne, lte, sql } from 'drizzle-orm';
@@ -16,14 +15,22 @@ const NFL_TEAM_IDS = [
   '33','34', // Ravens (33), Texans (34) — IDs 31/32 unused
 ];
 
-// Akamai (ESPN's edge/WAF) 403s any request carrying a spoofed desktop-browser User-Agent
-// with none of a real browser's other fingerprint headers (sec-ch-ua, sec-fetch-*, etc.) --
-// that combination reads as a bot signature and gets blocked outright, confirmed against
-// site.api.espn.com from multiple networks (not just Railway). A generic/no UA sails through
-// fine, so don't spoof one here.
-const ESPN_HEADERS = {
-  'Accept': 'application/json',
-};
+// axios sends its own default `User-Agent: axios/x.x.x` header on every request unless
+// explicitly stripped — a well-known scraping-library signature that Akamai's bot manager
+// blocks outright, regardless of anything else we do with headers on top of it (confirmed:
+// requests kept getting 400/403'd from Railway even after removing a spoofed browser UA,
+// because axios's own default UA was still there underneath). The original Replit
+// implementation never had this problem because it used the runtime's native fetch(), which
+// doesn't inject a library-identifying header. Use fetch() here too — no custom headers at all.
+async function espnFetch<T = any>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err: any = new Error(`ESPN request failed: ${res.status} ${res.statusText}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json() as Promise<T>;
+}
 
 // 1=preseason, 2=regular, 3=postseason
 const SEASON_TYPE_MAP: Record<string, number> = { preseason: 1, regular: 2, postseason: 3 };
@@ -85,11 +92,10 @@ async function syncWeekGamesFromTeamSchedules(week: number, season: number, seas
   let firstTeamDone = false;
   for (const teamId of teamIds) {
     try {
-      const schedResp = await axios.get(
+      const schedResp = await espnFetch<{ events?: any[] }>(
         `${BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`,
-        { headers: ESPN_HEADERS },
       );
-      const events: any[] = schedResp.data?.events ?? [];
+      const events: any[] = schedResp?.events ?? [];
       if (!firstTeamDone) {
         console.log(`[ESPN] team ${teamId} schedule: ${events.length} events, week numbers: ${[...new Set(events.map((e: any) => e.week?.number))].join(',')}`);
         firstTeamDone = true;
@@ -100,7 +106,7 @@ async function syncWeekGamesFromTeamSchedules(week: number, season: number, seas
         }
       }
     } catch (err: any) {
-      const status = err?.response?.status;
+      const status = err?.status;
       const msg = err?.message ?? String(err);
       if (!firstTeamDone) {
         console.warn(`[ESPN] team ${teamId} schedule failed: ${status ?? msg}`);
@@ -130,7 +136,7 @@ export async function syncGamesByEventIds(
   let upserted = 0;
   for (const eventId of eventIds) {
     try {
-      const { data } = await axios.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
+      const data = await espnFetch<any>(`${BASE}/summary?event=${eventId}`);
       const comp = data.header?.competitions?.[0];
       if (!comp) { console.warn(`[ESPN] no competition in summary for event ${eventId}`); continue; }
 
@@ -204,10 +210,10 @@ export async function syncWeekGames(week: number, season: number, seasonType: 'r
 
   let events: ESPNEvent[] = [];
   try {
-    const { data } = await axios.get<{ events?: ESPNEvent[] }>(url, { headers: ESPN_HEADERS });
+    const data = await espnFetch<{ events?: ESPNEvent[] }>(url);
     events = data.events ?? [];
   } catch (err: any) {
-    console.warn(`[ESPN] /scoreboard failed for ${seasonType} ${season} week ${week} (${err?.response?.status ?? err?.message}) — falling back to team-schedule sync`);
+    console.warn(`[ESPN] /scoreboard failed for ${seasonType} ${season} week ${week} (${err?.status ?? err?.message}) — falling back to team-schedule sync`);
   }
 
   if (events.length === 0) {
@@ -364,7 +370,7 @@ export async function syncWinProbabilities(week: number, season: number): Promis
   for (const game of weekGames) {
     try {
       const url = `${BASE}/summary?event=${game.espnId}`;
-      const { data } = await axios.get<any>(url, { headers: ESPN_HEADERS });
+      const data = await espnFetch<any>(url);
 
       // Only use pre-game predictor — homeTeamFPI/awayTeamFPI store the pre-kickoff prediction.
       // winningTeamWinProb/losingTeamWinProb are set post-game when the actual winner is known.
@@ -398,7 +404,7 @@ export async function syncBoxScoreStats(game: {
   awayScore: number | null;
 }): Promise<void> {
   try {
-    const { data } = await axios.get(`${BASE}/summary?event=${game.espnId}`);
+    const data = await espnFetch<any>(`${BASE}/summary?event=${game.espnId}`);
 
     const teams: any[] = data.boxscore?.teams ?? [];
     if (teams.length === 0) {

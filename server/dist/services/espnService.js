@@ -1,7 +1,4 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.syncGamesByEventIds = syncGamesByEventIds;
 exports.syncWeekGames = syncWeekGames;
@@ -9,7 +6,6 @@ exports.updateLiveScores = updateLiveScores;
 exports.syncWinProbabilities = syncWinProbabilities;
 exports.syncBoxScoreStats = syncBoxScoreStats;
 exports.backfillTeamStats = backfillTeamStats;
-const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
@@ -24,14 +20,22 @@ const NFL_TEAM_IDS = [
     '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
     '33', '34', // Ravens (33), Texans (34) — IDs 31/32 unused
 ];
-// Akamai (ESPN's edge/WAF) 403s any request carrying a spoofed desktop-browser User-Agent
-// with none of a real browser's other fingerprint headers (sec-ch-ua, sec-fetch-*, etc.) --
-// that combination reads as a bot signature and gets blocked outright, confirmed against
-// site.api.espn.com from multiple networks (not just Railway). A generic/no UA sails through
-// fine, so don't spoof one here.
-const ESPN_HEADERS = {
-    'Accept': 'application/json',
-};
+// axios sends its own default `User-Agent: axios/x.x.x` header on every request unless
+// explicitly stripped — a well-known scraping-library signature that Akamai's bot manager
+// blocks outright, regardless of anything else we do with headers on top of it (confirmed:
+// requests kept getting 400/403'd from Railway even after removing a spoofed browser UA,
+// because axios's own default UA was still there underneath). The original Replit
+// implementation never had this problem because it used the runtime's native fetch(), which
+// doesn't inject a library-identifying header. Use fetch() here too — no custom headers at all.
+async function espnFetch(url) {
+    const res = await fetch(url);
+    if (!res.ok) {
+        const err = new Error(`ESPN request failed: ${res.status} ${res.statusText}`);
+        err.status = res.status;
+        throw err;
+    }
+    return res.json();
+}
 // 1=preseason, 2=regular, 3=postseason
 const SEASON_TYPE_MAP = { preseason: 1, regular: 2, postseason: 3 };
 function parseStatus(state) {
@@ -68,8 +72,8 @@ async function syncWeekGamesFromTeamSchedules(week, season, seasonType) {
     let firstTeamDone = false;
     for (const teamId of teamIds) {
         try {
-            const schedResp = await axios_1.default.get(`${BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`, { headers: ESPN_HEADERS });
-            const events = schedResp.data?.events ?? [];
+            const schedResp = await espnFetch(`${BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${st}`);
+            const events = schedResp?.events ?? [];
             if (!firstTeamDone) {
                 console.log(`[ESPN] team ${teamId} schedule: ${events.length} events, week numbers: ${[...new Set(events.map((e) => e.week?.number))].join(',')}`);
                 firstTeamDone = true;
@@ -81,7 +85,7 @@ async function syncWeekGamesFromTeamSchedules(week, season, seasonType) {
             }
         }
         catch (err) {
-            const status = err?.response?.status;
+            const status = err?.status;
             const msg = err?.message ?? String(err);
             if (!firstTeamDone) {
                 console.warn(`[ESPN] team ${teamId} schedule failed: ${status ?? msg}`);
@@ -103,7 +107,7 @@ async function syncGamesByEventIds(eventIds, week, season, seasonType) {
     let upserted = 0;
     for (const eventId of eventIds) {
         try {
-            const { data } = await axios_1.default.get(`${BASE}/summary?event=${eventId}`, { headers: ESPN_HEADERS });
+            const data = await espnFetch(`${BASE}/summary?event=${eventId}`);
             const comp = data.header?.competitions?.[0];
             if (!comp) {
                 console.warn(`[ESPN] no competition in summary for event ${eventId}`);
@@ -175,11 +179,11 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
     const url = `${BASE}/scoreboard?week=${week}&seasontype=${st}&season=${season}&limit=50`;
     let events = [];
     try {
-        const { data } = await axios_1.default.get(url, { headers: ESPN_HEADERS });
+        const data = await espnFetch(url);
         events = data.events ?? [];
     }
     catch (err) {
-        console.warn(`[ESPN] /scoreboard failed for ${seasonType} ${season} week ${week} (${err?.response?.status ?? err?.message}) — falling back to team-schedule sync`);
+        console.warn(`[ESPN] /scoreboard failed for ${seasonType} ${season} week ${week} (${err?.status ?? err?.message}) — falling back to team-schedule sync`);
     }
     if (events.length === 0) {
         return syncWeekGamesFromTeamSchedules(week, season, seasonType);
@@ -317,7 +321,7 @@ async function syncWinProbabilities(week, season) {
     for (const game of weekGames) {
         try {
             const url = `${BASE}/summary?event=${game.espnId}`;
-            const { data } = await axios_1.default.get(url, { headers: ESPN_HEADERS });
+            const data = await espnFetch(url);
             // Only use pre-game predictor — homeTeamFPI/awayTeamFPI store the pre-kickoff prediction.
             // winningTeamWinProb/losingTeamWinProb are set post-game when the actual winner is known.
             const predictor = data.predictor;
@@ -338,7 +342,7 @@ async function syncWinProbabilities(week, season) {
 // Sync box score stats for a completed game into team_game_stats (idempotent — delete + insert).
 async function syncBoxScoreStats(game) {
     try {
-        const { data } = await axios_1.default.get(`${BASE}/summary?event=${game.espnId}`);
+        const data = await espnFetch(`${BASE}/summary?event=${game.espnId}`);
         const teams = data.boxscore?.teams ?? [];
         if (teams.length === 0) {
             console.warn(`[ESPN] No boxscore teams for event ${game.espnId}`);
