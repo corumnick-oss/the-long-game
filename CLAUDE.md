@@ -109,6 +109,7 @@ Nick needed to test H2H pick comparisons on `user/[id].tsx` before the 2026 regu
 4. **Onboarding polish** — Nick wants redesign before launch
 5. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
 6. **ascAppId for non-interactive TestFlight submits** — add to `eas.json` submit.preview profile so `eas submit --non-interactive` works without Nick's Apple ID/2FA each time. Find in App Store Connect → My Apps → The Long Game → General → App Information → Apple ID (10-digit number).
+7. **Remove the temporary preseason H2H toggle before regular season starts** — `PickComparison` in `mobile/app/user/[id].tsx` (added Aug 12 2026, see below). Testing-only; self-hides once regular season begins but the toggle code should be deleted outright, not just left dormant.
 
 ### Win Probability — weekly workflow
 As of Aug 10 2026 the Admin → NFL Tools → "Sync Win Probabilities" button should work directly from Railway (the old "IP block" was actually a bad User-Agent header, now fixed — see ESPN section below). If it ever fails again, fall back to running locally: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 9PM lock.
