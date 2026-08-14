@@ -11,36 +11,61 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
-### ⚠️ UNRESOLVED, IN PROGRESS — ESPN live score sync blocked from Railway; Raspberry Pi relay underway (paused Aug 13 2026)
+### ⚠️ TEMPORARILY WORKING via PC relay — Raspberry Pi still needed for a permanent fix (updated Aug 13-14 2026)
 
-**Symptom:** Preseason Week 2 games went live Aug 13 2026 but scores/status/clock never updated and picks never got graded. `updateLiveScores()` (30s cron) and the Admin → NFL Tools → "Sync Scores Only" button both call `syncWeekGames()` — every attempt from Railway now fails with a 400 or 403 from ESPN's edge (Akamai), on both `/scoreboard` and the team-schedule fallback.
+**Symptom (root problem, still true until the Pi is up):** ESPN's edge (Akamai) 400/403s every request that originates from a cloud/serverless host — confirmed against Railway (both its default region and us-east) and a Cloudflare Worker. Only non-cloud/residential networks succeed. `updateLiveScores()` (30s cron) and Admin → NFL Tools → "Sync Scores Only" both call `syncWeekGames()`, which fails from Railway on both `/scoreboard` and the team-schedule fallback whenever this block is active.
 
 **Tried and ruled out, in order:**
-1. Removing the spoofed Chrome User-Agent (the Aug 10 2026 fix below) — necessary but NOT sufficient; this is a recurrence, not something that fix actually finished solving.
-2. Manual Railway redeploy hoping for a fresh egress IP — no change. Railway's own docs say normal redeploys in the same region don't rotate the outbound IP anyway, and their paid "Static Outbound IP" add-on explicitly is **not** guaranteed dedicated ("may be shared with other customers") — don't buy it for this, it wouldn't help.
-3. Cloudflare Worker relay (`espn-relay.corumnick.workers.dev` — inactive/never wired up, safe to delete) — ALSO blocked by Akamai (`errors.edgesuite.net` "Access Denied"). This ruled out "just Railway" — a second, unrelated cloud platform got the same treatment.
-4. Swapped `axios` → native `fetch()` for every ESPN call in `espnService.ts` (matching the old Replit app's `server/services/espnApi.ts`, which used plain `fetch()` with zero custom headers and never had this problem). Still blocked from Railway — ruled out axios's default `User-Agent: axios/x.x.x` header as the sole cause.
-5. Switched Railway's deployment region to us-east (Aug 13 2026) — no change. Deleted `DISABLE_LIVE_SCORE_SYNC` to test, cron immediately hit the same 400s on both `/scoreboard` and the team-schedule fallback, then backed off normally. This rules out "just the default Railway region/IP range" the same way #3 ruled out "just Railway" — a different egress IP range from the same cloud host got the same treatment. `DISABLE_LIVE_SCORE_SYNC` was set back to `true` afterward.
+1. Removing the spoofed Chrome User-Agent (Aug 10 2026 fix) — necessary but NOT sufficient; this is a recurrence, not something that fix actually finished solving.
+2. Manual Railway redeploy hoping for a fresh egress IP — no change (Railway confirms redeploys in the same region don't rotate the outbound IP; their paid "Static Outbound IP" add-on isn't guaranteed dedicated either — don't buy it for this).
+3. Cloudflare Worker relay (`espn-relay.corumnick.workers.dev` — inactive/never wired up, safe to delete) — ALSO blocked by Akamai. Ruled out "just Railway."
+4. Swapped `axios` → native `fetch()` for every ESPN call in `espnService.ts` — still blocked from Railway. Ruled out axios's default `User-Agent` header as the sole cause.
+5. Switched Railway's deployment region to us-east (Aug 13 2026) — no change, same 400s. Ruled out "just the default Railway region/IP range."
 
-**Current best explanation (unconfirmed):** Akamai appears to block cloud/serverless-origin traffic broadly, regardless of specific IP/region — Railway (both its default region and us-east) and Cloudflare Workers all get the same treatment, while non-cloud networks (dev machine, Nick's home network via the local-script workaround) work every time. Replit likely worked historically either because it predates this level of blocking, or its IP range just isn't flagged — genuinely don't know which.
+**Current best explanation (unconfirmed):** Akamai blocks cloud/serverless-origin traffic broadly, regardless of specific IP/region/provider. Only real residential/dev-machine networks get through.
 
-**Shipped mitigations, both live in production:**
-- `d2b1b99` — exponential backoff in `espnFetch()`/`updateLiveScores()`. Previously a single failure cascaded into ~32 more requests via the team-schedule fallback, every 30 seconds, forever — this was likely re-triggering/extending whatever rate-based block Akamai applies. Now backs off up to 20 min between automatic attempts; manual admin sync always still attempts fresh regardless.
-- `4e88e77` — `DISABLE_LIVE_SCORE_SYNC=true` Railway env var kill switch, fully silences the automatic cron (manual admin sync unaffected). **Currently set to `true` (re-confirmed Aug 13 2026 after the us-east test above) while the Pi relay is being built — check next session whether it's still set, and unset it once the Pi relay is confirmed working.**
+**Important client-level finding (Aug 13 2026):** it's not just about *where* the request comes from — *which HTTP client* matters too. Node's raw `https` module (`https.request`) gets fingerprinted and blocked by Akamai even from a normal residential network. Node's native `fetch()` (undici) succeeds from the exact same machine, same network, same moment. `espnService.ts` already uses `fetch()` everywhere (confirmed safe) — but **any new relay/proxy code written for this must use `fetch()`, never the raw `https`/`http` module**, or it'll silently reproduce this same block.
 
-**In-progress fix — Raspberry Pi relay:** since only non-cloud/residential IPs have worked in every test, the plan is a Raspberry Pi 4 (1GB, purchased Aug 13 2026) running a tiny Node relay script at Nick's house, exposed publicly via Cloudflare Tunnel (free, no port-forwarding or static home IP needed — same Cloudflare account as the `gridironsports.net` domain), with Railway's `ESPN_API_BASE_URL` env var pointed at the tunnel URL instead of ESPN directly. **Zero changes needed to `espnService.ts`'s parsing logic** — every ESPN call already reads its base URL from that one env var, so scoreboard/team-schedule/summary/win-prob/box-score calls all reroute automatically once it's set.
+**Shipped mitigations, live in production:**
+- `d2b1b99` — exponential backoff in `espnFetch()`/`updateLiveScores()` (up to 20 min between automatic attempts after repeated failures; manual admin sync always attempts fresh).
+- `4e88e77` — `DISABLE_LIVE_SCORE_SYNC=true` Railway env var kill switch for the automatic cron.
 
-**Status Aug 13 2026, paused overnight:** Nick has the Pi but no microSD card yet. Setup paused right before Step 1. Remaining steps once resumed:
-1. Flash Raspberry Pi OS (Lite is enough) onto the microSD card via Raspberry Pi Imager, pre-configuring SSH + WiFi so it boots headless.
+**Current live status (Aug 13-14 2026 overnight):** ESPN sync is working again, temporarily, via a relay running on Nick's own PC (not the Pi yet — see below). `DISABLE_LIVE_SCORE_SYNC` is unset and `ESPN_API_BASE_URL` on Railway points at a Cloudflare quick-tunnel URL forwarding to that PC relay. Confirmed end-to-end: live scores, pick grading, and box-score/team-stats sync all flowing into production. **This stops working the moment Nick's PC sleeps, restarts, or the two processes below get closed** — see "Continuing PC-based sync" below for how to keep it alive or restart it.
+
+**Raspberry Pi — the actual permanent fix, still pending:** Nick has a Pi 4 (1GB, purchased Aug 13 2026) but no microSD card yet as of Aug 14 2026. Plan: same relay approach as the PC stopgap below, just running permanently on the Pi instead of Nick's desktop, exposed via Cloudflare Tunnel (free, no port-forwarding or static home IP needed — same Cloudflare account as `gridironsports.net`). **The working relay code already exists and is proven** — `C:\Dev\espn-relay\relay.js` on Nick's PC — so the Pi setup can copy that file directly instead of writing new passthrough logic (the old plan to reuse the abandoned/never-tested Cloudflare Worker code is superseded — that code was never confirmed working and predates the fetch()-vs-https finding above).
+
+Remaining Pi steps once the microSD card is available:
+1. Flash Raspberry Pi OS (Lite is enough) via Raspberry Pi Imager, pre-configuring SSH + WiFi so it boots headless.
 2. SSH in, install Node.js.
-3. Write/deploy the relay script (same passthrough logic already written for the abandoned Cloudflare Worker attempt: forward path+query to `site.api.espn.com`, return the JSON untouched, no custom headers).
-4. Install `cloudflared`, point it at the relay's local port, get a public HTTPS hostname.
+3. Copy `C:\Dev\espn-relay\relay.js` onto the Pi as-is (already uses `fetch()`, already proven working) and run it (`node relay.js 8787`).
+4. Install `cloudflared` on the Pi, run `cloudflared tunnel --url http://localhost:8787` (or set up a named/persistent tunnel tied to the Cloudflare account instead of a quick tunnel, so the URL doesn't change on restart — worth doing properly here since the Pi runs unattended).
 5. Set up both the relay script and `cloudflared` as systemd services so they survive reboots.
 6. Test the tunnel URL from an external network to confirm it reaches ESPN successfully.
 7. Set `ESPN_API_BASE_URL` on Railway to `<tunnel-url>/apis/site/v2/sports/football/nfl`.
-8. Unset `DISABLE_LIVE_SCORE_SYNC` on Railway, confirm via Deploy logs + a live game that scores/status/clock update automatically again.
+8. Confirm `DISABLE_LIVE_SCORE_SYNC` is unset on Railway, confirm via Logs (not Deploy Logs — see below) + a live game that scores/status/clock update automatically.
+9. Once the Pi is confirmed stable, shut down the PC relay/tunnel processes (see below) — no longer needed.
 
-**Interim workaround while unresolved:** only Nick's own local machine reaches ESPN successfully — `npm run sync:games -- <week> <season> <seasonType>` from `server/` (e.g. `npm run sync:games -- 2 2026 preseason`). May need to run this manually to grade any preseason Week 2+ picks before the Pi relay is live.
+**Continuing PC-based sync until the Pi is ready:**
+- Two processes must both stay running on Nick's PC: the relay (`C:\Dev\espn-relay\relay.js`, a plain Node script that forwards ESPN requests via `fetch()`) and `cloudflared.exe` (in the same folder) running a quick tunnel pointed at it.
+- **If they're still running, nothing to do** — check with `tasklist /FI "IMAGENAME eq node.exe"` and `tasklist /FI "IMAGENAME eq cloudflared.exe"` in a terminal.
+- **If they've stopped** (PC restarted, terminal closed, etc.), restart both:
+  1. Open a terminal, `cd C:\Dev\espn-relay`, run `node relay.js 8787` — leave this window open.
+  2. Open a second terminal, `cd C:\Dev\espn-relay`, run `cloudflared.exe tunnel --url http://localhost:8787` — leave this window open too. It prints a new `https://<random>.trycloudflare.com` URL.
+  3. **The quick-tunnel URL changes every time `cloudflared` restarts.** If the printed URL differs from what's currently set, update `ESPN_API_BASE_URL` on Railway to `<new-url>/apis/site/v2/sports/football/nfl` and save (Railway auto-restarts on env var change).
+  4. Confirm `DISABLE_LIVE_SCORE_SYNC` is unset on Railway.
+- A convenience script, `C:\Dev\espn-relay\start-relay.bat`, opens both processes in separate windows automatically — double-click it instead of typing the two commands above. It still won't survive a full PC shutdown/restart, and the tunnel URL still may change — check the Cloudflare Tunnel window it opens for the current URL and update Railway if it's different from before.
+- Bottom line: as long as those two windows stay open and the PC stays on and awake, sync keeps working exactly like it will once the Pi takes over permanently.
+
+### ✅ Box score sync silently skipping already-final games — FIXED (Aug 13 2026)
+`syncBoxScoreStats()` only fired off a detected in→post transition, so any game that skipped straight from `pre` to already-`post` on its first successful sync (e.g. after an ESPN outage, like the one above) never got `team_game_stats` populated — same gap pick grading already had a fix for (Aug 10 2026). Now checked via whether stats already exist for the game instead of relying on the transition, so it self-heals on the next cron tick regardless of how the game was missed. Confirmed live: self-healed all 5 of that night's already-finished preseason Week 2 games automatically after deploy, no manual backfill needed. This wasn't preseason-specific — the same gap would hit regular season under the same "missed the live window" conditions, which is a real risk until the Pi relay is permanent.
+
+### ✅ Ties treated as neither a win nor a loss — FIXED (Aug 13 2026)
+`picks.isCorrect` correctly stays `null` for a tied final game (by design — see `gradeGamePicks()`), but several UI spots derived win/loss purely from a live score comparison instead of reading that field, which silently rendered a tie as a **loss** for anyone who picked either team (red ✗). Fixed in `GameCard.tsx`, `game/[id].tsx` (outcome banner, "MY PICK" badges, everyone's-picks list), and `week-picks.tsx` (grid cells) — all now show a distinct yellow "Tie" instead. Caught via the Patriots 13–13 Colts preseason Week 2 game.
+
+### ✅ Live badge color + placement, Week Picks score layout — DONE (Aug 13 2026)
+- `GameCard.tsx`: live badge recolored from red (read as an error state) to blue; format is one combined line, `"LIVE - Q4 12:11"`.
+- `game/[id].tsx`: quarter/clock moved from the top header down to below the (now blue, was red) "LIVE" text under the score.
+- `week-picks.tsx`: columns widened (52px → 68px) to show the score directly beside each team's full-size logo instead of shrinking logos to fit; winner's score bold/green, loser's muted; small "F" divider when final instead of "vs".
 
 ### ✅ GameCard bounce fix — CONFIRMED WORKING
 ### ✅ Team Central + Picks by Team real-time cache invalidation — DONE
