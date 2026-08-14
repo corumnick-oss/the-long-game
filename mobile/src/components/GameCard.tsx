@@ -228,12 +228,12 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
     >
       {/* Live / Final badge */}
       {(isLive || isFinal) && (
-        <View className={`px-3 py-1 ${isLive ? 'bg-red-600' : 'bg-zinc-700'}`}>
+        <View className={`px-3 py-1 ${isLive ? 'bg-primary' : 'bg-zinc-700'}`}>
           <Text className="text-white text-xs font-bold text-center">
             {isLive
             ? game.statusType === 'STATUS_HALFTIME'
               ? 'HALFTIME'
-              : `${game.displayClock ?? '0:00'} · ${game.period ? formatPeriodLabel(game.period) : '—'}`
+              : 'LIVE'
             : 'FINAL'}
           </Text>
         </View>
@@ -322,6 +322,15 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
         onTeamPress={onTeamPress ? () => onTeamPress(game.homeTeam) : undefined}
         disabled={rowsDisabled}
       />
+
+      {/* Live quarter + time left — below both scores, only while the clock is actually running */}
+      {isLive && game.statusType !== 'STATUS_HALFTIME' && (
+        <View className="py-2">
+          <Text className="text-muted text-xs text-center font-semibold">
+            {`${game.period ? formatPeriodLabel(game.period) : '—'} · ${game.displayClock ?? '0:00'}`}
+          </Text>
+        </View>
+      )}
 
       {/* Locked message if no pick yet — only for weeks that were open */}
       {isLocked && !hasPick && isPre && game.isPicksOpen && (

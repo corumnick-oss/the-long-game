@@ -69,7 +69,7 @@ function GameHeader({ game, onPress }: { game: WeekPicksGame; onPress: () => voi
       </View>
       {isFinal ? (
         <Text className="text-muted text-xs mt-0.5">
-          {game.awayScore}–{game.homeScore}
+          {game.awayScore}–{game.homeScore} F
         </Text>
       ) : (
         <Text className="text-muted text-xs mt-0.5">vs</Text>
