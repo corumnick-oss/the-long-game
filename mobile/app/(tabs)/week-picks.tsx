@@ -50,36 +50,49 @@ function getDefaultEntryIdx(): number {
 }
 const DEFAULT_IDX = Math.max(0, getDefaultEntryIdx());
 
-const CELL = 52;   // px per game column
+const CELL = 68;   // px per game column — wide enough for full-size logo + score side by side
 const NAME_W = 88; // px for the fixed name column
 
 // ── Game column header ─────────────────────────────────────────────────────
 
 function GameHeader({ game, onPress }: { game: WeekPicksGame; onPress: () => void }) {
   const isFinal = game.status === 'post';
+  const awayWins = isFinal && (game.awayScore ?? 0) > (game.homeScore ?? 0);
+  const homeWins = isFinal && (game.homeScore ?? 0) > (game.awayScore ?? 0);
+
   return (
     <TouchableOpacity style={{ width: CELL }} className="items-center py-1 px-1" onPress={onPress} activeOpacity={0.7}>
-      {/* Away logo */}
-      <View className="w-9 h-9 items-center justify-center">
-        {game.awayTeamLogo ? (
-          <Image source={{ uri: game.awayTeamLogo }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-        ) : (
-          <Text className="text-muted text-xs">{game.awayTeam.slice(0, 3)}</Text>
+      {/* Away logo + score */}
+      <View className="flex-row items-center justify-center">
+        <View className="w-9 h-9 items-center justify-center">
+          {game.awayTeamLogo ? (
+            <Image source={{ uri: game.awayTeamLogo }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+          ) : (
+            <Text className="text-muted text-xs">{game.awayTeam.slice(0, 3)}</Text>
+          )}
+        </View>
+        {isFinal && (
+          <Text className={`text-xs font-bold ml-1 ${awayWins ? 'text-success' : 'text-muted'}`}>
+            {game.awayScore}
+          </Text>
         )}
       </View>
-      {isFinal ? (
-        <Text className="text-muted text-xs mt-0.5">
-          {game.awayScore}–{game.homeScore} F
-        </Text>
-      ) : (
-        <Text className="text-muted text-xs mt-0.5">vs</Text>
-      )}
-      {/* Home logo */}
-      <View className="w-9 h-9 items-center justify-center">
-        {game.homeTeamLogo ? (
-          <Image source={{ uri: game.homeTeamLogo }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-        ) : (
-          <Text className="text-muted text-xs">{game.homeTeam.slice(0, 3)}</Text>
+
+      <Text className="text-muted text-[9px] my-0.5">{isFinal ? 'F' : 'vs'}</Text>
+
+      {/* Home logo + score */}
+      <View className="flex-row items-center justify-center">
+        <View className="w-9 h-9 items-center justify-center">
+          {game.homeTeamLogo ? (
+            <Image source={{ uri: game.homeTeamLogo }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+          ) : (
+            <Text className="text-muted text-xs">{game.homeTeam.slice(0, 3)}</Text>
+          )}
+        </View>
+        {isFinal && (
+          <Text className={`text-xs font-bold ml-1 ${homeWins ? 'text-success' : 'text-muted'}`}>
+            {game.homeScore}
+          </Text>
         )}
       </View>
     </TouchableOpacity>
