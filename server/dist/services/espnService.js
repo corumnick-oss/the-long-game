@@ -323,6 +323,12 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
 // so this must not be gated on games already being 'in' (that was the original bug: nothing
 // ever bootstrapped the first pre→in transition for a week automatically).
 async function updateLiveScores() {
+    // Manual kill switch (Railway env var, no deploy needed to flip) — used while diagnosing
+    // ESPN blocking, so the automatic cron stays fully silent instead of relying on backoff
+    // alone. The "Sync Scores Only" admin button is unaffected and still always attempts fresh.
+    if (process.env['DISABLE_LIVE_SCORE_SYNC'] === 'true') {
+        return;
+    }
     if (isEspnBackedOff()) {
         const secondsLeft = Math.ceil((espnBackoffUntil - Date.now()) / 1000);
         console.warn(`[ESPN] Backed off after repeated failures — skipping this cycle (${secondsLeft}s left)`);
