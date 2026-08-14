@@ -11,6 +11,36 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
+### ⚠️ UNRESOLVED, IN PROGRESS — ESPN live score sync blocked from Railway; Raspberry Pi relay underway (paused Aug 13 2026)
+
+**Symptom:** Preseason Week 2 games went live Aug 13 2026 but scores/status/clock never updated and picks never got graded. `updateLiveScores()` (30s cron) and the Admin → NFL Tools → "Sync Scores Only" button both call `syncWeekGames()` — every attempt from Railway now fails with a 400 or 403 from ESPN's edge (Akamai), on both `/scoreboard` and the team-schedule fallback.
+
+**Tried and ruled out, in order:**
+1. Removing the spoofed Chrome User-Agent (the Aug 10 2026 fix below) — necessary but NOT sufficient; this is a recurrence, not something that fix actually finished solving.
+2. Manual Railway redeploy hoping for a fresh egress IP — no change. Railway's own docs say normal redeploys in the same region don't rotate the outbound IP anyway, and their paid "Static Outbound IP" add-on explicitly is **not** guaranteed dedicated ("may be shared with other customers") — don't buy it for this, it wouldn't help.
+3. Cloudflare Worker relay (`espn-relay.corumnick.workers.dev` — inactive/never wired up, safe to delete) — ALSO blocked by Akamai (`errors.edgesuite.net` "Access Denied"). This ruled out "just Railway" — a second, unrelated cloud platform got the same treatment.
+4. Swapped `axios` → native `fetch()` for every ESPN call in `espnService.ts` (matching the old Replit app's `server/services/espnApi.ts`, which used plain `fetch()` with zero custom headers and never had this problem). Still blocked from Railway — ruled out axios's default `User-Agent: axios/x.x.x` header as the sole cause.
+
+**Current best explanation (unconfirmed):** Akamai appears to block cloud/serverless-origin traffic broadly — Railway and Cloudflare Workers both get the same treatment, while non-cloud networks (dev machine, Nick's home network via the local-script workaround) work every time. Replit likely worked historically either because it predates this level of blocking, or its IP range just isn't flagged — genuinely don't know which.
+
+**Shipped mitigations, both live in production:**
+- `d2b1b99` — exponential backoff in `espnFetch()`/`updateLiveScores()`. Previously a single failure cascaded into ~32 more requests via the team-schedule fallback, every 30 seconds, forever — this was likely re-triggering/extending whatever rate-based block Akamai applies. Now backs off up to 20 min between automatic attempts; manual admin sync always still attempts fresh regardless.
+- `4e88e77` — `DISABLE_LIVE_SCORE_SYNC=true` Railway env var kill switch, fully silences the automatic cron (manual admin sync unaffected). **Nick set this while the Pi relay is being built (Aug 13 2026) — check next session whether it's still set, and unset it once the Pi relay is confirmed working.**
+
+**In-progress fix — Raspberry Pi relay:** since only non-cloud/residential IPs have worked in every test, the plan is a Raspberry Pi 4 (1GB, purchased Aug 13 2026) running a tiny Node relay script at Nick's house, exposed publicly via Cloudflare Tunnel (free, no port-forwarding or static home IP needed — same Cloudflare account as the `gridironsports.net` domain), with Railway's `ESPN_API_BASE_URL` env var pointed at the tunnel URL instead of ESPN directly. **Zero changes needed to `espnService.ts`'s parsing logic** — every ESPN call already reads its base URL from that one env var, so scoreboard/team-schedule/summary/win-prob/box-score calls all reroute automatically once it's set.
+
+**Status Aug 13 2026, paused overnight:** Nick has the Pi but no microSD card yet. Setup paused right before Step 1. Remaining steps once resumed:
+1. Flash Raspberry Pi OS (Lite is enough) onto the microSD card via Raspberry Pi Imager, pre-configuring SSH + WiFi so it boots headless.
+2. SSH in, install Node.js.
+3. Write/deploy the relay script (same passthrough logic already written for the abandoned Cloudflare Worker attempt: forward path+query to `site.api.espn.com`, return the JSON untouched, no custom headers).
+4. Install `cloudflared`, point it at the relay's local port, get a public HTTPS hostname.
+5. Set up both the relay script and `cloudflared` as systemd services so they survive reboots.
+6. Test the tunnel URL from an external network to confirm it reaches ESPN successfully.
+7. Set `ESPN_API_BASE_URL` on Railway to `<tunnel-url>/apis/site/v2/sports/football/nfl`.
+8. Unset `DISABLE_LIVE_SCORE_SYNC` on Railway, confirm via Deploy logs + a live game that scores/status/clock update automatically again.
+
+**Interim workaround while unresolved:** only Nick's own local machine reaches ESPN successfully — `npm run sync:games -- <week> <season> <seasonType>` from `server/` (e.g. `npm run sync:games -- 2 2026 preseason`). May need to run this manually to grade any preseason Week 2+ picks before the Pi relay is live.
+
 ### ✅ GameCard bounce fix — CONFIRMED WORKING
 ### ✅ Team Central + Picks by Team real-time cache invalidation — DONE
 ### ✅ Pre-game stats + post-game box scores — SHIPPED
@@ -112,7 +142,7 @@ Nick needed to test H2H pick comparisons on `user/[id].tsx` before the 2026 regu
 7. **Remove the temporary preseason H2H toggle before regular season starts** — `PickComparison` in `mobile/app/user/[id].tsx` (added Aug 12 2026, see below). Testing-only; self-hides once regular season begins but the toggle code should be deleted outright, not just left dormant.
 
 ### Win Probability — weekly workflow
-As of Aug 10 2026 the Admin → NFL Tools → "Sync Win Probabilities" button should work directly from Railway (the old "IP block" was actually a bad User-Agent header, now fixed — see ESPN section below). If it ever fails again, fall back to running locally: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 9PM lock.
+⚠️ **Currently broken from Railway** — see "UNRESOLVED, IN PROGRESS — ESPN live score sync blocked from Railway" at the top of this doc. The Aug 10 2026 UA fix below did NOT durably resolve it; ESPN/Akamai is blocking all Railway (and Cloudflare Worker) traffic again as of Aug 12-13 2026. Until the Raspberry Pi relay is live, run locally instead: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 9PM lock.
 
 ### Achievement images + Profile display redesign — DONE
 All 5 images wired in (`mobile/assets/achievements/`), Achievement Case redesigned to full-bleed badge images with no item cap. Shown on both own Profile and public profiles, season-filtered. See "Achievement & Trophy System" section above.
@@ -458,7 +488,10 @@ All 5 achievement images done, in `mobile/assets/achievements/{most_wins,loser,u
 
 All 5 push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`.
 
-### ✅ RESOLVED (Aug 10 2026) — "Railway IP Block" on ESPN was actually a bad User-Agent header
+### ⚠️ SUPERSEDED — see "UNRESOLVED, IN PROGRESS" entry at the top of this doc (Aug 13 2026)
+This section originally claimed the fix below was the full resolution. It wasn't — the same blocking (400/403 from Railway) resumed/never actually stopped, and was later confirmed to also hit a Cloudflare Worker and a native-`fetch()` rewrite, ruling out both "just Railway" and "just axios's default UA" as the full explanation. Kept below for historical context on the UA finding, which was still a real and worthwhile fix, just not sufficient on its own.
+
+### Aug 10 2026 — "Railway IP Block" on ESPN was actually (partly) a bad User-Agent header
 Every ESPN call in `espnService.ts` (and `sync-2026-local.ts`) sent a hardcoded desktop-Chrome
 `User-Agent` string on every request. Tested directly against `site.api.espn.com` from multiple
 networks: that header alone — with none of a real browser's other fingerprint headers — gets
