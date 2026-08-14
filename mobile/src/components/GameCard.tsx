@@ -233,7 +233,7 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
             {isLive
             ? game.statusType === 'STATUS_HALFTIME'
               ? 'HALFTIME'
-              : 'LIVE'
+              : `LIVE - ${game.period ? formatPeriodLabel(game.period) : '—'} ${game.displayClock ?? '0:00'}`
             : 'FINAL'}
           </Text>
         </View>
@@ -322,15 +322,6 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
         onTeamPress={onTeamPress ? () => onTeamPress(game.homeTeam) : undefined}
         disabled={rowsDisabled}
       />
-
-      {/* Live quarter + time left — below both scores, only while the clock is actually running */}
-      {isLive && game.statusType !== 'STATUS_HALFTIME' && (
-        <View className="py-2">
-          <Text className="text-muted text-xs text-center font-semibold">
-            {`${game.period ? formatPeriodLabel(game.period) : '—'} · ${game.displayClock ?? '0:00'}`}
-          </Text>
-        </View>
-      )}
 
       {/* Locked message if no pick yet — only for weeks that were open */}
       {isLocked && !hasPick && isPre && game.isPicksOpen && (
