@@ -286,6 +286,16 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
         // (e.g. catching up after the app missed the live window) still gets its picks graded.
         if (savedGame && row.status === 'post' && row.homeScore != null && row.awayScore != null) {
             await gradeGamePicks(savedGame.id, row.homeScore, row.awayScore).catch(err => console.error(`[ESPN] gradeGamePicks failed for game ${savedGame.id}:`, err));
+            // Same "arrives already-final" gap as grading above — box score sync used to only fire
+            // off the in→post transition detected below, so a game that skipped straight from pre to
+            // post (e.g. after an ESPN outage) never got its team_game_stats synced at all. Check for
+            // existing rows instead of relying on the transition, so this self-heals on the next cron
+            // tick regardless of how the game got missed.
+            const existingStats = await db_1.db.query.teamGameStats.findFirst({ where: (0, drizzle_orm_1.eq)(schema_1.teamGameStats.gameId, savedGame.id) });
+            if (!existingStats) {
+                syncBoxScoreStats({ id: savedGame.id, espnId: event.id, week, season, seasonType, homeTeam: row.homeTeam, awayTeam: row.awayTeam, homeScore: row.homeScore, awayScore: row.awayScore })
+                    .catch(err => console.error(`[ESPN] syncBoxScoreStats failed for game ${savedGame.id}:`, err));
+            }
         }
     }
     // Fire game-final notifications and sync box score stats for just-finished games
@@ -312,9 +322,8 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
         catch (err) {
             console.error('[ESPN] Game final notification batch failed for game', game.id, err);
         }
-        // Sync box score stats asynchronously — don't block the live update loop
-        syncBoxScoreStats({ id: game.id, espnId: game.espnId, week, season, seasonType, homeTeam: game.homeTeam, awayTeam: game.awayTeam, homeScore: game.homeScore, awayScore: game.awayScore })
-            .catch(err => console.error('[ESPN] syncBoxScoreStats failed for game', game.id, err));
+        // Box score sync now happens above (keyed off missing team_game_stats rows), which covers
+        // this transition case too — no separate call needed here.
     }
     return upserted;
 }
