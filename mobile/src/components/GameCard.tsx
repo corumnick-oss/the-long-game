@@ -63,7 +63,7 @@ function TeamRow({
   isHome: boolean;
   pickPct: number;
   showPct: boolean;
-  pickOutcome: 'correct' | 'wrong' | 'pending' | null;
+  pickOutcome: 'correct' | 'wrong' | 'tie' | 'pending' | null;
   otherTeamPicked: boolean;
   onPress: () => void;
   onTeamPress?: () => void;
@@ -76,14 +76,16 @@ function TeamRow({
     ? 'rgba(34,197,94,0.25)'
     : pickOutcome === 'wrong'
     ? 'rgba(239,68,68,0.12)'
+    : pickOutcome === 'tie'
+    ? 'rgba(234,179,8,0.15)'
     : pickOutcome === 'pending'
     ? 'rgba(59,130,246,0.20)'
     : otherTeamPicked && !isFinal
     ? 'rgba(0,0,0,0.18)'
     : undefined;
 
-  const outcomeBadgeStyle = pickOutcome === 'correct' ? 'bg-success' : 'bg-danger';
-  const outcomeBadgeLabel = pickOutcome === 'correct' ? '✓ CORRECT' : '✗ WRONG';
+  const outcomeBadgeStyle = pickOutcome === 'correct' ? 'bg-success' : pickOutcome === 'tie' ? 'bg-yellow-500' : 'bg-danger';
+  const outcomeBadgeLabel = pickOutcome === 'correct' ? '✓ CORRECT' : pickOutcome === 'tie' ? 'TIE' : '✗ WRONG';
 
   return (
     <TouchableOpacity
@@ -114,7 +116,7 @@ function TeamRow({
           </TouchableOpacity>
           <Text className="text-muted text-[10px] ml-1.5">{isHome ? 'Home' : 'Away'}</Text>
           {/* Always reserve space for checkmark to prevent layout shift */}
-          {(pickOutcome === 'correct' || pickOutcome === 'wrong') ? (
+          {(pickOutcome === 'correct' || pickOutcome === 'wrong' || pickOutcome === 'tie') ? (
             <View className={`ml-2 rounded px-1.5 py-0.5 ${outcomeBadgeStyle}`}>
               <Text className="text-white text-xs font-bold">{outcomeBadgeLabel}</Text>
             </View>
@@ -167,16 +169,18 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
   // Determine winner for final games
   const homeWins = isFinal && game.homeScore !== null && game.awayScore !== null && game.homeScore > game.awayScore;
   const awayWins = isFinal && game.homeScore !== null && game.awayScore !== null && game.awayScore > game.homeScore;
+  // A tie counts as neither a win nor a loss for anyone who picked either team.
+  const isTie = isFinal && game.homeScore !== null && game.awayScore !== null && game.homeScore === game.awayScore;
 
   const homePicked = game.myPick === 'home';
   const awayPicked = game.myPick === 'away';
 
   // Pick outcome for badge + border color
-  const homePickOutcome: 'correct' | 'wrong' | 'pending' | null = homePicked
-    ? isFinal ? (homeWins ? 'correct' : 'wrong') : 'pending'
+  const homePickOutcome: 'correct' | 'wrong' | 'tie' | 'pending' | null = homePicked
+    ? isTie ? 'tie' : isFinal ? (homeWins ? 'correct' : 'wrong') : 'pending'
     : null;
-  const awayPickOutcome: 'correct' | 'wrong' | 'pending' | null = awayPicked
-    ? isFinal ? (awayWins ? 'correct' : 'wrong') : 'pending'
+  const awayPickOutcome: 'correct' | 'wrong' | 'tie' | 'pending' | null = awayPicked
+    ? isTie ? 'tie' : isFinal ? (awayWins ? 'correct' : 'wrong') : 'pending'
     : null;
 
   // Show percentages whenever the server returns them (server only does so after lock)
@@ -218,6 +222,8 @@ function GameCardInner({ game, isLocked, onPick, onPress, onTeamPress }: Props) 
     ? '#22c55e'
     : pickedOutcome === 'wrong'
     ? '#ef4444'
+    : pickedOutcome === 'tie'
+    ? '#eab308'
     : '#3b82f6';
 
   return (

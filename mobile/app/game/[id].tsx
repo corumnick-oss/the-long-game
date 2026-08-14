@@ -9,6 +9,12 @@ import { getCurrentNFLSeason } from '@/lib/nflSeason';
 
 const nickname = (fullName: string) => fullName.split(' ').pop() ?? fullName;
 
+function formatPeriodLabel(period: number): string {
+  if (period <= 4) return `Q${period}`;
+  if (period === 5) return 'OT';
+  return `${period - 4}OT`;
+}
+
 function formatRatio(raw: string | null | undefined): string {
   if (!raw) return '—';
   return raw.replace('-', '/');
@@ -114,12 +120,16 @@ function RecentGameRow({ g }: { g: RecentGameEntry }) {
 
 // ── Pick list row ─────────────────────────────────────────────────────────────
 
-function PickRow({ entry }: { entry: PickEntry }) {
+function PickRow({ entry, isFinal }: { entry: PickEntry; isFinal: boolean }) {
   const initials = entry.teamName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  // A null isCorrect after the game is final means the game tied — not "ungraded".
+  const isTie = isFinal && entry.isCorrect === null;
   const outcomeColor = entry.isCorrect === true
     ? 'text-success'
     : entry.isCorrect === false
     ? 'text-danger'
+    : isTie
+    ? 'text-yellow-500'
     : 'text-muted';
   const outcomeChar = entry.isCorrect === true ? '✓' : entry.isCorrect === false ? '✗' : '·';
 
@@ -129,7 +139,11 @@ function PickRow({ entry }: { entry: PickEntry }) {
         <Text className="text-white text-xs font-bold">{initials}</Text>
       </View>
       <Text className="flex-1 text-white text-sm">{entry.teamName}</Text>
-      <Text className={`text-lg font-bold ${outcomeColor}`}>{outcomeChar}</Text>
+      {isTie ? (
+        <Text className="text-yellow-500 text-xs font-bold">Tie</Text>
+      ) : (
+        <Text className={`text-lg font-bold ${outcomeColor}`}>{outcomeChar}</Text>
+      )}
     </View>
   );
 }
@@ -183,11 +197,13 @@ export default function GameDetailScreen() {
 
   const homeWins = isFinal && (game.homeScore ?? 0) > (game.awayScore ?? 0);
   const awayWins = isFinal && (game.awayScore ?? 0) > (game.homeScore ?? 0);
+  // A tie counts as neither a win nor a loss for anyone who picked either team.
+  const isTie = isFinal && game.homeScore !== null && game.awayScore !== null && game.homeScore === game.awayScore;
   const myPickedHome = game.myPick === 'home';
   const myPickedAway = game.myPick === 'away';
   const hasPick = game.myPick !== null;
   const iWon = (myPickedHome && homeWins) || (myPickedAway && awayWins);
-  const iLost = hasPick && isFinal && !iWon;
+  const iLost = hasPick && isFinal && !iWon && !isTie;
 
   // Same eligibility rule as GameCard's canPick
   const canPick = !game.isLocked && game.isPicksOpen && (isPre || isLive);
@@ -217,7 +233,7 @@ export default function GameDetailScreen() {
             {nickname(game.awayTeam)} @ {nickname(game.homeTeam)}
           </Text>
           <Text className="text-muted text-xs">
-            {isFinal ? 'Final' : isLive ? `Q${game.period ?? ''} · ${game.displayClock ?? ''}` : formatDate(game.gameTime)}
+            {isFinal ? 'Final' : isLive ? 'Live' : formatDate(game.gameTime)}
           </Text>
         </View>
         <View className="flex-row ml-3 gap-2">
@@ -242,13 +258,17 @@ export default function GameDetailScreen() {
         {/* ── Outcome banner (final games with a pick) ── */}
         {isFinal && hasPick && (
           <View
-            className={`mx-4 mt-4 rounded-xl py-3 px-4 flex-row items-center justify-center gap-2 ${iWon ? 'bg-success/20' : 'bg-danger/20'}`}
+            className={`mx-4 mt-4 rounded-xl py-3 px-4 flex-row items-center justify-center gap-2 ${
+              isTie ? 'bg-yellow-500/20' : iWon ? 'bg-success/20' : 'bg-danger/20'
+            }`}
           >
-            <Text className={`text-xl font-bold ${iWon ? 'text-success' : 'text-danger'}`}>
-              {iWon ? '✓' : '✗'}
-            </Text>
-            <Text className={`font-bold text-base ${iWon ? 'text-success' : 'text-danger'}`}>
-              {iWon ? 'Correct pick!' : 'Wrong pick'}
+            {!isTie && (
+              <Text className={`text-xl font-bold ${iWon ? 'text-success' : 'text-danger'}`}>
+                {iWon ? '✓' : '✗'}
+              </Text>
+            )}
+            <Text className={`font-bold text-base ${isTie ? 'text-yellow-500' : iWon ? 'text-success' : 'text-danger'}`}>
+              {isTie ? 'Tie' : iWon ? 'Correct pick!' : 'Wrong pick'}
             </Text>
           </View>
         )}
@@ -279,9 +299,9 @@ export default function GameDetailScreen() {
               <Text className="text-muted text-xs">{game.awayTeamRecord}</Text>
             )}
             {myPickedAway && (
-              <View className={`mt-1.5 rounded px-2 py-0.5 ${isFinal ? (awayWins ? 'bg-success' : 'bg-danger') : 'bg-primary'}`}>
+              <View className={`mt-1.5 rounded px-2 py-0.5 ${isFinal ? (isTie ? 'bg-yellow-500' : awayWins ? 'bg-success' : 'bg-danger') : 'bg-primary'}`}>
                 <Text className="text-white text-xs font-bold">
-                  {isFinal ? (awayWins ? '✓ MY PICK' : '✗ MY PICK') : 'MY PICK'}
+                  {isFinal ? (isTie ? 'TIE' : awayWins ? '✓ MY PICK' : '✗ MY PICK') : 'MY PICK'}
                 </Text>
               </View>
             )}
@@ -301,7 +321,12 @@ export default function GameDetailScreen() {
                   </Text>
                 </View>
                 {isLive && (
-                  <Text className="text-danger text-xs font-bold mt-1">LIVE</Text>
+                  <>
+                    <Text className="text-primary text-xs font-bold mt-1">LIVE</Text>
+                    <Text className="text-muted text-xs font-semibold mt-0.5">
+                      {`${game.period ? formatPeriodLabel(game.period) : '—'} ${game.displayClock ?? '0:00'}`}
+                    </Text>
+                  </>
                 )}
               </View>
             ) : (
@@ -333,9 +358,9 @@ export default function GameDetailScreen() {
               <Text className="text-muted text-xs">{game.homeTeamRecord}</Text>
             )}
             {myPickedHome && (
-              <View className={`mt-1.5 rounded px-2 py-0.5 ${isFinal ? (homeWins ? 'bg-success' : 'bg-danger') : 'bg-primary'}`}>
+              <View className={`mt-1.5 rounded px-2 py-0.5 ${isFinal ? (isTie ? 'bg-yellow-500' : homeWins ? 'bg-success' : 'bg-danger') : 'bg-primary'}`}>
                 <Text className="text-white text-xs font-bold">
-                  {isFinal ? (homeWins ? '✓ MY PICK' : '✗ MY PICK') : 'MY PICK'}
+                  {isFinal ? (isTie ? 'TIE' : homeWins ? '✓ MY PICK' : '✗ MY PICK') : 'MY PICK'}
                 </Text>
               </View>
             )}
@@ -519,7 +544,7 @@ export default function GameDetailScreen() {
                   </Text>
                 </View>
                 <View className="bg-surface rounded-xl overflow-hidden">
-                  {awayPicks.map(p => <PickRow key={p.userId} entry={p} />)}
+                  {awayPicks.map(p => <PickRow key={p.userId} entry={p} isFinal={isFinal} />)}
                 </View>
               </View>
             )}
@@ -536,7 +561,7 @@ export default function GameDetailScreen() {
                   </Text>
                 </View>
                 <View className="bg-surface rounded-xl overflow-hidden">
-                  {homePicks.map(p => <PickRow key={p.userId} entry={p} />)}
+                  {homePicks.map(p => <PickRow key={p.userId} entry={p} isFinal={isFinal} />)}
                 </View>
               </View>
             )}

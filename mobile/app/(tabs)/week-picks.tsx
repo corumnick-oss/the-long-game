@@ -123,11 +123,13 @@ function PickCell({
   const teamName = pickedHome ? game.homeTeam : game.awayTeam;
 
   const isFinal = game.status === 'post';
+  // A null isCorrect after the game is final means the game tied — not a loss.
+  const isTie = isFinal && entry.isCorrect === null;
   const borderColor = isFinal
-    ? entry.isCorrect === true ? '#22c55e' : '#ef4444'
+    ? isTie ? '#eab308' : entry.isCorrect === true ? '#22c55e' : '#ef4444'
     : '#3b82f6';
   const bgColor = isFinal
-    ? entry.isCorrect === true ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
+    ? isTie ? 'rgba(234,179,8,0.15)' : entry.isCorrect === true ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
     : 'rgba(59,130,246,0.15)';
 
   return (
