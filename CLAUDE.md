@@ -45,16 +45,17 @@ Remaining Pi steps once the microSD card is available:
 8. Confirm `DISABLE_LIVE_SCORE_SYNC` is unset on Railway, confirm via Logs (not Deploy Logs — see below) + a live game that scores/status/clock update automatically.
 9. Once the Pi is confirmed stable, shut down the PC relay/tunnel processes (see below) — no longer needed.
 
-**Continuing PC-based sync until the Pi is ready:**
-- Two processes must both stay running on Nick's PC: the relay (`C:\Dev\espn-relay\relay.js`, a plain Node script that forwards ESPN requests via `fetch()`) and `cloudflared.exe` (in the same folder) running a quick tunnel pointed at it.
-- **If they're still running, nothing to do** — check with `tasklist /FI "IMAGENAME eq node.exe"` and `tasklist /FI "IMAGENAME eq cloudflared.exe"` in a terminal.
-- **If they've stopped** (PC restarted, terminal closed, etc.), restart both:
-  1. Open a terminal, `cd C:\Dev\espn-relay`, run `node relay.js 8787` — leave this window open.
-  2. Open a second terminal, `cd C:\Dev\espn-relay`, run `cloudflared.exe tunnel --url http://localhost:8787` — leave this window open too. It prints a new `https://<random>.trycloudflare.com` URL.
-  3. **The quick-tunnel URL changes every time `cloudflared` restarts.** If the printed URL differs from what's currently set, update `ESPN_API_BASE_URL` on Railway to `<new-url>/apis/site/v2/sports/football/nfl` and save (Railway auto-restarts on env var change).
-  4. Confirm `DISABLE_LIVE_SCORE_SYNC` is unset on Railway.
-- A convenience script, `C:\Dev\espn-relay\start-relay.bat`, opens both processes in separate windows automatically — double-click it instead of typing the two commands above. It still won't survive a full PC shutdown/restart, and the tunnel URL still may change — check the Cloudflare Tunnel window it opens for the current URL and update Railway if it's different from before.
-- Bottom line: as long as those two windows stay open and the PC stays on and awake, sync keeps working exactly like it will once the Pi takes over permanently.
+**Continuing PC-based sync until the Pi is ready — READ THIS FIRST if Nick's PC was off:**
+The relay (`C:\Dev\espn-relay\relay.js`) and `cloudflared.exe` (same folder) must both be running on Nick's PC for ESPN sync to work at all. Turning the PC off stops both — nothing syncs (harmless if it's just overnight with no games in progress, but must be restarted before the next sync is needed). **Give Nick these exact steps whenever he says he turned the PC back on / needs sync going again:**
+
+1. Open File Explorer, go to `C:\Dev\espn-relay`, double-click `start-relay.bat`. Two terminal windows open ("ESPN Relay" and "Cloudflare Tunnel") — leave both open.
+2. Read the URL printed in the "Cloudflare Tunnel" window (`https://<random-words>.trycloudflare.com`). **It changes every single restart** — assume it's different from last time.
+3. On Railway → service → Variables: set `ESPN_API_BASE_URL` to `<that-url>/apis/site/v2/sports/football/nfl`, save (Railway auto-restarts on save).
+4. Confirm `DISABLE_LIVE_SCORE_SYNC` is still unset/deleted on Railway.
+5. If a Claude Code session is open, verify end-to-end the same way as Aug 13 2026: curl the relay locally (`http://localhost:8787/apis/site/v2/sports/football/nfl/scoreboard?...`) and the tunnel URL both return real ESPN JSON, then check `team_game_stats`/`games` in the DB directly for a live/recent game to confirm data is actually flowing, not just that the endpoints respond.
+6. Sync keeps working only as long as those two windows stay open and the PC stays on and awake. Closing them or sleeping/shutting down the PC pauses sync again until steps 1-4 repeat.
+
+(Manual restart without the batch file: `cd C:\Dev\espn-relay` then `node relay.js 8787` in one terminal, `cloudflared.exe tunnel --url http://localhost:8787` in a second — same result as the batch file, just two commands instead of one double-click.)
 
 ### ✅ Box score sync silently skipping already-final games — FIXED (Aug 13 2026)
 `syncBoxScoreStats()` only fired off a detected in→post transition, so any game that skipped straight from `pre` to already-`post` on its first successful sync (e.g. after an ESPN outage, like the one above) never got `team_game_stats` populated — same gap pick grading already had a fix for (Aug 10 2026). Now checked via whether stats already exist for the game instead of relying on the transition, so it self-heals on the next cron tick regardless of how the game was missed. Confirmed live: self-healed all 5 of that night's already-finished preseason Week 2 games automatically after deploy, no manual backfill needed. This wasn't preseason-specific — the same gap would hit regular season under the same "missed the live window" conditions, which is a real risk until the Pi relay is permanent.
