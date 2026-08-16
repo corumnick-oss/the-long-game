@@ -25,6 +25,13 @@ const FEATURES = [
   { icon: '⚡', title: 'Chase the Upset', description: "Call the games nobody else does. Earn achievements for it." },
 ];
 
+const RULES_SUMMARY = [
+  'Pick the winner of every NFL game, every week.',
+  'Picks lock Wednesday at 11:59 PM PST — no changes after that.',
+  "Miss a pick after your first active week? We'll auto-fill it for you.",
+  'Full rules are always available from your Profile.',
+];
+
 // Shared style for all text inputs — explicit height prevents iOS text clipping
 const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
 
@@ -52,26 +59,37 @@ export default function LoginScreen() {
     return (
       <SafeAreaView style={ob.safe}>
         <View style={ob.container}>
-          <View style={ob.logoSection}>
-            <View style={ob.iconCircle}>
-              <Text style={ob.footballEmoji}>🏈</Text>
-            </View>
-            <Text style={ob.appName}>The Long Game</Text>
-            <Text style={ob.tagline}>NFL Picks &amp; Leaderboards</Text>
-          </View>
-          <View style={ob.featuresSection}>
-            {FEATURES.map(f => (
-              <View key={f.title} style={ob.featureRow}>
-                <View style={ob.featureIconBox}>
-                  <Text style={ob.featureIcon}>{f.icon}</Text>
-                </View>
-                <View style={ob.featureText}>
-                  <Text style={ob.featureTitle}>{f.title}</Text>
-                  <Text style={ob.featureDesc}>{f.description}</Text>
-                </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={ob.scrollContent} showsVerticalScrollIndicator={false}>
+            <View style={ob.logoSection}>
+              <View style={ob.iconCircle}>
+                <Text style={ob.footballEmoji}>🏈</Text>
               </View>
-            ))}
-          </View>
+              <Text style={ob.appName}>The Long Game</Text>
+              <Text style={ob.tagline}>NFL Picks &amp; Leaderboards</Text>
+            </View>
+            <View style={ob.featuresSection}>
+              {FEATURES.map(f => (
+                <View key={f.title} style={ob.featureRow}>
+                  <View style={ob.featureIconBox}>
+                    <Text style={ob.featureIcon}>{f.icon}</Text>
+                  </View>
+                  <View style={ob.featureText}>
+                    <Text style={ob.featureTitle}>{f.title}</Text>
+                    <Text style={ob.featureDesc}>{f.description}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            <View style={ob.rulesSection}>
+              <Text style={ob.rulesTitle}>How It Works</Text>
+              {RULES_SUMMARY.map(line => (
+                <View key={line} style={ob.rulesRow}>
+                  <Text style={ob.rulesBullet}>•</Text>
+                  <Text style={ob.rulesText}>{line}</Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
           <View style={ob.ctaSection}>
             <TouchableOpacity style={ob.button} onPress={handleGetStarted} activeOpacity={0.85}>
               <Text style={ob.buttonText}>Get Started</Text>
@@ -259,7 +277,8 @@ function friendlyFirebaseError(msg: string): string {
 
 const ob = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#0f0f0f' },
-  container: { flex: 1, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 24, justifyContent: 'space-between' },
+  container: { flex: 1, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 24 },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', gap: 28 },
   logoSection: { alignItems: 'center' },
   iconCircle: { width: 84, height: 84, borderRadius: 42, backgroundColor: 'rgba(59,130,246,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   footballEmoji: { fontSize: 40 },
@@ -272,6 +291,11 @@ const ob = StyleSheet.create({
   featureText: { flex: 1 },
   featureTitle: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
   featureDesc: { color: '#9ca3af', fontSize: 13, marginTop: 2, lineHeight: 18 },
+  rulesSection: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 16 },
+  rulesTitle: { color: '#ffffff', fontSize: 14, fontWeight: '700', marginBottom: 10 },
+  rulesRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
+  rulesBullet: { color: '#3b82f6', fontSize: 13, lineHeight: 18 },
+  rulesText: { color: '#9ca3af', fontSize: 13, lineHeight: 18, flex: 1 },
   ctaSection: { gap: 8 },
   button: { backgroundColor: '#3b82f6', borderRadius: 16, height: 54, alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },

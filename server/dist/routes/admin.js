@@ -433,7 +433,7 @@ router.get('/email/status', async (req, res) => {
     res.json({ resendConfigured: !!process.env['RESEND_API_KEY'] });
 });
 // Send the calling admin their own current-week picks as a test email, without waiting
-// for Wednesday 9PM. Falls back to whatever week actually has games for the admin's picks.
+// for Wednesday 11:59PM. Falls back to whatever week actually has games for the admin's picks.
 router.post('/email/test', async (req, res) => {
     try {
         const { sendWeeklyPicksEmails } = await Promise.resolve().then(() => __importStar(require('../services/emailService')));

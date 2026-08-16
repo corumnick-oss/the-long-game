@@ -95,7 +95,7 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
         {entry.teamName}
       </Text>
 
-      <Text className="text-muted text-sm mr-4">
+      <Text className="text-white text-sm font-bold mr-4">
         {entry.wins}-{entry.losses}
       </Text>
 

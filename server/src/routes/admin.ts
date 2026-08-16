@@ -406,7 +406,7 @@ router.get('/email/status', async (req, res) => {
 });
 
 // Send the calling admin their own current-week picks as a test email, without waiting
-// for Wednesday 9PM. Falls back to whatever week actually has games for the admin's picks.
+// for Wednesday 11:59PM. Falls back to whatever week actually has games for the admin's picks.
 router.post('/email/test', async (req, res) => {
   try {
     const { sendWeeklyPicksEmails } = await import('../services/emailService');

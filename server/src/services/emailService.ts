@@ -69,7 +69,7 @@ function buildEmailHtml(teamName: string, weekLabel: string, season: number, pic
           <tr>
             <td style="padding:18px 20px;text-align:center;">
               <div style="color:#9ca3af;font-size:12px;">
-                This is your official record of picks for ${weekLabel.toLowerCase()}, locked at Wednesday 9PM PST.
+                This is your official record of picks for ${weekLabel.toLowerCase()}, locked at Wednesday 11:59PM PST.
               </div>
             </td>
           </tr>

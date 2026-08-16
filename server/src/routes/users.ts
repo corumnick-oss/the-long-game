@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import admin from 'firebase-admin';
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { sql, eq, and, desc, asc } from 'drizzle-orm';
@@ -27,6 +28,36 @@ router.patch('/me', requireAuth, async (req, res) => {
 
   const [updated] = await db.update(schema.users).set(updates).where(eq(schema.users.id, req.currentUser!.id)).returning();
   res.json(updated);
+});
+
+// DELETE /api/users/me — account deletion (Apple 5.1.1v requires in-app self-service deletion).
+// Keeps the users row (anonymized) rather than hard-deleting, since picks/trophies/audit rows
+// from this user are referenced by other users' leaderboards and H2H history — matches what
+// the privacy policy promises ("delete or anonymize... except where retaining limited records
+// is necessary to preserve the integrity of past leaderboard results for other users").
+router.delete('/me', requireAuth, async (req, res) => {
+  const userId = req.currentUser!.id;
+
+  await db.delete(schema.pushTokens).where(eq(schema.pushTokens.userId, userId));
+
+  await db.update(schema.users).set({
+    email: `deleted-${userId}@deleted.local`,
+    teamName: 'Deleted User',
+    profileImageUrl: null,
+    isAdmin: false,
+    isGridiron: false,
+    isPremium: false,
+    nflAccess: false,
+    updatedAt: new Date(),
+  }).where(eq(schema.users.id, userId));
+
+  try {
+    await admin.auth().deleteUser(userId);
+  } catch (err) {
+    console.error('[DELETE /users/me] Firebase account deletion failed:', err);
+  }
+
+  res.json({ ok: true });
 });
 
 // POST /api/users — create user profile on first login

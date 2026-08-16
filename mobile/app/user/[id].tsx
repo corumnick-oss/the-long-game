@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useWeekPicks } from '@/hooks/useWeekPicks';
-import { useCurrentWeek } from '@/hooks/usePicksData';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { useAuth } from '@/context/AuthContext';
 import { WeekSelector } from '@/components/WeekSelector';
@@ -128,24 +127,16 @@ function PickComparison({
 }) {
   const { user } = useAuth();
   const currentWeek = getCurrentNFLWeek();
-  // TEMPORARY (Aug 2026): lets Nick test H2H comparisons against real preseason data before
-  // the regular season has any games. Self-limiting -- only appears while preseason is the
-  // actual current season type -- but should be removed outright once regular season starts.
-  const { data: currentWeekData } = useCurrentWeek();
-  const previewingPreseason = isCurrentSeason && currentWeekData?.seasonType === 'preseason';
-  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
-  const effectiveSeasonType = previewingPreseason ? seasonType : 'regular';
 
-  const maxWeek = effectiveSeasonType === 'preseason' ? (currentWeekData?.week ?? 1) : (isCurrentSeason ? currentWeek : 18);
+  const maxWeek = isCurrentSeason ? currentWeek : 18;
   const [comparisonWeek, setComparisonWeek] = useState(maxWeek);
 
-  // Reset to latest week when season or season type changes
+  // Reset to latest week when season changes
   useEffect(() => {
-    if (effectiveSeasonType === 'preseason') setComparisonWeek(currentWeekData?.week ?? 1);
-    else setComparisonWeek(isCurrentSeason ? getCurrentNFLWeek() : 18);
-  }, [season, effectiveSeasonType]);
+    setComparisonWeek(isCurrentSeason ? getCurrentNFLWeek() : 18);
+  }, [season]);
 
-  const { data: weekPicksData } = useWeekPicks(comparisonWeek, season, effectiveSeasonType);
+  const { data: weekPicksData } = useWeekPicks(comparisonWeek, season, 'regular');
 
   const myPicksMap = weekPicksData?.picksByUser[user!.uid] ?? {};
   const theirPicksMap = weekPicksData?.picksByUser[targetId] ?? {};
@@ -169,29 +160,16 @@ function PickComparison({
     return mine && theirs && mine !== theirs;
   }).length;
 
-  const effectiveCurrentWeek = effectiveSeasonType === 'preseason' ? (currentWeekData?.week ?? 1) : currentWeek;
-  const isPastWeek = !isCurrentSeason || comparisonWeek < effectiveCurrentWeek;
+  const isPastWeek = !isCurrentSeason || comparisonWeek < currentWeek;
   const canShow = weekPicksData?.locked || isPastWeek;
 
   const weekSelector = (
-    <View>
-      {previewingPreseason && (
-        <TouchableOpacity
-          onPress={() => setSeasonType(t => (t === 'preseason' ? 'regular' : 'preseason'))}
-          className="self-start bg-surface border border-border rounded-full px-3 py-1 mb-2"
-        >
-          <Text className="text-xs text-primary font-semibold">
-            {seasonType === 'preseason' ? 'Viewing Preseason — tap for Regular' : 'Viewing Regular — tap for Preseason'}
-          </Text>
-        </TouchableOpacity>
-      )}
-      <WeekSelector
-        currentWeek={isCurrentSeason ? effectiveCurrentWeek : 0}
-        selectedWeek={comparisonWeek}
-        onSelect={setComparisonWeek}
-        totalWeeks={maxWeek}
-      />
-    </View>
+    <WeekSelector
+      currentWeek={isCurrentSeason ? currentWeek : 0}
+      selectedWeek={comparisonWeek}
+      onSelect={setComparisonWeek}
+      totalWeeks={maxWeek}
+    />
   );
 
   if (!canShow) {
@@ -200,7 +178,7 @@ function PickComparison({
         {weekSelector}
         <View className="bg-surface rounded-xl px-4 py-5 mt-3 items-center">
           <Text className="text-muted text-sm text-center">
-            Pick comparison appears here after Wednesday 9 PM lock.
+            Pick comparison appears here after Wednesday 11:59 PM lock.
           </Text>
         </View>
       </View>

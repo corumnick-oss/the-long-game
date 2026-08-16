@@ -22,7 +22,7 @@ async function firstGameTime(season: number, seasonType: 'preseason' | 'regular'
 }
 
 // The current week for a season type is the first one whose picks aren't locked yet (still
-// open, or about to open) -- naturally advances 1, 2, 3... as each week's Wednesday 9PM lock
+// open, or about to open) -- naturally advances 1, 2, 3... as each week's Wednesday 11:59PM lock
 // passes. If every known week is already locked, stay on the last one rather than erroring.
 async function firstUnlockedOrLastWeek(season: number, seasonType: 'preseason' | 'regular'): Promise<number | null> {
   const { games } = await import('../db/schema');
@@ -43,7 +43,7 @@ async function firstUnlockedOrLastWeek(season: number, seasonType: 'preseason' |
 // The week the scheduler's Tuesday 6AM job has most recently unlocked for a season type --
 // this is the single source of truth for "current week" below. Using it (instead of raw
 // lock-time math against whatever weeks' games happen to already be synced) is what keeps
-// the current week from jumping to next week the instant the current one's Wednesday 9PM
+// the current week from jumping to next week the instant the current one's Wednesday 11:59PM
 // lock passes -- since the full season schedule is pre-synced ahead of time, next week's
 // games already exist with a computable (future) lock time well before Tuesday actually
 // opens it, and lock-time math alone can't tell "not locked yet" apart from "not open yet".
@@ -92,7 +92,7 @@ function determineSeasonType(season: number, now: Date): Promise<'preseason' | '
 // synced into the DB instead of assuming a schedule shape.
 //
 // "Current week" only advances when the scheduler's Tuesday 6AM job formally unlocks the next
-// one (see maxUnlockedWeek above) -- never merely because the previous week's Wednesday 9PM
+// one (see maxUnlockedWeek above) -- never merely because the previous week's Wednesday 11:59PM
 // lock passed.
 export async function getCurrentWeekAndType(): Promise<{ week: number; seasonType: 'preseason' | 'regular' }> {
   // Manual admin override (Admin -> app settings) always wins.

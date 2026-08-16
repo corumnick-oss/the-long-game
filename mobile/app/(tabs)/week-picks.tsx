@@ -265,7 +265,7 @@ export default function WeekPicksScreen() {
             Picks are hidden
           </Text>
           <Text className="text-muted text-sm text-center">
-            Everyone's picks for {entry.seasonType === 'preseason' ? `Pre ${selectedWeek}` : `Week ${selectedWeek}`} will appear here after Wednesday 9 PM lock.
+            Everyone's picks for {entry.seasonType === 'preseason' ? `Pre ${selectedWeek}` : `Week ${selectedWeek}`} will appear here after Wednesday 11:59 PM lock.
           </Text>
           {selectedWeek > 1 && (
             <Text className="text-muted text-xs text-center mt-4">

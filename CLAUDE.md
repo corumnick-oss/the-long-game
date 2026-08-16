@@ -11,51 +11,75 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
-### ⚠️ TEMPORARILY WORKING via PC relay — Raspberry Pi still needed for a permanent fix (updated Aug 13-14 2026)
+### ✅ Raspberry Pi ESPN relay — PERMANENT FIX SHIPPED (Aug 15-16 2026)
 
-**Symptom (root problem, still true until the Pi is up):** ESPN's edge (Akamai) 400/403s every request that originates from a cloud/serverless host — confirmed against Railway (both its default region and us-east) and a Cloudflare Worker. Only non-cloud/residential networks succeed. `updateLiveScores()` (30s cron) and Admin → NFL Tools → "Sync Scores Only" both call `syncWeekGames()`, which fails from Railway on both `/scoreboard` and the team-schedule fallback whenever this block is active.
+The ESPN/Akamai block on Railway (full history in the "ESPN/Akamai background" section below) is now solved permanently via a Raspberry Pi running 24/7 on Nick's home network, relaying Railway's ESPN requests through a real residential IP. **PC relay stopgap is retired** — both its processes were already stopped, `C:\Dev\espn-relay` on Nick's PC is now just a historical reference (the same `relay.js` was copied to the Pi as-is).
+
+**Confirmed end-to-end (Aug 15-16 2026):** watched Railway's 30-second cron hit the Pi's relay log live, watched two real in-progress preseason games (Eagles@Ravens, Cowboys@Seahawks) have their clock/score update in the production DB in step with ESPN's actual live feed. No manual sync needed — fully automatic.
+
+**Setup:**
+- Hardware: Raspberry Pi 4, hostname `espn-relay` (reachable at `espn-relay.local` on the home LAN), OS: Raspberry Pi OS Lite (64-bit), SSH user `nickcorum`
+- SSH: key-based auth (Nick's PC has the private key at `~/.ssh/id_ed25519`; the Pi has the matching public key in `~/.ssh/authorized_keys`) — no password needed from Nick's PC. Password auth still works too (same password set in Raspberry Pi Imager) but isn't needed day-to-day.
+- Relay: `~/relay.js` on the Pi (identical to `C:\Dev\espn-relay\relay.js` — uses `fetch()`, never the raw `https` module, see Akamai background below for why that matters), run as systemd service `espn-relay` (`ExecStart=/usr/bin/node /home/nickcorum/relay.js 8787`, `Restart=always`, enabled on boot). Service file: `/etc/systemd/system/espn-relay.service`.
+- Tunnel: named/persistent Cloudflare Tunnel (not a quick tunnel — URL never changes), name `espn-relay`, tunnel ID `45f920c4-e52d-49af-8639-f10489b014d6`, routed to **`https://espn-relay.gridironsports.net`** (same Cloudflare account/zone as the main domain). Config at `/etc/cloudflared/config.yml`, credentials at `~/.cloudflared/45f920c4-e52d-49af-8639-f10489b014d6.json` and `~/.cloudflared/cert.pem`. Runs as systemd service `cloudflared`, enabled on boot.
+- Railway: `ESPN_API_BASE_URL` = `https://espn-relay.gridironsports.net/apis/site/v2/sports/football/nfl`. `DISABLE_LIVE_SCORE_SYNC` unset.
+
+**Routine health check / troubleshooting** (from Nick's PC, passwordless):
+```
+ssh nickcorum@espn-relay.local "sudo systemctl status espn-relay cloudflared --no-pager"
+```
+Both should show `active (running)`. To restart either: `ssh nickcorum@espn-relay.local "sudo systemctl restart espn-relay"` (or `cloudflared`). To tail live relay traffic: `ssh nickcorum@espn-relay.local "journalctl -u espn-relay -f"`. If the Pi loses power/reboots, both services auto-start — nothing manual needed. If `espn-relay.local` won't resolve, check the Pi's actual IP via your router and SSH to that instead (mDNS occasionally flakes on some networks).
+
+**If ESPN blocks the Pi's residential IP too, someday:** re-read the "ESPN/Akamai background" section below — the fix would need a *different* residential/non-cloud network, not a code change, since `fetch()` + non-cloud origin is already confirmed as the working combination.
+
+**Hardware note for any future SD card work:** the first microSD card (Onn/Walmart store brand) got bricked by an interrupted Raspberry Pi Imager write — went from working to completely unreadable (0 bytes/"No Media" in Windows, undetected on 2 PCs, hung SD Card Formatter, invisible to `diskpart`) after the write was interrupted. Replacement was a name-brand card and worked fine. **Never unplug/interrupt Raspberry Pi Imager mid-write**, and prefer SanDisk/Samsung/Kingston over store-brand cards for anything Pi-related.
+
+### ✅ Lock time changed to 11:59PM PST — DONE (Aug 16 2026)
+Wednesday lock moved from 9PM to **11:59PM PST**, pulled forward out of the deferred notification-overhaul plan because the new in-app Rules page (see below) needed to state the real lock time. The 8PM "1 hour left" reminder push **stays at 8PM** but its copy no longer claims "1 hour left" (no longer accurate at ~4 hours out) — now reads "[Week] picks lock tonight at 11:59 PM!". Updated: `server/src/utils/lockTime.ts` (`pacificWallTimeToUtc(..., 23, 59)`), `server/src/services/scheduler.ts` (lock cron `'59 23 * * 3'`), `server/src/services/notificationService.ts`, `server/src/services/emailService.ts`, `server/src/routes/admin.ts` (comment), `server/src/utils/season.ts` (comments), `mobile/app/(tabs)/week-picks.tsx`, `mobile/app/game/[id].tsx`, `mobile/app/user/[id].tsx`, `mobile/app/rules.tsx`, `mobile/app/(auth)/login.tsx` (onboarding rules summary). `server/src/scripts/backfill-week-lock.ts`'s comment was deliberately left as-is — it describes a specific historical bug that really did fire at 9PM at the time, changing it would misrepresent history. No DB migration involved — pure code/copy change, safe to deploy same as any other backend push.
+
+### 🔜 PLANNED, NOT STARTED (scoped Aug 15 2026) — remaining notification overhaul
+Lock time (item 1) is done, see above. Three pieces remain, agreed with Nick, ready to build whenever — go straight to implementation, no need to re-scope:
+
+**2. Personalized game-final push text** — currently "Final: {away} X, {home} Y" / "Your pick was correct/wrong." Change to lead with the pick itself: *"You correctly picked the {team} to win! 🎉"* / *"Bummer, the {team} lost. 😬"* (score moves to body line).
+- `server/src/services/espnService.ts` — thread the picked team's name into the `notifyGameFinal` call (currently only passes home/away/scores + isCorrect bool); ties already skip this block entirely (`if (game.homeScore === game.awayScore) continue`), no change needed there
+- `server/src/services/notificationService.ts` — rewrite `notifyGameFinal`'s title/body
+
+**3. Granular notification settings** (new Settings screen — none exists today; Sign Out/Admin Dashboard currently just sit as bare links on Profile). Categories, all default `true`: game win/loss, week summary, week unlocked, week locked. **Deadline reminder rides along with "week locked"** (both lock-related); **achievement-earned pushes stay always-on**, not user-toggleable (Nick's call, Aug 15 2026).
+- `server/src/db/schema.ts` — add 4 boolean columns to `users`: `notifyGameResults`, `notifyWeekSummary`, `notifyWeekUnlocked`, `notifyWeekLocked`
+- `server/src/scripts/migrate-notification-prefs.ts` — new one-off `ALTER TABLE users ADD COLUMN IF NOT EXISTS ...` script — **run manually against Railway prod DB, confirm with Nick before running** (same DB serves local + prod, no separate environments)
+- `server/src/routes/users.ts` — extend `PATCH /api/users/me` to accept the 4 new fields (GET already spreads full user row, no change needed there)
+- `server/src/services/notificationService.ts` — broadcast sends (`notifyWeekUnlocked`, `notifyPicksLocked`, `notifyDeadlineApproaching`, `notifyGameFinal`) filter recipients by their relevant preference column instead of blasting every `nflAccess` user
+- **New**: `mobile/app/settings.tsx` — master push-notifications switch (re-triggers the OS permission prompt if previously declined — this is also what closes the earlier "let users turn notifications back on" gap), the 4 category toggles, and the **Rules page link lives here too** (natural pairing, also satisfies part of the hard-blocker rules-page requirement in "Next priority items" below)
+- `mobile/app/(tabs)/profile.tsx` — add a "⚙️ Settings" entry point
+
+**4. New "Week summary" notification** — doesn't exist yet. Fires **Tuesday 6AM** (Nick's call), riding along with the existing weekly-transition cron that already computes "the week that just closed" (`week - 1`) to award achievements — but unlike achievements (regular-season-only), week summary should fire for **both preseason and regular season**.
+- `server/src/services/notificationService.ts` — new `notifyWeekSummary(userId, week, seasonType, wins, losses)`, gated by `notifyWeekSummary` pref
+- `server/src/services/scheduler.ts` — in the Tuesday 6AM job (`cron.schedule('0 6 * * 2', ...)`), after the existing `week > 1` achievement-award branch, add a per-participant W-L calc for `week - 1` / `seasonType` and call `notifyWeekSummary` for each
+
+**Before deploying:** build touches a prod DB schema change (item 3) and ships via the normal backend-push + `eas update --branch preview` OTA flow — confirm with Nick before running the migration script and before pushing/publishing, same as any other deploy.
+
+<details>
+<summary>ESPN/Akamai background — why this was needed (click to expand historical debugging)</summary>
+
+**Symptom:** ESPN's edge (Akamai) 400/403s every request that originates from a cloud/serverless host — confirmed against Railway (both its default region and us-east) and a Cloudflare Worker. Only non-cloud/residential networks succeed.
 
 **Tried and ruled out, in order:**
-1. Removing the spoofed Chrome User-Agent (Aug 10 2026 fix) — necessary but NOT sufficient; this is a recurrence, not something that fix actually finished solving.
-2. Manual Railway redeploy hoping for a fresh egress IP — no change (Railway confirms redeploys in the same region don't rotate the outbound IP; their paid "Static Outbound IP" add-on isn't guaranteed dedicated either — don't buy it for this).
-3. Cloudflare Worker relay (`espn-relay.corumnick.workers.dev` — inactive/never wired up, safe to delete) — ALSO blocked by Akamai. Ruled out "just Railway."
-4. Swapped `axios` → native `fetch()` for every ESPN call in `espnService.ts` — still blocked from Railway. Ruled out axios's default `User-Agent` header as the sole cause.
-5. Switched Railway's deployment region to us-east (Aug 13 2026) — no change, same 400s. Ruled out "just the default Railway region/IP range."
+1. Removing the spoofed Chrome User-Agent (Aug 10 2026 fix) — necessary but NOT sufficient; this was a recurrence, not something that fix actually finished solving.
+2. Manual Railway redeploy hoping for a fresh egress IP — no change (Railway confirms redeploys in the same region don't rotate the outbound IP; their paid "Static Outbound IP" add-on isn't guaranteed dedicated either).
+3. Cloudflare Worker relay (`espn-relay.corumnick.workers.dev` — inactive, safe to delete) — ALSO blocked by Akamai. Ruled out "just Railway."
+4. Swapped `axios` → native `fetch()` for every ESPN call in `espnService.ts` — still blocked from Railway. Ruled out axios's default `User-Agent` as the sole cause.
+5. Switched Railway's deployment region to us-east (Aug 13 2026) — no change. Ruled out "just the default Railway region/IP range."
 
-**Current best explanation (unconfirmed):** Akamai blocks cloud/serverless-origin traffic broadly, regardless of specific IP/region/provider. Only real residential/dev-machine networks get through.
+**Conclusion:** Akamai blocks cloud/serverless-origin traffic broadly, regardless of specific IP/region/provider. Only real residential/dev-machine networks get through — hence running a relay on Pi hardware on Nick's home network.
 
-**Important client-level finding (Aug 13 2026):** it's not just about *where* the request comes from — *which HTTP client* matters too. Node's raw `https` module (`https.request`) gets fingerprinted and blocked by Akamai even from a normal residential network. Node's native `fetch()` (undici) succeeds from the exact same machine, same network, same moment. `espnService.ts` already uses `fetch()` everywhere (confirmed safe) — but **any new relay/proxy code written for this must use `fetch()`, never the raw `https`/`http` module**, or it'll silently reproduce this same block.
+**Client-level finding (Aug 13 2026):** it's not just *where* the request comes from — *which HTTP client* matters too. Node's raw `https` module (`https.request`) gets fingerprinted and blocked by Akamai even from a normal residential network. Node's native `fetch()` (undici) succeeds from the exact same machine/network. `espnService.ts` and `relay.js` both use `fetch()` exclusively — **any new relay/proxy code for this must use `fetch()`, never the raw `https`/`http` module**, or it'll silently reproduce this block.
 
-**Shipped mitigations, live in production:**
+**Shipped mitigations, still live in production:**
 - `d2b1b99` — exponential backoff in `espnFetch()`/`updateLiveScores()` (up to 20 min between automatic attempts after repeated failures; manual admin sync always attempts fresh).
-- `4e88e77` — `DISABLE_LIVE_SCORE_SYNC=true` Railway env var kill switch for the automatic cron.
+- `4e88e77` — `DISABLE_LIVE_SCORE_SYNC=true` Railway env var kill switch, available if the Pi relay ever needs to be taken offline for maintenance.
 
-**Current live status (Aug 13-14 2026 overnight):** ESPN sync is working again, temporarily, via a relay running on Nick's own PC (not the Pi yet — see below). `DISABLE_LIVE_SCORE_SYNC` is unset and `ESPN_API_BASE_URL` on Railway points at a Cloudflare quick-tunnel URL forwarding to that PC relay. Confirmed end-to-end: live scores, pick grading, and box-score/team-stats sync all flowing into production. **This stops working the moment Nick's PC sleeps, restarts, or the two processes below get closed** — see "Continuing PC-based sync" below for how to keep it alive or restart it.
-
-**Raspberry Pi — the actual permanent fix, still pending:** Nick has a Pi 4 (1GB, purchased Aug 13 2026) but no microSD card yet as of Aug 14 2026. Plan: same relay approach as the PC stopgap below, just running permanently on the Pi instead of Nick's desktop, exposed via Cloudflare Tunnel (free, no port-forwarding or static home IP needed — same Cloudflare account as `gridironsports.net`). **The working relay code already exists and is proven** — `C:\Dev\espn-relay\relay.js` on Nick's PC — so the Pi setup can copy that file directly instead of writing new passthrough logic (the old plan to reuse the abandoned/never-tested Cloudflare Worker code is superseded — that code was never confirmed working and predates the fetch()-vs-https finding above).
-
-Remaining Pi steps once the microSD card is available:
-1. Flash Raspberry Pi OS (Lite is enough) via Raspberry Pi Imager, pre-configuring SSH + WiFi so it boots headless.
-2. SSH in, install Node.js.
-3. Copy `C:\Dev\espn-relay\relay.js` onto the Pi as-is (already uses `fetch()`, already proven working) and run it (`node relay.js 8787`).
-4. Install `cloudflared` on the Pi, run `cloudflared tunnel --url http://localhost:8787` (or set up a named/persistent tunnel tied to the Cloudflare account instead of a quick tunnel, so the URL doesn't change on restart — worth doing properly here since the Pi runs unattended).
-5. Set up both the relay script and `cloudflared` as systemd services so they survive reboots.
-6. Test the tunnel URL from an external network to confirm it reaches ESPN successfully.
-7. Set `ESPN_API_BASE_URL` on Railway to `<tunnel-url>/apis/site/v2/sports/football/nfl`.
-8. Confirm `DISABLE_LIVE_SCORE_SYNC` is unset on Railway, confirm via Logs (not Deploy Logs — see below) + a live game that scores/status/clock update automatically.
-9. Once the Pi is confirmed stable, shut down the PC relay/tunnel processes (see below) — no longer needed.
-
-**Continuing PC-based sync until the Pi is ready — READ THIS FIRST if Nick's PC was off:**
-The relay (`C:\Dev\espn-relay\relay.js`) and `cloudflared.exe` (same folder) must both be running on Nick's PC for ESPN sync to work at all. Turning the PC off stops both — nothing syncs (harmless if it's just overnight with no games in progress, but must be restarted before the next sync is needed). **Give Nick these exact steps whenever he says he turned the PC back on / needs sync going again:**
-
-1. Open File Explorer, go to `C:\Dev\espn-relay`, double-click `start-relay.bat`. Two terminal windows open ("ESPN Relay" and "Cloudflare Tunnel") — leave both open.
-2. Read the URL printed in the "Cloudflare Tunnel" window (`https://<random-words>.trycloudflare.com`). **It changes every single restart** — assume it's different from last time.
-3. On Railway → service → Variables: set `ESPN_API_BASE_URL` to `<that-url>/apis/site/v2/sports/football/nfl`, save (Railway auto-restarts on save).
-4. Confirm `DISABLE_LIVE_SCORE_SYNC` is still unset/deleted on Railway.
-5. If a Claude Code session is open, verify end-to-end the same way as Aug 13 2026: curl the relay locally (`http://localhost:8787/apis/site/v2/sports/football/nfl/scoreboard?...`) and the tunnel URL both return real ESPN JSON, then check `team_game_stats`/`games` in the DB directly for a live/recent game to confirm data is actually flowing, not just that the endpoints respond.
-6. Sync keeps working only as long as those two windows stay open and the PC stays on and awake. Closing them or sleeping/shutting down the PC pauses sync again until steps 1-4 repeat.
-
-(Manual restart without the batch file: `cd C:\Dev\espn-relay` then `node relay.js 8787` in one terminal, `cloudflared.exe tunnel --url http://localhost:8787` in a second — same result as the batch file, just two commands instead of one double-click.)
+**Timeline:** PC-based relay stopgap (Aug 13-14 2026, same `relay.js` running on Nick's desktop through a Cloudflare quick tunnel) proved the approach worked before the Pi hardware was ready, then was fully retired once the Pi took over (Aug 15-16 2026).
+</details>
 
 ### ✅ Box score sync silently skipping already-final games — FIXED (Aug 13 2026)
 `syncBoxScoreStats()` only fired off a detected in→post transition, so any game that skipped straight from `pre` to already-`post` on its first successful sync (e.g. after an ESPN outage, like the one above) never got `team_game_stats` populated — same gap pick grading already had a fix for (Aug 10 2026). Now checked via whether stats already exist for the game instead of relying on the transition, so it self-heals on the next cron tick regardless of how the game was missed. Confirmed live: self-healed all 5 of that night's already-finished preseason Week 2 games automatically after deploy, no manual backfill needed. This wasn't preseason-specific — the same gap would hit regular season under the same "missed the live window" conditions, which is a real risk until the Pi relay is permanent.
@@ -139,7 +163,7 @@ Nick noticed weekly push notifications still said "make your Week 18 picks" duri
 - Shipped via OTA (`eas update --branch preview`) same night — confirmed picked up on Nick's device.
 
 ### ✅ Weekly picks proof-of-record email — SHIPPED (Aug 10 2026)
-Sends every user their own locked-in picks for the week as a private, individual email (dark-themed HTML matching app style) right after Wednesday 9PM lock, once default picks are applied so it reflects each user's final state. **One separate email per user, containing only that user's own picks — never anyone else's.**
+Sends every user their own locked-in picks for the week as a private, individual email (dark-themed HTML matching app style) right after Wednesday 11:59PM lock, once default picks are applied so it reflects each user's final state. **One separate email per user, containing only that user's own picks — never anyone else's.**
 - `server/src/services/emailService.ts` — `sendWeeklyPicksEmails(week, season, seasonType, onlyUserId?)`, wired into the Wednesday 9PM cron in `scheduler.ts`. Uses [Resend](https://resend.com); `RESEND_API_KEY` in `server/.env` and Railway variables (**note: Nick regenerated this key once already — Resend only shows a key's value once at creation, so "Add API Key" again creates a new one, doesn't reveal the old one. If email stops working, check whether the key was regenerated and Railway wasn't updated to match.**)
 - **Domain**: `gridironsports.net` (bought and verified in Resend, DNS records added at registrar). Sender is `The Long Game <picks@gridironsports.net>`, set via `EMAIL_FROM` in Railway variables (falls back to Resend's shared `onboarding@resend.dev` if unset — **that shared sender can ONLY deliver to the Resend account's own verified email, not to real users, so `EMAIL_FROM` must stay set on Railway or the feature silently stops reaching anyone but the account owner**).
 - Testing tools: `sendPreviewEmail(toEmail, teamName)` in `emailService.ts` sends the real template with dummy picks (no real data needed) — use this to check template changes. Admin → NFL Tools → "Send Test Picks Email (to yourself)" button (`POST /api/admin/email/test`) sends the calling admin their own real current-week picks. `GET /api/admin/email/status` returns `{resendConfigured: boolean}` to unambiguously check whether `RESEND_API_KEY` reached the deployment (a 0-sent test result is otherwise ambiguous between "no picks" and "key missing").
@@ -156,20 +180,24 @@ Nick reported two related bugs: (1) preseason week 2's proof-of-picks email neve
 Nick noticed Week Picks was showing users (Gmac, The Purdy Mouths, EWIK) who'd never made a single pick, with blank rows. Root cause: `GET /api/picks/week` in `server/src/routes/picks.ts` listed every user matching the Gridirons/Global filter (`isGridiron`/`nflAccess`) with no check for prior participation — unlike the leaderboard query, which already requires `HAVING COUNT(picks) > 0`. Fixed by applying that same "at least one pick this season+seasonType" gate to the Week Picks user list, so membership now matches the leaderboard exactly.
 - Nick separately flagged that `applyDefaultPicks()` (Raiders/away-team auto-fill for missed games) had no participation gate at all — a freshly-created account with zero real picks would still get auto-filled every week, making brand-new non-players look like active participants indefinitely. **Confirmed with Nick**: default picks should only apply to a user once they've already completed at least one *other* week this season (their very first active week is never auto-filled, even for games they forgot) — implemented in `applyDefaultPicks()` in `scheduler.ts`. This is stricter than "made any pick this week" — a user who picks only 1 of 8 games in their first-ever week will NOT get the other 7 defaulted; only from their 2nd active week onward does missing-game auto-fill kick in.
 
-### ✅ Temporary preseason toggle on public profile pick comparisons — DONE (Aug 12 2026), REMOVE before regular season starts
-Nick needed to test H2H pick comparisons on `user/[id].tsx` before the 2026 regular season has any games to compare. Season record/week-history/insights on profiles intentionally stay regular-season-only (see "Profile stats regular-season-only" above) — this does NOT change. Added a small toggle pill, shown only inside the H2H comparison section and only while `useCurrentWeek()` reports `seasonType === 'preseason'` for the viewed (current) season, that switches just that section's `useWeekPicks` call between `seasonType: 'regular'` and `'preseason'`. **This is explicitly temporary** (Nick's call, Aug 12 2026) — self-limiting in that it disappears on its own once regular season starts (the gating condition goes false), but the toggle code itself (`PickComparison` in `mobile/app/user/[id].tsx`) should be removed outright once regular season data exists and it's no longer needed for testing.
+### ✅ Temporary preseason toggle on public profile pick comparisons — REMOVED (Aug 16 2026)
+Added Aug 12 2026 so Nick could test H2H pick comparisons on `user/[id].tsx` before the 2026 regular season had any games to compare. Removed outright now that it's no longer needed — `PickComparison` in `mobile/app/user/[id].tsx` always compares `seasonType: 'regular'` again, the `useCurrentWeek` import and preseason-toggle pill are gone. Season record/week-history/insights on profiles remain regular-season-only (unchanged, see "Profile stats regular-season-only" above).
+
+### ✅ Rules page — HARD BLOCKER cleared (Aug 16 2026)
+New `mobile/app/rules.tsx` — a standalone "How It Works" screen (matches the app's existing stack-screen header pattern, back button + title) covering: picks lock Wednesday 11:59PM PST, missing picks default to Raiders (if playing) or away team after your first active week, achievements awarded Tuesday, leaderboard global vs. friend-group view. Reachable two ways per the hard-blocker requirement: (a) inline in onboarding — `login.tsx`'s first-run screen now has a "How It Works" bullet summary between the features list and the Get Started button (wrapped the onboarding content in a `ScrollView` to fit it; full rules text lives only in `rules.tsx` to avoid duplicating copy that could drift), and (b) a permanent book-icon link in Profile's header row (`profile.tsx`), next to the admin gear/sign out icons, for existing users. Since the app went from "Gridirons-only" framing to "open to anyone" (see privacy policy discussion), the copy is written generically — Gridirons mentioned only as an optional private friend-group feature, not the premise of the app.
+
+### ✅ In-app account deletion — Apple 5.1.1v requirement cleared (Aug 16 2026)
+Apple requires any app with account creation to also offer in-app self-service deletion. New `DELETE /api/users/me` (`server/src/routes/users.ts`) — deletes the Firebase Auth account and the user's push tokens, but **anonymizes rather than hard-deletes** the `users` row (email → `deleted-<uid>@deleted.local`, teamName → "Deleted User", flags cleared) since `picks`/`trophies`/`pick_audit_log` reference `userId` and other users' leaderboards/H2H history depend on those rows staying intact — matches what `docs/privacy.html` already promises. Mobile: `useDeleteAccount()` hook (`mobile/src/hooks/useProfile.ts`) + a "Delete Account" button at the bottom of Profile (`profile.tsx`) behind a destructive confirmation `Alert`, signs the user out locally on success.
 
 ### Next priority items:
 1. **UI polish pass** — Go screen by screen: Login/Onboarding → Picks tab → Game Detail → Leaderboard → Week Picks → Profile. **This is the final gate before App Store + Google Play submission.** (Activity panel was removed — replaced by feedback modal.)
-2. **Rules/instructions page — HARD BLOCKER before App Store/Google Play submission (Nick reconfirmed Aug 12 2026).** Two requirements: (a) the default first-run screen a brand-new user lands on (onboarding flow) must itself explain the rules — not just link out to them; (b) rules must also be reachable afterward from somewhere in the app (Profile or Settings) for existing users. Rules to cover: picks lock Wednesday 9PM PST, missing picks default to Raiders (if playing) or away team — but only after a user has completed at least one prior week (see default-pick eligibility fix, Aug 12 2026), weekly achievements awarded Tuesday, leaderboard shows all users or Gridirons-only. Confirm exact copy + placement with Nick before building.
-3. **Past seasons row on Profile** — W-L per season for historical context
-4. **Onboarding polish** — Nick wants redesign before launch
-5. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
-6. **ascAppId for non-interactive TestFlight submits** — add to `eas.json` submit.preview profile so `eas submit --non-interactive` works without Nick's Apple ID/2FA each time. Find in App Store Connect → My Apps → The Long Game → General → App Information → Apple ID (10-digit number).
-7. **Remove the temporary preseason H2H toggle before regular season starts** — `PickComparison` in `mobile/app/user/[id].tsx` (added Aug 12 2026, see below). Testing-only; self-hides once regular season begins but the toggle code should be deleted outright, not just left dormant.
+2. **Past seasons row on Profile** — W-L per season for historical context
+3. **Onboarding polish** — Nick wants a fuller visual redesign before launch (the Aug 16 2026 rules addition covers the *content* requirement only, not a redesign)
+4. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
+5. **ascAppId for non-interactive TestFlight submits** — add to `eas.json` submit.preview profile so `eas submit --non-interactive` works without Nick's Apple ID/2FA each time. Find in App Store Connect → My Apps → The Long Game → General → App Information → Apple ID (10-digit number).
 
 ### Win Probability — weekly workflow
-⚠️ **Currently broken from Railway** — see "UNRESOLVED, IN PROGRESS — ESPN live score sync blocked from Railway" at the top of this doc. The Aug 10 2026 UA fix below did NOT durably resolve it; ESPN/Akamai is blocking all Railway (and Cloudflare Worker) traffic again as of Aug 12-13 2026. Until the Raspberry Pi relay is live, run locally instead: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 9PM lock.
+⚠️ **Currently broken from Railway** — see "UNRESOLVED, IN PROGRESS — ESPN live score sync blocked from Railway" at the top of this doc. The Aug 10 2026 UA fix below did NOT durably resolve it; ESPN/Akamai is blocking all Railway (and Cloudflare Worker) traffic again as of Aug 12-13 2026. Until the Raspberry Pi relay is live, run locally instead: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 11:59PM lock.
 
 ### Achievement images + Profile display redesign — DONE
 All 5 images wired in (`mobile/assets/achievements/`), Achievement Case redesigned to full-bleed badge images with no item cap. Shown on both own Profile and public profiles, season-filtered. See "Achievement & Trophy System" section above.
@@ -380,6 +408,7 @@ TheLongGame/
 │   │   ├── admin.tsx                ← Admin Dashboard (3 tabs: Users, NFL Tools, Data)
 │   │   ├── picks-by-team.tsx        ← Picks by Team (from Profile → Insights)
 │   │   ├── team-central.tsx         ← Team Central list (from Picks tab)
+│   │   ├── rules.tsx                ← How It Works / Rules (from Profile header icon)
 │   │   ├── team/[name].tsx          ← Team Detail
 │   │   ├── game/[id].tsx            ← Game Detail
 │   │   ├── user/[id].tsx            ← Public profile
@@ -510,8 +539,8 @@ All 5 achievement images done, in `mobile/assets/achievements/{most_wins,loser,u
 | Tuesday 9PM PST | Win probability refresh |
 | Wednesday 6AM PST | Win probability refresh |
 | Wednesday 5PM PST | Win probability refresh |
-| Wednesday 8PM PST | Push: "1 hour left for Week X picks!" |
-| Wednesday 9PM PST | Picks lock + push notification |
+| Wednesday 8PM PST | Push: "[Week] picks lock tonight at 11:59 PM!" |
+| Wednesday 11:59PM PST | Picks lock + push notification |
 
 All 5 push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`.
 
@@ -539,7 +568,7 @@ change again, but as of this fix the local-script requirement should no longer a
 If any of these start failing with 403s again, re-run the diagnostic: `curl -A "axios/1.7.9" -H "Accept: application/json" "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=1&season=2026&limit=50"` — a plain/no-UA request succeeding while the app's requests fail would point back at a header/fingerprint issue, not an IP block.
 
 ### Lock Times
-- Default: Wednesday 9PM PST
+- Default: Wednesday 11:59PM PST
 - Admin-configurable per week via `week_settings` table
 
 ### Preseason — FUNCTIONAL, NOT ISOLATED
@@ -561,7 +590,7 @@ The 2026 preseason (Aug 7–Sept 3) is a REAL picks period:
 
 ## CRITICAL: Pick Visibility Rules
 
-> NO ONE's picks visible ANYWHERE until Wednesday 9PM PST lock passes.
+> NO ONE's picks visible ANYWHERE until Wednesday 11:59PM PST lock passes.
 
 - Week Picks tab: hidden before lock
 - Game Detail pick list: hidden before lock
@@ -604,8 +633,8 @@ Rule 12 is now expanded: H2H pick comparison on public profiles shows current we
 | Trigger | Message | When | Status |
 |---|---|---|---|
 | Week unlocked | "Week X picks are now open! 🏈" | Tue 6AM | wired |
-| Deadline | "1 hour left for Week X picks!" | Wed 8PM | wired |
-| Locked | "Picks locked. Good luck! 🏈" | Wed 9PM | wired |
+| Deadline | "[Week] picks lock tonight at 11:59 PM!" | Wed 8PM | wired |
+| Locked | "Picks locked. Good luck! 🏈" | Wed 11:59PM | wired |
 | Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring | wired |
 | Final | "Final: [score]. Your pick: ✓/✗" | As games end | wired |
 
@@ -647,7 +676,7 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 1. No CBB ever. Future = brackets only.
 2. Dark mode only. Never light mode.
 3. No ads ever.
-4. Never show anyone's picks before Wednesday 9PM PST lock.
+4. Never show anyone's picks before Wednesday 11:59PM PST lock.
 5. Full team names always. Never abbreviations.
 6. Top/bottom game card layout. Never left/right.
 7. Friend group = "Gridirons". isGridiron boolean.

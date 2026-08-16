@@ -131,3 +131,10 @@ export function useSendFeedback() {
       ),
   });
 }
+
+export function useDeleteAccount() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean }>('/api/users/me', { method: 'DELETE' }, user),
+  });
+}

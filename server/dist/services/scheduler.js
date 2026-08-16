@@ -125,7 +125,7 @@ node_cron_1.default.schedule('0 17 * * 3', async () => {
         console.error('[Scheduler] Wednesday 5PM prob sync failed:', err);
     }
 }, PT);
-// Wednesday 8PM PT — 1 hour warning
+// Wednesday 8PM PT — deadline reminder (lock is 11:59PM same night)
 node_cron_1.default.schedule('0 20 * * 3', async () => {
     try {
         const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
@@ -135,8 +135,8 @@ node_cron_1.default.schedule('0 20 * * 3', async () => {
         console.error('[Scheduler] Wednesday 8PM warning failed:', err);
     }
 }, PT);
-// Wednesday 9PM PT — picks lock notification + apply default picks
-node_cron_1.default.schedule('0 21 * * 3', async () => {
+// Wednesday 11:59PM PT — picks lock notification + apply default picks
+node_cron_1.default.schedule('59 23 * * 3', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
         const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
@@ -147,7 +147,7 @@ node_cron_1.default.schedule('0 21 * * 3', async () => {
         (0, emailService_1.sendWeeklyPicksEmails)(week, season, seasonType).catch(err => console.error('[Scheduler] sendWeeklyPicksEmails failed:', err));
     }
     catch (err) {
-        console.error('[Scheduler] Wednesday 9PM lock notification failed:', err);
+        console.error('[Scheduler] Wednesday 11:59PM lock notification failed:', err);
     }
 }, PT);
 // Apply default picks for users who didn't pick all games.

@@ -60,10 +60,10 @@ function weekLabel(week, seasonType) {
     return seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
 }
 async function notifyWeekUnlocked(week, seasonType = 'regular') {
-    await sendPushToAllUsers(weekLabel(week, seasonType) + " is now open!", "Make your picks before Wednesday 9PM PST.", { type: 'week_unlocked', week, seasonType });
+    await sendPushToAllUsers(weekLabel(week, seasonType) + " is now open!", "Make your picks before Wednesday 11:59PM PST.", { type: 'week_unlocked', week, seasonType });
 }
 async function notifyDeadlineApproaching(week, seasonType = 'regular') {
-    await sendPushToAllUsers("1 hour left for " + weekLabel(week, seasonType) + " picks!", "Lock in your picks before they close.", { type: 'deadline', week, seasonType });
+    await sendPushToAllUsers(weekLabel(week, seasonType) + " picks lock tonight at 11:59 PM!", "Lock in your picks before they close.", { type: 'deadline', week, seasonType });
 }
 async function notifyPicksLocked(week, seasonType = 'regular') {
     await sendPushToAllUsers("Picks locked. Good luck!", weekLabel(week, seasonType) + " picks are locked. Games start soon.", { type: 'picks_locked', week, seasonType });

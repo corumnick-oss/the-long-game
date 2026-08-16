@@ -29,14 +29,14 @@ function getPacificDateParts(date: Date): { year: number; month: number; day: nu
   return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day) };
 }
 
-// Wednesday 9PM America/Los_Angeles. DST-aware — do not replace with fixed UTC offset math.
+// Wednesday 11:59PM America/Los_Angeles. DST-aware — do not replace with fixed UTC offset math.
 export async function getWeekLockTime(week: number, season: number, seasonType: string = 'regular'): Promise<Date | null> {
   const setting = await db.query.weekSettings.findFirst({
     where: and(eq(weekSettings.week, week), eq(weekSettings.season, season), eq(weekSettings.seasonType, seasonType)),
   });
   if (setting?.lockTime) return setting.lockTime;
 
-  // Derive Wednesday 9PM Pacific from the earliest game of the week (same season type only —
+  // Derive Wednesday 11:59PM Pacific from the earliest game of the week (same season type only —
   // preseason and regular season both use week numbers 1-4, so this must not cross-match).
   const firstGame = await db.query.games.findFirst({
     where: and(eq(games.week, week), eq(games.season, season), eq(games.sport, 'nfl'), eq(games.seasonType, seasonType)),
@@ -54,7 +54,7 @@ export async function getWeekLockTime(week: number, season: number, seasonType: 
   const daysToWed = (weekday - 3 + 7) % 7;
   const wedAnchor = new Date(anchor.getTime() - daysToWed * 86400000);
 
-  return pacificWallTimeToUtc(wedAnchor.getUTCFullYear(), wedAnchor.getUTCMonth() + 1, wedAnchor.getUTCDate(), 21, 0);
+  return pacificWallTimeToUtc(wedAnchor.getUTCFullYear(), wedAnchor.getUTCMonth() + 1, wedAnchor.getUTCDate(), 23, 59);
 }
 
 export async function isWeekLocked(week: number, season: number, seasonType: string = 'regular'): Promise<boolean> {

@@ -67,14 +67,14 @@ function weekLabel(week: number, seasonType: 'regular' | 'preseason'): string {
 export async function notifyWeekUnlocked(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
   await sendPushToAllUsers(
     weekLabel(week, seasonType) + " is now open!",
-    "Make your picks before Wednesday 9PM PST.",
+    "Make your picks before Wednesday 11:59PM PST.",
     { type: 'week_unlocked', week, seasonType }
   );
 }
 
 export async function notifyDeadlineApproaching(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
   await sendPushToAllUsers(
-    "1 hour left for " + weekLabel(week, seasonType) + " picks!",
+    weekLabel(week, seasonType) + " picks lock tonight at 11:59 PM!",
     "Lock in your picks before they close.",
     { type: 'deadline', week, seasonType }
   );

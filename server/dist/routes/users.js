@@ -32,8 +32,12 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const firebase_admin_1 = __importDefault(require("firebase-admin"));
 const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
@@ -58,6 +62,32 @@ router.patch('/me', auth_1.requireAuth, async (req, res) => {
         updates.profileImageUrl = profileImageUrl || null;
     const [updated] = await db_1.db.update(schema.users).set(updates).where((0, drizzle_orm_1.eq)(schema.users.id, req.currentUser.id)).returning();
     res.json(updated);
+});
+// DELETE /api/users/me — account deletion (Apple 5.1.1v requires in-app self-service deletion).
+// Keeps the users row (anonymized) rather than hard-deleting, since picks/trophies/audit rows
+// from this user are referenced by other users' leaderboards and H2H history — matches what
+// the privacy policy promises ("delete or anonymize... except where retaining limited records
+// is necessary to preserve the integrity of past leaderboard results for other users").
+router.delete('/me', auth_1.requireAuth, async (req, res) => {
+    const userId = req.currentUser.id;
+    await db_1.db.delete(schema.pushTokens).where((0, drizzle_orm_1.eq)(schema.pushTokens.userId, userId));
+    await db_1.db.update(schema.users).set({
+        email: `deleted-${userId}@deleted.local`,
+        teamName: 'Deleted User',
+        profileImageUrl: null,
+        isAdmin: false,
+        isGridiron: false,
+        isPremium: false,
+        nflAccess: false,
+        updatedAt: new Date(),
+    }).where((0, drizzle_orm_1.eq)(schema.users.id, userId));
+    try {
+        await firebase_admin_1.default.auth().deleteUser(userId);
+    }
+    catch (err) {
+        console.error('[DELETE /users/me] Firebase account deletion failed:', err);
+    }
+    res.json({ ok: true });
 });
 // POST /api/users — create user profile on first login
 router.post('/', auth_1.requireFirebaseToken, async (req, res) => {

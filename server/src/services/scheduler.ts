@@ -91,7 +91,7 @@ cron.schedule('0 17 * * 3', async () => {
   }
 }, PT);
 
-// Wednesday 8PM PT — 1 hour warning
+// Wednesday 8PM PT — deadline reminder (lock is 11:59PM same night)
 cron.schedule('0 20 * * 3', async () => {
   try {
     const { week, seasonType } = await getCurrentWeekAndType();
@@ -101,8 +101,8 @@ cron.schedule('0 20 * * 3', async () => {
   }
 }, PT);
 
-// Wednesday 9PM PT — picks lock notification + apply default picks
-cron.schedule('0 21 * * 3', async () => {
+// Wednesday 11:59PM PT — picks lock notification + apply default picks
+cron.schedule('59 23 * * 3', async () => {
   try {
     const season = getCurrentNFLSeason();
     const { week, seasonType } = await getCurrentWeekAndType();
@@ -115,7 +115,7 @@ cron.schedule('0 21 * * 3', async () => {
       console.error('[Scheduler] sendWeeklyPicksEmails failed:', err)
     );
   } catch (err) {
-    console.error('[Scheduler] Wednesday 9PM lock notification failed:', err);
+    console.error('[Scheduler] Wednesday 11:59PM lock notification failed:', err);
   }
 }, PT);
 
