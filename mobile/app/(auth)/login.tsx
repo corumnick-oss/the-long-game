@@ -27,9 +27,10 @@ const FEATURES = [
 
 const RULES_SUMMARY = [
   'Pick the winner of every NFL game, every week.',
+  "It's a season-long competition — most wins by the end of the season takes the title.",
   'Picks lock Wednesday at 11:59 PM PST — no changes after that.',
   "Miss a pick after your first active week? We'll auto-fill it for you.",
-  'Full rules are always available from your Profile.',
+  'Full rules are always available from the book icon at the top of the app. Good luck!',
 ];
 
 // Shared style for all text inputs — explicit height prevents iOS text clipping

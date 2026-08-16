@@ -7,6 +7,10 @@ const RULES = [
     body: 'Every week, pick the winner of each NFL game. Picks are free to change right up until they lock.',
   },
   {
+    title: 'How You Win',
+    body: "This is a season-long competition. Every correct pick counts toward your record, and whoever has the most wins when the season ends takes the title.",
+  },
+  {
     title: 'Picks Lock Wednesday at 11:59 PM PST',
     body: "Once a week locks, no more changes — your picks are final and everyone's picks become visible.",
   },
@@ -51,6 +55,7 @@ export default function RulesScreen() {
             <Text className="text-muted text-sm leading-5">{rule.body}</Text>
           </View>
         ))}
+        <Text className="text-white text-sm font-semibold text-center mt-2">Good luck! 🏈</Text>
       </ScrollView>
     </View>
   );

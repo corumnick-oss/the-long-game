@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Tabs } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FeedbackModal } from '@/components/FeedbackModal';
 
@@ -16,19 +16,37 @@ function TabIcon({ name, focused }: { name: IoniconsName; focused: boolean }) {
   );
 }
 
+function RulesButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity className="pl-2 pr-1 py-1" onPress={onPress}>
+      <Ionicons name="book-outline" size={24} color="#9ca3af" />
+    </TouchableOpacity>
+  );
+}
+
 function FeedbackButton({ onPress }: { onPress: () => void }) {
   return (
-    <TouchableOpacity className="pr-4 pl-2 py-1" onPress={onPress}>
+    <TouchableOpacity className="pr-4 pl-1 py-1" onPress={onPress}>
       <Ionicons name="chatbubble-ellipses-outline" size={24} color="#9ca3af" />
     </TouchableOpacity>
   );
 }
 
 export default function TabLayout() {
+  const router = useRouter();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const openFeedback = useCallback(() => setFeedbackOpen(true), []);
   const closeFeedback = useCallback(() => setFeedbackOpen(false), []);
-  const headerRight = useCallback(() => <FeedbackButton onPress={openFeedback} />, [openFeedback]);
+  const openRules = useCallback(() => router.push('/rules' as any), [router]);
+  const headerRight = useCallback(
+    () => (
+      <View className="flex-row items-center">
+        <RulesButton onPress={openRules} />
+        <FeedbackButton onPress={openFeedback} />
+      </View>
+    ),
+    [openFeedback, openRules],
+  );
 
   return (
     <>

@@ -1,11 +1,11 @@
-import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import {
-  useMyProfile, useMyAchievements, useSeasonTrophies, useDeleteAccount,
+  useMyProfile, useMyAchievements, useSeasonTrophies,
   type H2HEntry, type WeekRecord, type Achievement, type SeasonTrophy,
 } from '@/hooks/useProfile';
 
@@ -186,29 +186,6 @@ export default function ProfileScreen() {
   const { data: profile, isLoading } = useMyProfile(season);
   const { data: trophies = [] } = useMyAchievements(season);
   const { data: seasonTrophies = [] } = useSeasonTrophies(profile?.id);
-  const deleteAccount = useDeleteAccount();
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This permanently deletes your account and sign-in. Your past picks stay on record to keep other players’ leaderboards and history accurate, but they’ll no longer be tied to a visible name. This can’t be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteAccount.mutateAsync();
-              await signOut();
-            } catch (err) {
-              Alert.alert('Error', 'Could not delete your account. Please try again.');
-            }
-          },
-        },
-      ],
-    );
-  };
 
   if (isLoading) {
     return (
@@ -259,10 +236,10 @@ export default function ProfileScreen() {
         </View>
         <View className="flex-row gap-2">
           <TouchableOpacity
-            onPress={() => router.push('/rules' as any)}
+            onPress={() => router.push('/settings' as any)}
             className="bg-surface rounded-xl p-2.5"
           >
-            <Ionicons name="book-outline" size={18} color="#6b7280" />
+            <Ionicons name="options-outline" size={18} color="#6b7280" />
           </TouchableOpacity>
           {profile.isAdmin && (
             <TouchableOpacity
@@ -431,16 +408,6 @@ export default function ProfileScreen() {
           </View>
         </Section>
       )}
-
-      <TouchableOpacity
-        onPress={handleDeleteAccount}
-        disabled={deleteAccount.isPending}
-        className="mx-4 mt-6 items-center py-3"
-      >
-        <Text className="text-danger text-xs font-semibold">
-          {deleteAccount.isPending ? 'Deleting…' : 'Delete Account'}
-        </Text>
-      </TouchableOpacity>
 
       <View className="h-8" />
     </ScrollView>
