@@ -84,6 +84,7 @@ export default function PicksScreen() {
 
   const pickedCount = games?.filter(g => g.myPick !== null).length ?? 0;
   const totalGames = games?.length ?? 0;
+  const picksNotYetOpen = !isLoading && !!games && games.length > 0 && games.every(g => !g.isPicksOpen);
 
   return (
     <View className="flex-1 bg-background">
@@ -139,6 +140,16 @@ export default function PicksScreen() {
         <Text className="text-muted text-xs mr-1">Stats · Records · Picks</Text>
         <Text className="text-primary text-sm">›</Text>
       </TouchableOpacity>
+
+      {/* Week not unlocked yet */}
+      {picksNotYetOpen && (
+        <View className="flex-row items-center mx-4 mb-2 px-4 py-2.5 bg-surface rounded-xl border border-border">
+          <Text className="text-base mr-2">🔒</Text>
+          <Text className="flex-1 text-muted text-sm">
+            Week picks locked. They'll unlock at 6:00 AM PST on Tuesday.
+          </Text>
+        </View>
+      )}
 
       {/* Pick progress header */}
       {!isLoading && games && games.length > 0 && (
