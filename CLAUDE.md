@@ -11,6 +11,34 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
+### 🚀 App Store submission push (Aug 16 2026) — iOS submitted, Android in progress
+
+**iOS: submitted for App Store review** (Aug 16 2026, evening). Build 3 (already on TestFlight, `preview` profile/channel) was reused for the production submission — no separate production build was needed since it's already store-distribution and picks up OTA updates on the same channel. Filled in: description, promotional text, keywords, copyright (`© 2026 Nicholas Corum` — locked to Nick's legal name since the Apple Developer account is Individual, not Organization), support URL (new `docs/support.html`, see below), privacy policy URL (`docs/privacy.html`), and the "does this app access third-party content" question (answered **yes** — ESPN game data/logos). Now just waiting on Apple's review (historically 1-3 days).
+
+**Android: blocked on Google Play identity verification**, everything else prepped and ready to resume the moment it clears:
+- Google Play developer account created tonight, developer name **"Gridiron Sports"** (Nick's choice — public "Offered by" name, independent of Apple's forced legal-name seller field; can be changed later without much friction, unlike Apple's).
+- Account owner login: `nickcorum@gmail.com`. Public-facing contact email on the store listing: `corumnick@gmail.com` (Nick's personal choice, low-risk — not the login).
+- **Device-owner verification: DONE** — Nick borrowed his dad's Android phone, added `nickcorum@gmail.com` as a second Google account on it (didn't touch his dad's existing account/data), installed the Google Play Console app, verified from there.
+- **Currently waiting on Google's account-level identity verification** ($25 fee + ID check) — this is the blocker keeping Nick out of Play Console proper (can't create the app listing, can't start closed testing, until this clears). No action to take, just waiting.
+- **12-tester / 14-day closed-testing requirement**: only 1 of 12 lined up so far (Nick's dad, via his own separate Google account/phone — confirmed a different account than the device-verification account counts fine). Need 11 more real people with Android phones + their own Google accounts, opted in continuously for 14 days, before Google will allow a production release. **Fallback if 12 can't be found**: direct APK sideloading (`distribution: "internal"`, what Nick's dad already uses) works indefinitely for the whole season with zero Play Store gate — OTA updates reach it identically either way. Not a hard blocker on launch, just blocks the *Play Store listing* specifically.
+- **Android production AAB already built** and sitting ready: `eas build --profile production --platform android` (build succeeded Aug 16 2026). Nothing needs to be rebuilt for tonight's code changes — they reached it via the OTA channel automatically (see eas.json fix below). Just needs to be uploaded to Play Console's closed-testing track once Nick is unblocked.
+- **eas.json fix (important, already shipped)**: the `production` build profile didn't declare an `updates` channel, which would have silently split future `eas update` pushes across two channels (iOS store build on `preview`, Android production build on nothing/orphaned). Fixed by adding `"channel": "preview"` to the `production` profile — now **every build (dev, preview, and production, both platforms) shares the single `preview` OTA channel**, so one `eas update --branch preview` always reaches everyone. Confirmed this pattern holds going forward — no more per-platform OTA pushes needed.
+
+**Also shipped in this same push, all live via OTA already:**
+- **In-app Rules/"How It Works" page** (`mobile/app/rules.tsx`) — cleared the App Store hard-blocker requiring the rules to be explained both in first-run onboarding and reachable afterward. Content covers: season-long win condition (most wins by season's end), lock time, default-pick behavior, weekly achievements, leaderboard. Ends with "Good luck! 🏈". Linked from the **app-wide header** (next to the feedback chat-bubble icon in `mobile/app/(tabs)/_layout.tsx`, visible on every tab) — NOT from Profile specifically (moved there after Nick found the original Profile-icon placement didn't fit visually). Onboarding (`login.tsx`) has its own condensed bullet summary of the same content, wrapped in a `ScrollView` to fit.
+- **New `mobile/app/settings.tsx`** — currently holds only Delete Account (moved off the bottom of Profile per Nick's request), gated behind two sequential confirmation `Alert`s ("Delete Account?" → "Are you absolutely sure?") before it fires. Linked from a new gear-style icon in Profile's header row. This is also the natural home for the granular notification-preference toggles described in the "remaining notification overhaul" plan below, when that gets built — don't create a second settings screen, extend this one.
+- **In-app account deletion** (`DELETE /api/users/me`) — cleared Apple's Guideline 5.1.1v requirement. Anonymizes the `users` row (doesn't hard-delete, since `picks`/`trophies`/`pick_audit_log` are referenced by other users' leaderboards/H2H) and deletes the Firebase Auth account + push tokens.
+- **Lock time → 11:59PM PST everywhere** (see dedicated entry below).
+- **New static pages for store requirements**, all under `docs/`, served live via GitHub Pages (`corumnick-oss.github.io/the-long-game/...`, enabled once this session — Settings → Pages → Deploy from branch → `main` → `/docs`):
+  - `docs/privacy.html` — rewritten mid-session to drop the internal "Gridirons" feature name entirely (Nick's call — it's just an internal friend-subgroup flag, not something an outside reader or reviewer needs explained); now describes the app generically as open to anyone.
+  - `docs/terms.html` — same generic-app framing, explicitly states no real-money wagering/gambling.
+  - `docs/support.html` — new, satisfies Apple's required support URL field (separate from privacy policy). Points to the in-app feedback icon + email.
+- **Picks tab: "week not unlocked yet" banner** — below Team Central, shown when every game in the selected week has `isPicksOpen: false` (the API's existing per-week-unlock flag, already computed server-side from the `unlocked_weeks` table). Reads "Week picks locked. They'll unlock at 6:00 AM PST on Tuesday."
+- **Leaderboard W-L text sizing** — now matches the accuracy % next to it (`text-white font-bold`, was small muted gray).
+- **Removed the temporary preseason H2H toggle** on public profiles (`user/[id].tsx`) — no longer needed now that regular-season data exists to compare against.
+- **EWIK is sitting out the 2026 season** (Nick's call) — do not run his UID reassignment. His row stays in the Gridirons table below purely as 2025 historical record.
+- 7 iOS screenshots taken by Nick (Picks, Leaderboard, Week Picks, Profile, Game Details, Game Preview, Rules) at 1170×2532 — Apple's App Store Connect required 1284×2778 for the mandatory size bucket, so all 7 were resized (`docs`-adjacent scratch step, not committed to the repo — the originals live in `C:\Dev\TheLongGame\Screenshots\iOS\`, resized copies in `...\iOS-1284x2778\`). **Gotcha hit and fixed**: first resize attempt preserved an alpha/transparency channel (`Format32bppArgb`) which Apple silently rejected on upload with no clear error — re-generated as flattened 24-bit RGB (`Format24bppRgb`) and the upload succeeded. If this comes up again for future screenshot batches, flatten transparency before upload.
+
 ### ✅ Raspberry Pi ESPN relay — PERMANENT FIX SHIPPED (Aug 15-16 2026)
 
 The ESPN/Akamai block on Railway (full history in the "ESPN/Akamai background" section below) is now solved permanently via a Raspberry Pi running 24/7 on Nick's home network, relaying Railway's ESPN requests through a real residential IP. **PC relay stopgap is retired** — both its processes were already stopped, `C:\Dev\espn-relay` on Nick's PC is now just a historical reference (the same `relay.js` was copied to the Pi as-is).
@@ -44,13 +72,12 @@ Lock time (item 1) is done, see above. Three pieces remain, agreed with Nick, re
 - `server/src/services/espnService.ts` — thread the picked team's name into the `notifyGameFinal` call (currently only passes home/away/scores + isCorrect bool); ties already skip this block entirely (`if (game.homeScore === game.awayScore) continue`), no change needed there
 - `server/src/services/notificationService.ts` — rewrite `notifyGameFinal`'s title/body
 
-**3. Granular notification settings** (new Settings screen — none exists today; Sign Out/Admin Dashboard currently just sit as bare links on Profile). Categories, all default `true`: game win/loss, week summary, week unlocked, week locked. **Deadline reminder rides along with "week locked"** (both lock-related); **achievement-earned pushes stay always-on**, not user-toggleable (Nick's call, Aug 15 2026).
+**3. Granular notification settings** (`mobile/app/settings.tsx` now exists — built Aug 16 2026 for Delete Account, see above — add to it, don't create a second settings screen). Categories, all default `true`: game win/loss, week summary, week unlocked, week locked. **Deadline reminder rides along with "week locked"** (both lock-related); **achievement-earned pushes stay always-on**, not user-toggleable (Nick's call, Aug 15 2026).
 - `server/src/db/schema.ts` — add 4 boolean columns to `users`: `notifyGameResults`, `notifyWeekSummary`, `notifyWeekUnlocked`, `notifyWeekLocked`
 - `server/src/scripts/migrate-notification-prefs.ts` — new one-off `ALTER TABLE users ADD COLUMN IF NOT EXISTS ...` script — **run manually against Railway prod DB, confirm with Nick before running** (same DB serves local + prod, no separate environments)
 - `server/src/routes/users.ts` — extend `PATCH /api/users/me` to accept the 4 new fields (GET already spreads full user row, no change needed there)
 - `server/src/services/notificationService.ts` — broadcast sends (`notifyWeekUnlocked`, `notifyPicksLocked`, `notifyDeadlineApproaching`, `notifyGameFinal`) filter recipients by their relevant preference column instead of blasting every `nflAccess` user
-- **New**: `mobile/app/settings.tsx` — master push-notifications switch (re-triggers the OS permission prompt if previously declined — this is also what closes the earlier "let users turn notifications back on" gap), the 4 category toggles, and the **Rules page link lives here too** (natural pairing, also satisfies part of the hard-blocker rules-page requirement in "Next priority items" below)
-- `mobile/app/(tabs)/profile.tsx` — add a "⚙️ Settings" entry point
+- `mobile/app/settings.tsx` — add a master push-notifications switch (re-triggers the OS permission prompt if previously declined — this is also what closes the earlier "let users turn notifications back on" gap) and the 4 category toggles, above the existing Delete Account section
 
 **4. New "Week summary" notification** — doesn't exist yet. Fires **Tuesday 6AM** (Nick's call), riding along with the existing weekly-transition cron that already computes "the week that just closed" (`week - 1`) to award achievements — but unlike achievements (regular-season-only), week summary should fire for **both preseason and regular season**.
 - `server/src/services/notificationService.ts` — new `notifyWeekSummary(userId, week, seasonType, wins, losses)`, gated by `notifyWeekSummary` pref
@@ -230,9 +257,9 @@ Files that should exist but are NOT in git (verify manually):
 **App Name:** The Long Game  
 **Type:** iOS and Android mobile app (React Native / Expo)  
 **Purpose:** NFL picks app where users predict game winners and compete on leaderboards  
-**Status:** Phase 5 in progress. Preview build 3 on Nick's iPhone (TestFlight) and Android (direct APK), both with the new branded app icon. OTA updates working on preview channel. All mobile/backend work that had been sitting uncommitted locally is now pushed to GitHub (was previously only reflected in the actual TestFlight/EAS build, not git history).  
+**Status:** iOS submitted for App Store review (Aug 16 2026, using existing preview/TestFlight build 3 — no separate production build needed). Android production AAB built and ready, blocked only on Google Play's account identity verification clearing (in progress) before Play Console access opens up. Every build profile (dev/preview/production, both platforms) now shares one OTA channel (`preview`) — a single `eas update --branch preview` reaches everyone regardless of store status.  
 **Railway URL:** https://thelonggame-production.up.railway.app  
-**Target Launch:** App Store submission late July 2026. Regular season starts September 4, 2026.  
+**Target Launch:** iOS submitted Aug 16 2026 (Apple review typically 1-3 days). Android: Play Store listing pending Google identity verification + 12-tester/14-day closed test, OR ship via direct APK sideload indefinitely if 12 testers can't be found — either way not blocking the season. Regular season starts September 4, 2026.  
 **Owner:** Nick (Corums) — GitHub: corumnick-oss — Windows 11 — iPhone — Admin team name: Nicholas  
 **Local Code Path:** C:\Dev\TheLongGame
 
@@ -240,12 +267,11 @@ Files that should exist but are NOT in git (verify manually):
 
 ## Launch Strategy
 
-- Submit to Apple and Google in **late July** — before preseason starts August 7
-- Use **preseason (Aug 7-28) as live testing** via OTA updates while app is already in the App Store
+- Original plan was submission in late July before preseason (Aug 7) started; actual iOS submission happened Aug 16 2026 instead (see "DO THIS FIRST NEXT SESSION" at the top) — preseason has been serving as live testing via OTA in the meantime regardless of the delay.
 - **Hard deadline:** Regular season September 4, 2026
 
 ### 3 Ways to Push Updates
-1. **OTA Updates** — INSTANT, no review. `eas update --branch preview` for preview build, `--branch development` for dev build. **CRITICAL: `--branch preview` only — publishing to `production` or `development` will NOT reach preview build.**
+1. **OTA Updates** — INSTANT, no review. `eas update --branch preview` for preview build, `--branch development` for dev build. As of Aug 16 2026, the `production` build profile is also bound to the `preview` channel (see eas.json fix above) — so `--branch preview` now reaches dev, preview, AND production builds on both platforms. Only `--branch development` is still separate.
 2. **Backend Updates** — INSTANT. Push to GitHub → Railway auto-deploys.
 3. **App Store Update** — 1-3 days. Only for new native packages, permission changes, or major version bumps.
 
@@ -265,22 +291,14 @@ EAS CLI v20 has `EPERM: operation not permitted, rmdir` bug on Windows during up
 
 ## Current Status
 
-All core infrastructure, screens, stats, and push notifications are complete. Preview build active on Nick's iPhone.
+All core infrastructure, screens, stats, and push notifications are complete. iOS submitted for App Store review (Aug 16 2026); Android pending Google Play identity verification. See "DO THIS FIRST NEXT SESSION" at the top of this doc for the current submission status and "Next priority items" below for what's left post-launch.
 
 ### Open TODOs — Priority Order
-1. **TheRidl3r + Leo UID reassignments** — see PENDING section above
-2. **2025 podium trophies** — award champion/runner_up/third_place (and last_place?) for 2025 season. NOT YET BUILT. Design with Nick first.
-3. **Achievement images** — all 5 from ChatGPT, drop in `mobile/assets/achievements/`
-4. **Achievement display on public profiles** — currently not shown
-5. **Achievement display redesign** — card layout, scope decision
-6. **Past seasons row on Profile** — W-L per season for historical context
-7. **Onboarding polish** — Nick wants redesign before launch
-8. **TestFlight for remaining Gridirons** — after UID reassignments complete
-9. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
-10. **In-app feedback / bug report** — Profile tab, email to nickcorum@gmail.com. Decide: `mailto:` deep link vs. in-app form. Discuss with Nick.
-11. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
-12. **App Store + Google Play submission** — target late July. Android Google Sign-In needs SHA-1 fingerprint — fix when Google Play is set up (Play App Signing gives the definitive SHA-1).
-13. **Leaderboard Season Selector** — all users (currently admin only)
+This list has mostly been superseded by "Next priority items" above (achievement images/display/redesign, all 3 Gridiron UID reassignments, and in-app feedback are all done — see their own dated ✅ entries elsewhere in this doc). Remaining genuinely open items not tracked elsewhere:
+1. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
+2. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
+3. **Leaderboard Season Selector for all users** — same +/− control the admin already has; currently admin-only (see "TO BUILD" note further down)
+4. **Android Google Sign-In SHA-1 fingerprint** — needed once Google Play is set up; Play App Signing (available once the app listing exists in Play Console) gives the definitive SHA-1 to register
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isGridiron=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
@@ -347,7 +365,7 @@ Firebase project: the-long-game-prod-bef05. Bundle ID: com.thelonggame.picks —
 | The Purdy Mouths | jhayhurst714@gmail.com | no | The Purdy Mouths | ❌ not yet signed up |
 | Gmac | garciagarrett24@gmail.com | no | Gmac | ❌ not yet signed up |
 | leocorum (Leo/dad) | leocorum@gmail.com | no | Leo | ✅ done (reassign:user) |
-| EWIK | erikhernandez531@yahoo.com | no | EWIK | ❌ not yet signed up |
+| EWIK | erikhernandez531@yahoo.com | no | EWIK | 🚫 sitting out 2026 (Nick's call, Aug 16 2026) — do not migrate |
 
 DO NOT migrate: CBB Test (nicholas.corum@sce.com) or blank team name (nickcorum@gmail.com).
 
@@ -355,9 +373,6 @@ DO NOT migrate: CBB Test (nicholas.corum@sce.com) or blank team name (nickcorum@
 1. Kevin Akers 181-91 (66.5%) | 2. Nicholas 179-93 (65.8%) | 3. TheRidl3r (was Squid) 177-95 (65.1%)
 4. Leo 175-97 (64.3%) | 5. EWIK 172-100 (63.2%) | 6. The Purdy Mouths 165-107 (60.7%) | 7. Gmac 165-107 (60.7%)
 
-**Pending UID reassignments (old UIDs):**
-- TheRidl3r: old UID = `BQMdo8NUOgY8n0QxdUophLPMewp2`
-- Leo/dad: old UID = `uTosuZBxPucsOAnCnHmdA3pzBlb2`
 
 Migration script: `server/src/scripts/migrate-2025.ts` — imports 7 users, 272 games, 1903 picks, 109 trophies from `data/` CSVs. Skip: activity_log, pick_audit_log, unlocked_weeks, sessions.
 
@@ -389,7 +404,7 @@ Migration script: `server/src/scripts/migrate-2025.ts` — imports 7 users, 272 
 - Railway: auto-deploys on push to main
 - Apple Developer: approved (Individual account)
 - EAS Project: @nickcorum/the-long-game (projectId: cb389856-b1ab-42c9-a22b-803f25093e22)
-- Google Play: NOT set up yet
+- Google Play: developer account created (Aug 16 2026), developer name "Gridiron Sports", awaiting Google's identity verification before Play Console access opens (see "DO THIS FIRST NEXT SESSION" above)
 - Bundle ID: com.thelonggame.picks (both platforms)
 
 ---
@@ -401,6 +416,10 @@ TheLongGame/
 ├── CLAUDE.md
 ├── FUTURE.md                        ← post-launch features (read when planning future work)
 ├── data/                            ← 2025 CSV files for migration
+├── docs/                            ← static pages served via GitHub Pages (corumnick-oss.github.io/the-long-game/...)
+│   ├── privacy.html                 ← privacy policy (app store required)
+│   ├── terms.html                   ← terms of service
+│   └── support.html                 ← support page (App Store Connect required support URL)
 ├── mobile/
 │   ├── app/
 │   │   ├── _layout.tsx              ← root layout (QueryClientProvider + AuthProvider + AuthGate + OTA check)
@@ -408,7 +427,8 @@ TheLongGame/
 │   │   ├── admin.tsx                ← Admin Dashboard (3 tabs: Users, NFL Tools, Data)
 │   │   ├── picks-by-team.tsx        ← Picks by Team (from Profile → Insights)
 │   │   ├── team-central.tsx         ← Team Central list (from Picks tab)
-│   │   ├── rules.tsx                ← How It Works / Rules (from Profile header icon)
+│   │   ├── rules.tsx                ← How It Works / Rules (linked from the app-wide tabs header, next to feedback icon)
+│   │   ├── settings.tsx             ← Delete Account (double-confirm); future home for notification prefs
 │   │   ├── team/[name].tsx          ← Team Detail
 │   │   ├── game/[id].tsx            ← Game Detail
 │   │   ├── user/[id].tsx            ← Public profile
@@ -417,7 +437,7 @@ TheLongGame/
 │   │   │   ├── signup.tsx
 │   │   │   └── forgot-password.tsx
 │   │   └── (tabs)/
-│   │       ├── _layout.tsx          ← 4 bottom tabs + bell icon header
+│   │       ├── _layout.tsx          ← 4 bottom tabs + header (Rules book icon + feedback chat icon)
 │   │       ├── picks.tsx
 │   │       ├── leaderboard.tsx
 │   │       ├── week-picks.tsx
@@ -701,7 +721,6 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 - Past seasons: how many years back to support in season selector?
 - Season trophy (podium) real artwork — currently emoji placeholders (🥇🥈🥉🥄), same path as Achievements (ChatGPT-generated images later)
 - Premium pricing and features
-- Google Play account setup timing
 
 ---
 
