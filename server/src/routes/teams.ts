@@ -211,7 +211,7 @@ router.get('/:name', optionalAuth, async (req, res) => {
   const logo = teamGames[0]?.homeTeam === resolvedName ? teamGames[0].homeTeamLogo : teamGames[0]?.awayTeamLogo;
 
   // Team stats from team_game_stats — use abbrev for 2025 data, full name for 2026+
-  const statsName = NFL_FULL_TO_ABBREV[resolvedName] ?? resolvedName;
+  const statsName = season === 2025 ? (NFL_FULL_TO_ABBREV[resolvedName] ?? resolvedName) : resolvedName;
   let statsRows = await db.query.teamGameStats.findMany({
     where: and(
       eq(schema.teamGameStats.teamName, statsName),

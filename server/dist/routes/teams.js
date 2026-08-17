@@ -228,7 +228,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
     const logo = teamGames[0]?.homeTeam === resolvedName ? teamGames[0].homeTeamLogo : teamGames[0]?.awayTeamLogo;
     // Team stats from team_game_stats — use abbrev for 2025 data, full name for 2026+
-    const statsName = NFL_FULL_TO_ABBREV[resolvedName] ?? resolvedName;
+    const statsName = season === 2025 ? (NFL_FULL_TO_ABBREV[resolvedName] ?? resolvedName) : resolvedName;
     let statsRows = await db_1.db.query.teamGameStats.findMany({
         where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.teamGameStats.teamName, statsName), (0, drizzle_orm_1.eq)(schema.teamGameStats.season, season), (0, drizzle_orm_1.eq)(schema.teamGameStats.sport, 'nfl')),
     });
