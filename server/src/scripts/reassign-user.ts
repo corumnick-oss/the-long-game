@@ -19,6 +19,7 @@ import {
   pushTokens,
   tiebreakerPicks,
   activityLog,
+  seasonTrophies,
 } from '../db/schema.js';
 
 const pool = new Pool({
@@ -99,6 +100,9 @@ async function main() {
 
   await db.update(trophies).set({ userId: newUid }).where(eq(trophies.userId, oldUid));
   console.log(`✓ Migrated trophies`);
+
+  await db.update(seasonTrophies).set({ userId: newUid }).where(eq(seasonTrophies.userId, oldUid));
+  console.log(`✓ Migrated season trophies`);
 
   await db.update(pushTokens).set({ userId: newUid }).where(eq(pushTokens.userId, oldUid));
   console.log(`✓ Migrated push tokens`);
