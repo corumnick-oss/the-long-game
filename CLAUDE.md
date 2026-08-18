@@ -298,7 +298,7 @@ This list has mostly been superseded by "Next priority items" above (achievement
 1. **Week 18 2025 tiebreaker** — check `tiebreaker_games` and `tiebreaker_picks` tables for week 18 season 2025
 2. **Admin email editing** — deferred. Workaround: new account + UID reassignment.
 3. **Leaderboard Season Selector for all users** — same +/− control the admin already has; currently admin-only (see "TO BUILD" note further down)
-4. **Android Google Sign-In SHA-1 fingerprint** — needed once Google Play is set up; Play App Signing (available once the app listing exists in Play Console) gives the definitive SHA-1 to register
+4. ✅ **Android Google Sign-In SHA-1 fingerprint** — DONE (Aug 18 2026). Found via Play Console → Setup → App integrity → "Protect with Play" redirect → App signing page → App signing key certificate. SHA-1 `9F:09:3D:B1:BB:33:37:66:42:9F:C8:83:48:4D:3E:70:EB:26:49:B0` added to Firebase Console → the-long-game-prod → Project settings → Your apps → Android app (com.thelonggame.picks) → SHA certificate fingerprints. No rebuild needed, takes effect server-side within minutes.
 
 ### seed:nick — Re-run After Any Cleanup
 `npm run seed:nick` (from server/) sets nickcorum@gmail.com as isAdmin=true, isGridiron=true, teamName=Nicholas and copies 179 2025 picks + all trophies from CSV. Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in server/.env.
