@@ -363,7 +363,7 @@ Firebase project: the-long-game-prod-bef05. Bundle ID: com.thelonggame.picks —
 | TheRidl3r | cloud7king10@yahoo.com | no | Squid | ✅ done (reassign:user) |
 | Kevin Akers | kakers91@gmail.com | no | Kevin Akers | ✅ done (reassign:user) |
 | The Purdy Mouths | jhayhurst714@gmail.com | no | The Purdy Mouths | ❌ not yet signed up |
-| Gmac | garciagarrett24@gmail.com | no | Gmac | ❌ not yet signed up |
+| Gmac | garciagarrett24@gmail.com | no | Gmac | ✅ done (reassign:user, Aug 18 2026) |
 | leocorum (Leo/dad) | leocorum@gmail.com | no | Leo | ✅ done (reassign:user) |
 | EWIK | erikhernandez531@yahoo.com | no | EWIK | 🚫 sitting out 2026 (Nick's call, Aug 16 2026) — do not migrate |
 
