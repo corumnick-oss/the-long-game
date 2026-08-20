@@ -6,6 +6,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth';
 import { syncWeekGames, syncWinProbabilities, syncGamesByEventIds, backfillTeamStats } from '../services/espnService';
 import { awardWeeklyTrophies, calculateSeasonStandings, awardSeasonTrophies } from '../services/trophyService';
 import { getCurrentNFLSeason } from '../utils/season';
+import { isWeekLocked } from '../utils/lockTime';
 import { logActivity } from './activity';
 import { sendPushToUsers, sendPushToAllUsers } from '../services/notificationService';
 
@@ -284,8 +285,19 @@ router.get('/pick-audit-log', async (req, res) => {
     ORDER BY pal.created_at DESC
     LIMIT 300
   `);
+  const rows = ((result as any).rows ?? result) as any[];
 
-  res.json((result as any).rows ?? result);
+  // Admins are players too -- they must not see anyone's picks (including via this audit
+  // trail) before that week's lock, same rule as everyone else. Past/locked weeks stay fully
+  // visible for dispute resolution; only the current, not-yet-locked week is withheld.
+  const weekKeys = Array.from(new Set(rows.map(r => `${r.week}:${r.season_type}`)));
+  const lockedByKey = new Map<string, boolean>();
+  await Promise.all(weekKeys.map(async key => {
+    const [w, st] = key.split(':') as [string, string];
+    lockedByKey.set(key, await isWeekLocked(Number(w), season, st));
+  }));
+
+  res.json(rows.filter(r => lockedByKey.get(`${r.week}:${r.season_type}`)));
 });
 
 // ── Unlock Week ───────────────────────────────────────────────────────────────

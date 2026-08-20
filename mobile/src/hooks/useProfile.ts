@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/queryClient';
 import { getCurrentNFLSeason } from '../lib/nflSeason';
@@ -129,6 +129,16 @@ export function useSendFeedback() {
         { method: 'POST', body: JSON.stringify({ subject, message }) },
         user,
       ),
+  });
+}
+
+export function useUpdateTeamName() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (teamName: string) =>
+      apiFetch<MyProfile>('/api/users/me', { method: 'PATCH', body: JSON.stringify({ teamName }) }, user),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', 'me'] }),
   });
 }
 

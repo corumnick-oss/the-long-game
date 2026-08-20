@@ -41,6 +41,7 @@ const auth_1 = require("../middleware/auth");
 const espnService_1 = require("../services/espnService");
 const trophyService_1 = require("../services/trophyService");
 const season_1 = require("../utils/season");
+const lockTime_1 = require("../utils/lockTime");
 const activity_1 = require("./activity");
 const notificationService_1 = require("../services/notificationService");
 const router = (0, express_1.Router)();
@@ -319,7 +320,17 @@ router.get('/pick-audit-log', async (req, res) => {
     ORDER BY pal.created_at DESC
     LIMIT 300
   `);
-    res.json(result.rows ?? result);
+    const rows = (result.rows ?? result);
+    // Admins are players too -- they must not see anyone's picks (including via this audit
+    // trail) before that week's lock, same rule as everyone else. Past/locked weeks stay fully
+    // visible for dispute resolution; only the current, not-yet-locked week is withheld.
+    const weekKeys = Array.from(new Set(rows.map(r => `${r.week}:${r.season_type}`)));
+    const lockedByKey = new Map();
+    await Promise.all(weekKeys.map(async (key) => {
+        const [w, st] = key.split(':');
+        lockedByKey.set(key, await (0, lockTime_1.isWeekLocked)(Number(w), season, st));
+    }));
+    res.json(rows.filter(r => lockedByKey.get(`${r.week}:${r.season_type}`)));
 });
 // ── Unlock Week ───────────────────────────────────────────────────────────────
 router.post('/unlock-week', async (req, res) => {

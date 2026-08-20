@@ -107,6 +107,8 @@ async function main() {
     console.log(`✓ Migrated picks`);
     await db.update(schema_js_1.trophies).set({ userId: newUid }).where((0, drizzle_orm_1.eq)(schema_js_1.trophies.userId, oldUid));
     console.log(`✓ Migrated trophies`);
+    await db.update(schema_js_1.seasonTrophies).set({ userId: newUid }).where((0, drizzle_orm_1.eq)(schema_js_1.seasonTrophies.userId, oldUid));
+    console.log(`✓ Migrated season trophies`);
     await db.update(schema_js_1.pushTokens).set({ userId: newUid }).where((0, drizzle_orm_1.eq)(schema_js_1.pushTokens.userId, oldUid));
     console.log(`✓ Migrated push tokens`);
     await db.update(schema_js_1.tiebreakerPicks).set({ userId: newUid }).where((0, drizzle_orm_1.eq)(schema_js_1.tiebreakerPicks.userId, oldUid));
