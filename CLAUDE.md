@@ -91,17 +91,18 @@ Nick found the per-game "Final: {away} X, {home} Y / Your pick was correct/wrong
 
 No DB change, no mobile change (no notification-tap handling existed for the old `game_final` type). Deployed via the normal backend push (build + commit `dist` + push to `main` → Railway auto-deploy).
 
-### 🔜 PLANNED, NOT STARTED (scoped Aug 15 2026) — remaining notification overhaul
-Lock time (item 1) is done, see above; per-game/week-summary (items 2 and 4) are superseded by the Aug 20 2026 entry above. One piece remains, agreed with Nick, ready to build whenever — go straight to implementation, no need to re-scope:
+### ✅ Granular notification settings — DONE (Aug 20 2026)
+Nick asked for per-category notification toggles in Settings, with one hard requirement: admin broadcasts/test sends must always reach everyone regardless of a user's toggle choices. Built:
+- `server/src/db/schema.ts` — 3 boolean columns on `users`: `notifyWeekUnlocked`, `notifyWeekLocked`, `notifyWeekSummary` (all `default(true)`)
+- `server/src/scripts/migrate-notification-prefs.ts` — one-off `ADD COLUMN IF NOT EXISTS` migration — **already run against prod** (Nick ran it manually — the sandbox's auto-mode classifier blocks direct prod-DB writes from Claude Code, so this one always needs Nick to run it himself, same command each time schema changes: `npm run migrate:notification-prefs` from `server/`)
+- `server/src/routes/users.ts` — `PATCH /api/users/me` accepts the 3 new fields (GET already spread the full user row, no change needed there)
+- `server/src/services/notificationService.ts` — `notifyWeekUnlocked`, `notifyDeadlineApproaching`, `notifyPicksLocked`, `notifyWeekSummary` each filter recipients by the matching preference column via a new `sendPushToOptedInUsers()` helper (deadline reminder + picks-locked both key off the single `notifyWeekLocked` column, since both are lock-related — Nick's Aug 15 2026 call). **Admin broadcast (`POST /api/admin/notifications/broadcast`) and test-send routes were deliberately left untouched** — they call `sendPushToUsers`/`sendPushToAllUsers` directly, never the opted-in helper, so they always reach everyone by construction, satisfying Nick's "admin messages go through regardless" requirement with no special-case code.
+- `mobile/src/hooks/useProfile.ts` — `useUpdateNotificationPrefs()` hook, `notifyWeekUnlocked`/`notifyWeekLocked`/`notifyWeekSummary` added to `MyProfile`
+- `mobile/app/settings.tsx` — new "Notifications" section, 3 toggle rows, above Danger Zone
 
-**3. Granular notification settings** (`mobile/app/settings.tsx` now exists — built Aug 16 2026 for Delete Account, see above — add to it, don't create a second settings screen). Categories, all default `true`: week summary, week unlocked, week locked. (Per-game win/loss is no longer a category — that notification type was removed, see above.) **Deadline reminder rides along with "week locked"** (both lock-related); **achievement-earned pushes stay always-on**, not user-toggleable (Nick's call, Aug 15 2026).
-- `server/src/db/schema.ts` — add 3 boolean columns to `users`: `notifyWeekSummary`, `notifyWeekUnlocked`, `notifyWeekLocked`
-- `server/src/scripts/migrate-notification-prefs.ts` — new one-off `ALTER TABLE users ADD COLUMN IF NOT EXISTS ...` script — **run manually against Railway prod DB, confirm with Nick before running** (same DB serves local + prod, no separate environments)
-- `server/src/routes/users.ts` — extend `PATCH /api/users/me` to accept the 3 new fields (GET already spreads full user row, no change needed there)
-- `server/src/services/notificationService.ts` — broadcast/per-user sends (`notifyWeekUnlocked`, `notifyPicksLocked`, `notifyDeadlineApproaching`, `notifyWeekSummary`) filter recipients by their relevant preference column instead of blasting every `nflAccess` user
-- `mobile/app/settings.tsx` — add a master push-notifications switch (re-triggers the OS permission prompt if previously declined — this is also what closes the earlier "let users turn notifications back on" gap) and the 3 category toggles, above the existing Delete Account section
+Achievement-earned pushes stay always-on/not toggleable (unchanged, Nick's Aug 15 2026 call). **Not built:** a master push-notifications on/off switch that re-triggers the OS permission prompt — wasn't part of what Nick asked for this round; the 3 category toggles only affect delivery for users who already have push enabled at the OS level. Revisit if Nick wants that closing-the-loop UX later.
 
-**Before deploying:** touches a prod DB schema change — confirm with Nick before running the migration script and before pushing/publishing, same as any other deploy.
+Deployed Aug 20 2026: backend via normal build + commit `dist` + push to `main` (Railway auto-deploy); mobile via `eas update --branch preview` (update group `8bae4d71-e253-4fb8-9666-0d1848d7789e`).
 
 <details>
 <summary>ESPN/Akamai background — why this was needed (click to expand historical debugging)</summary>
@@ -446,7 +447,7 @@ TheLongGame/
 │   │   ├── picks-by-team.tsx        ← Picks by Team (from Profile → Insights)
 │   │   ├── team-central.tsx         ← Team Central list (from Picks tab)
 │   │   ├── rules.tsx                ← How It Works / Rules (linked from the app-wide tabs header, next to feedback icon)
-│   │   ├── settings.tsx             ← Team Name (editable) + Delete Account (double-confirm); future home for notification prefs
+│   │   ├── settings.tsx             ← Team Name (editable) + Notifications (3 toggles) + Delete Account (double-confirm)
 │   │   ├── team/[name].tsx          ← Team Detail
 │   │   ├── game/[id].tsx            ← Game Detail
 │   │   ├── user/[id].tsx            ← Public profile
