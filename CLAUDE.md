@@ -82,25 +82,26 @@ Two fixes, both shipped (backend push + OTA), no native changes:
 1. **Apple Sign-In "Hide My Email" could leave a user stuck with a random team name.** `AuthContext.tsx`'s `signInWithApple` only gets the real name from Apple on the very first login (and only if shared); after that, `syncUserToBackend` falls back to `user.displayName ?? email.split('@')[0]`. With Hide My Email, the email is a random relay string (e.g. `abc123xyz@privaterelay.appleid.com`), so that string silently became the team name with no way to fix it — `PATCH /api/users/me` already supported editing `teamName`, but nothing in the app called it. Fixed by adding an editable Team Name field to `mobile/app/settings.tsx` (new `useUpdateTeamName()` hook in `mobile/src/hooks/useProfile.ts`). Deeper fix (force a name-confirmation step during onboarding for new OAuth users) deferred to the planned onboarding redesign — this unblocks the affected user immediately without a bigger flow change this close to launch.
 2. **Admin could see everyone's current-week picks before lock, via the Activity tab.** `GET /api/admin/pick-audit-log` (used by `mobile/app/admin.tsx`'s Activity tab) had no lock-time gating — it returned exact picked teams the instant anyone picked, for any week including the current unlocked one. Since Nick is both admin and a player, this was an unfair real-time advantage, on top of violating Rule 4's spirit. Fixed in `server/src/routes/admin.ts`: rows for any not-yet-locked week (checked via the existing `isWeekLocked()` from `lockTime.ts`, per that row's own `week`+`season_type`) are filtered out entirely before the response is sent. Past/already-locked weeks are returned in full, unchanged — still fully usable for "I never picked that" dispute resolution. `GET /api/admin/picks` (the raw admin picks list, used for admin pick-editing) was deliberately left ungated — out of scope, not what was reported, and may have a legitimate need to show pre-lock picks for admin corrections; revisit if Nick flags that one too.
 
+### ✅ Per-game push notifications replaced with a weekly summary — DONE (Aug 20 2026)
+Nick found the per-game "Final: {away} X, {home} Y / Your pick was correct/wrong" push (`notifyGameFinal`, fired once per pick from `espnService.ts`'s `justFinished` loop) too spammy on a full game day — up to ~16 pushes per person per week. Rather than build the previously-planned "item 2" personalization (see git history for the old plan text — now moot), removed per-game pushes entirely and built the previously-planned "item 4" week-summary notification to replace them:
+- `server/src/services/espnService.ts` — removed the per-pick `notifyGameFinal(...)` loop (grading via `gradeGamePicks` and win-probability writing, both separate code paths, are untouched)
+- `server/src/services/notificationService.ts` — deleted `notifyGameFinal`; added `notifyWeekSummary(userId, week, seasonType, wins, losses)` — "Week X wrap-up" / "You went W-L this week! 🏈"
+- `server/src/services/trophyService.ts` — new `getWeeklyRecords(week, season, seasonType)` returns each participant's W-L for a week (only users with ≥1 pick that week; ties/ungraded picks excluded from both counts)
+- `server/src/services/scheduler.ts` — in the Tuesday 6AM weekly-transition cron, right after the existing achievement-award step, calls `getWeeklyRecords(week - 1, ...)` and sends `notifyWeekSummary` to each participant. Runs for **both** preseason and regular season (unlike Achievements, which stay regular-season-only).
+
+No DB change, no mobile change (no notification-tap handling existed for the old `game_final` type). Deployed via the normal backend push (build + commit `dist` + push to `main` → Railway auto-deploy).
+
 ### 🔜 PLANNED, NOT STARTED (scoped Aug 15 2026) — remaining notification overhaul
-Lock time (item 1) is done, see above. Three pieces remain, agreed with Nick, ready to build whenever — go straight to implementation, no need to re-scope:
+Lock time (item 1) is done, see above; per-game/week-summary (items 2 and 4) are superseded by the Aug 20 2026 entry above. One piece remains, agreed with Nick, ready to build whenever — go straight to implementation, no need to re-scope:
 
-**2. Personalized game-final push text** — currently "Final: {away} X, {home} Y" / "Your pick was correct/wrong." Change to lead with the pick itself: *"You correctly picked the {team} to win! 🎉"* / *"Bummer, the {team} lost. 😬"* (score moves to body line).
-- `server/src/services/espnService.ts` — thread the picked team's name into the `notifyGameFinal` call (currently only passes home/away/scores + isCorrect bool); ties already skip this block entirely (`if (game.homeScore === game.awayScore) continue`), no change needed there
-- `server/src/services/notificationService.ts` — rewrite `notifyGameFinal`'s title/body
-
-**3. Granular notification settings** (`mobile/app/settings.tsx` now exists — built Aug 16 2026 for Delete Account, see above — add to it, don't create a second settings screen). Categories, all default `true`: game win/loss, week summary, week unlocked, week locked. **Deadline reminder rides along with "week locked"** (both lock-related); **achievement-earned pushes stay always-on**, not user-toggleable (Nick's call, Aug 15 2026).
-- `server/src/db/schema.ts` — add 4 boolean columns to `users`: `notifyGameResults`, `notifyWeekSummary`, `notifyWeekUnlocked`, `notifyWeekLocked`
+**3. Granular notification settings** (`mobile/app/settings.tsx` now exists — built Aug 16 2026 for Delete Account, see above — add to it, don't create a second settings screen). Categories, all default `true`: week summary, week unlocked, week locked. (Per-game win/loss is no longer a category — that notification type was removed, see above.) **Deadline reminder rides along with "week locked"** (both lock-related); **achievement-earned pushes stay always-on**, not user-toggleable (Nick's call, Aug 15 2026).
+- `server/src/db/schema.ts` — add 3 boolean columns to `users`: `notifyWeekSummary`, `notifyWeekUnlocked`, `notifyWeekLocked`
 - `server/src/scripts/migrate-notification-prefs.ts` — new one-off `ALTER TABLE users ADD COLUMN IF NOT EXISTS ...` script — **run manually against Railway prod DB, confirm with Nick before running** (same DB serves local + prod, no separate environments)
-- `server/src/routes/users.ts` — extend `PATCH /api/users/me` to accept the 4 new fields (GET already spreads full user row, no change needed there)
-- `server/src/services/notificationService.ts` — broadcast sends (`notifyWeekUnlocked`, `notifyPicksLocked`, `notifyDeadlineApproaching`, `notifyGameFinal`) filter recipients by their relevant preference column instead of blasting every `nflAccess` user
-- `mobile/app/settings.tsx` — add a master push-notifications switch (re-triggers the OS permission prompt if previously declined — this is also what closes the earlier "let users turn notifications back on" gap) and the 4 category toggles, above the existing Delete Account section
+- `server/src/routes/users.ts` — extend `PATCH /api/users/me` to accept the 3 new fields (GET already spreads full user row, no change needed there)
+- `server/src/services/notificationService.ts` — broadcast/per-user sends (`notifyWeekUnlocked`, `notifyPicksLocked`, `notifyDeadlineApproaching`, `notifyWeekSummary`) filter recipients by their relevant preference column instead of blasting every `nflAccess` user
+- `mobile/app/settings.tsx` — add a master push-notifications switch (re-triggers the OS permission prompt if previously declined — this is also what closes the earlier "let users turn notifications back on" gap) and the 3 category toggles, above the existing Delete Account section
 
-**4. New "Week summary" notification** — doesn't exist yet. Fires **Tuesday 6AM** (Nick's call), riding along with the existing weekly-transition cron that already computes "the week that just closed" (`week - 1`) to award achievements — but unlike achievements (regular-season-only), week summary should fire for **both preseason and regular season**.
-- `server/src/services/notificationService.ts` — new `notifyWeekSummary(userId, week, seasonType, wins, losses)`, gated by `notifyWeekSummary` pref
-- `server/src/services/scheduler.ts` — in the Tuesday 6AM job (`cron.schedule('0 6 * * 2', ...)`), after the existing `week > 1` achievement-award branch, add a per-participant W-L calc for `week - 1` / `seasonType` and call `notifyWeekSummary` for each
-
-**Before deploying:** build touches a prod DB schema change (item 3) and ships via the normal backend-push + `eas update --branch preview` OTA flow — confirm with Nick before running the migration script and before pushing/publishing, same as any other deploy.
+**Before deploying:** touches a prod DB schema change — confirm with Nick before running the migration script and before pushing/publishing, same as any other deploy.
 
 <details>
 <summary>ESPN/Akamai background — why this was needed (click to expand historical debugging)</summary>
@@ -579,7 +580,7 @@ All 5 achievement images done, in `mobile/assets/achievements/{most_wins,loser,u
 | Wednesday 8PM PST | Push: "[Week] picks lock tonight at 11:59 PM!" |
 | Wednesday 11:59PM PST | Picks lock + push notification |
 
-All 5 push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`; `notifyGameFinal` in `espnService.ts`.
+Push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` + `notifyWeekSummary` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`. (Per-game `notifyGameFinal` was removed Aug 20 2026 in favor of `notifyWeekSummary` — see "remaining notification overhaul" section above.)
 
 ### ⚠️ SUPERSEDED — see "UNRESOLVED, IN PROGRESS" entry at the top of this doc (Aug 13 2026)
 This section originally claimed the fix below was the full resolution. It wasn't — the same blocking (400/403 from Railway) resumed/never actually stopped, and was later confirmed to also hit a Cloudflare Worker and a native-`fetch()` rewrite, ruling out both "just Railway" and "just axios's default UA" as the full explanation. Kept below for historical context on the UA finding, which was still a real and worthwhile fix, just not sufficient on its own.
@@ -673,7 +674,7 @@ Rule 12 is now expanded: H2H pick comparison on public profiles shows current we
 | Deadline | "[Week] picks lock tonight at 11:59 PM!" | Wed 8PM | wired |
 | Locked | "Picks locked. Good luck! 🏈" | Wed 11:59PM | wired |
 | Achievement | "🏆 You earned [Achievement] for Week X!" | Tue after scoring | wired |
-| Final | "Final: [score]. Your pick: ✓/✗" | As games end | wired |
+| Week summary | "[Week] wrap-up — You went W-L this week! 🏈" | Tue 6AM (both preseason + regular) | wired |
 
 Test via Admin → NFL Tools → "Send Test Notification Now" or "Schedule Deadline Reminder Test" (1/5/10/30m presets).
 
