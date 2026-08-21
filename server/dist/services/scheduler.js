@@ -72,6 +72,14 @@ node_cron_1.default.schedule('0 6 * * 2', async () => {
         // Weekly Achievements ("trophies") are regular-season only for now.
         if (seasonType === 'regular' && week > 1)
             await (0, trophyService_1.awardWeeklyTrophies)(week - 1, season);
+        // Week summary notification ("You went X-Y this week!") — unlike Achievements, this
+        // fires for both preseason and regular season.
+        if (week > 1) {
+            const records = await (0, trophyService_1.getWeeklyRecords)(week - 1, season, seasonType);
+            for (const record of records) {
+                (0, notificationService_1.notifyWeekSummary)(record.userId, week - 1, seasonType, record.wins, record.losses).catch(err => console.error('[Scheduler] notifyWeekSummary failed for user', record.userId, err));
+            }
+        }
         // Sync new week's games from ESPN
         await (0, espnService_1.syncWeekGames)(week, season, seasonType);
         // Backfill box score stats for all completed games in the prior week

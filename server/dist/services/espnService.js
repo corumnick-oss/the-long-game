@@ -9,7 +9,6 @@ exports.backfillTeamStats = backfillTeamStats;
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
-const notificationService_1 = require("./notificationService");
 const BASE = process.env['ESPN_API_BASE_URL'] ?? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 const CORE_BASE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
 // ESPN's /teams list endpoint returns 400 from Railway (server-side blocked).
@@ -298,29 +297,20 @@ async function syncWeekGames(week, season, seasonType = 'regular') {
             }
         }
     }
-    // Fire game-final notifications and sync box score stats for just-finished games
+    // Write winningTeamWinProb/losingTeamWinProb for just-finished games now that we know who
+    // won. These are used to evaluate ESPN's pre-game prediction accuracy. (Per-game push
+    // notifications were removed in favor of a single Tuesday weekly summary — see
+    // notifyWeekSummary in notificationService.ts / scheduler.ts.)
     for (const game of justFinished) {
         if (game.homeScore === game.awayScore)
             continue; // tie — no clear correct/incorrect to report
         const homeWon = game.homeScore > game.awayScore;
-        // Write winningTeamWinProb/losingTeamWinProb now that we know who won.
-        // These are used to evaluate ESPN's pre-game prediction accuracy.
         const existing = existingByEspnId.get(game.espnId);
         if (existing?.homeTeamFPI != null && existing?.awayTeamFPI != null) {
             await db_1.db.update(schema_1.games).set({
                 winningTeamWinProb: homeWon ? existing.homeTeamFPI : existing.awayTeamFPI,
                 losingTeamWinProb: homeWon ? existing.awayTeamFPI : existing.homeTeamFPI,
             }).where((0, drizzle_orm_1.eq)(schema_1.games.id, game.id));
-        }
-        try {
-            const gamePicks = await db_1.db.query.picks.findMany({ where: (0, drizzle_orm_1.eq)(schema_1.picks.gameId, game.id) });
-            for (const pick of gamePicks) {
-                const isCorrect = pick.pick === 'home' ? homeWon : !homeWon;
-                (0, notificationService_1.notifyGameFinal)(pick.userId, game.homeTeam, game.awayTeam, game.homeScore, game.awayScore, isCorrect).catch(err => console.error('[ESPN] notifyGameFinal failed for user', pick.userId, err));
-            }
-        }
-        catch (err) {
-            console.error('[ESPN] Game final notification batch failed for game', game.id, err);
         }
         // Box score sync now happens above (keyed off missing team_game_stats rows), which covers
         // this transition case too — no separate call needed here.

@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { syncWeekGames, updateLiveScores, syncWinProbabilities, backfillTeamStats } from './espnService';
-import { awardWeeklyTrophies } from './trophyService';
-import { notifyWeekUnlocked, notifyDeadlineApproaching, notifyPicksLocked, notifyDefaultPicksApplied } from './notificationService';
+import { awardWeeklyTrophies, getWeeklyRecords } from './trophyService';
+import { notifyWeekUnlocked, notifyDeadlineApproaching, notifyPicksLocked, notifyDefaultPicksApplied, notifyWeekSummary } from './notificationService';
 import { sendWeeklyPicksEmails } from './emailService';
 import { getCurrentNFLSeason, getCurrentWeekAndType, getNextWeekToUnlock } from '../utils/season';
 import { db } from '../db';
@@ -36,6 +36,17 @@ cron.schedule('0 6 * * 2', async () => {
 
     // Weekly Achievements ("trophies") are regular-season only for now.
     if (seasonType === 'regular' && week > 1) await awardWeeklyTrophies(week - 1, season);
+
+    // Week summary notification ("You went X-Y this week!") — unlike Achievements, this
+    // fires for both preseason and regular season.
+    if (week > 1) {
+      const records = await getWeeklyRecords(week - 1, season, seasonType);
+      for (const record of records) {
+        notifyWeekSummary(record.userId, week - 1, seasonType, record.wins, record.losses).catch(err =>
+          console.error('[Scheduler] notifyWeekSummary failed for user', record.userId, err)
+        );
+      }
+    }
 
     // Sync new week's games from ESPN
     await syncWeekGames(week, season, seasonType);

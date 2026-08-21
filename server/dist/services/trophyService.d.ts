@@ -26,6 +26,12 @@ export interface WeeklyTrophyResults {
     contrarian: ContrarianCandidate[];
 }
 export declare function calculateWeeklyTrophies(week: number, season: number, seasonType?: string): Promise<WeeklyTrophyResults>;
+export interface WeeklyRecord {
+    userId: string;
+    wins: number;
+    losses: number;
+}
+export declare function getWeeklyRecords(week: number, season: number, seasonType?: string): Promise<WeeklyRecord[]>;
 export declare function awardWeeklyTrophies(week: number, season: number, specificType?: string, seasonType?: string): Promise<number>;
 export interface SeasonStandingEntry {
     userId: string;

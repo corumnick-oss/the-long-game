@@ -162,6 +162,31 @@ export async function calculateWeeklyTrophies(week: number, season: number, seas
   return { mostWins, mostLosses, upsetPick, loneWolf, contrarian };
 }
 
+// Per-participant win/loss record for a single week, for the Tuesday week-summary
+// notification. Only includes users who made at least one pick that week (same
+// participation gate used elsewhere — leaderboard, Week Picks tab, etc.).
+export interface WeeklyRecord { userId: string; wins: number; losses: number }
+export async function getWeeklyRecords(week: number, season: number, seasonType: string = 'regular'): Promise<WeeklyRecord[]> {
+  const weekGames = await db.query.games.findMany({
+    where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
+  });
+  if (weekGames.length === 0) return [];
+
+  const gameIds = weekGames.map(g => g.id);
+  const weekPicks = await db.query.picks.findMany({ where: inArray(schema.picks.gameId, gameIds) });
+
+  const recordsByUser = new Map<string, WeeklyRecord>();
+  for (const pick of weekPicks) {
+    if (pick.isCorrect === null) continue; // ties, or games not yet graded — neither a win nor a loss
+    if (!recordsByUser.has(pick.userId)) recordsByUser.set(pick.userId, { userId: pick.userId, wins: 0, losses: 0 });
+    const record = recordsByUser.get(pick.userId)!;
+    if (pick.isCorrect) record.wins++;
+    else record.losses++;
+  }
+
+  return Array.from(recordsByUser.values()).filter(r => r.wins + r.losses > 0);
+}
+
 export async function awardWeeklyTrophies(week: number, season: number, specificType?: string, seasonType: string = 'regular'): Promise<number> {
   console.log(`Awarding trophies for Week ${week}, Season ${season}${specificType ? ` (${specificType})` : ''}...`);
   const results = await calculateWeeklyTrophies(week, season, seasonType);

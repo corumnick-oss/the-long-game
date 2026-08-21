@@ -11,5 +11,5 @@ export declare function notifyDeadlineApproaching(week: number, seasonType?: 're
 export declare function notifyPicksLocked(week: number, seasonType?: 'regular' | 'preseason'): Promise<void>;
 export declare function notifyAchievementEarned(userId: string, achievementName: string, week: number): Promise<void>;
 export declare function notifyDefaultPicksApplied(userId: string, count: number, week: number, seasonType?: 'regular' | 'preseason'): Promise<void>;
-export declare function notifyGameFinal(userId: string, homeTeam: string, awayTeam: string, homeScore: number, awayScore: number, isCorrect: boolean): Promise<void>;
+export declare function notifyWeekSummary(userId: string, week: number, seasonType: 'regular' | 'preseason', wins: number, losses: number): Promise<void>;
 export {};

@@ -106,12 +106,11 @@ export async function notifyDefaultPicksApplied(userId: string, count: number, w
   );
 }
 
-export async function notifyGameFinal(userId: string, homeTeam: string, awayTeam: string, homeScore: number, awayScore: number, isCorrect: boolean): Promise<void> {
-  const result = isCorrect ? 'correct ✓' : 'wrong ✗';
+export async function notifyWeekSummary(userId: string, week: number, seasonType: 'regular' | 'preseason', wins: number, losses: number): Promise<void> {
   await sendPushToUsers(
     [userId],
-    `Final: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}`,
-    `Your pick was ${result}.`,
-    { type: 'game_final' }
+    weekLabel(week, seasonType) + " wrap-up",
+    `You went ${wins}-${losses} this week! 🏈`,
+    { type: 'week_summary', week, seasonType }
   );
 }

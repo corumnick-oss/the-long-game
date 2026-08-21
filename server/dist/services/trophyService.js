@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.calculateWeeklyTrophies = calculateWeeklyTrophies;
+exports.getWeeklyRecords = getWeeklyRecords;
 exports.awardWeeklyTrophies = awardWeeklyTrophies;
 exports.calculateSeasonStandings = calculateSeasonStandings;
 exports.awardSeasonTrophies = awardSeasonTrophies;
@@ -176,6 +177,28 @@ async function calculateWeeklyTrophies(week, season, seasonType = 'regular') {
         }
     }
     return { mostWins, mostLosses, upsetPick, loneWolf, contrarian };
+}
+async function getWeeklyRecords(week, season, seasonType = 'regular') {
+    const weekGames = await db_1.db.query.games.findMany({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
+    });
+    if (weekGames.length === 0)
+        return [];
+    const gameIds = weekGames.map(g => g.id);
+    const weekPicks = await db_1.db.query.picks.findMany({ where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds) });
+    const recordsByUser = new Map();
+    for (const pick of weekPicks) {
+        if (pick.isCorrect === null)
+            continue; // ties, or games not yet graded — neither a win nor a loss
+        if (!recordsByUser.has(pick.userId))
+            recordsByUser.set(pick.userId, { userId: pick.userId, wins: 0, losses: 0 });
+        const record = recordsByUser.get(pick.userId);
+        if (pick.isCorrect)
+            record.wins++;
+        else
+            record.losses++;
+    }
+    return Array.from(recordsByUser.values()).filter(r => r.wins + r.losses > 0);
 }
 async function awardWeeklyTrophies(week, season, specificType, seasonType = 'regular') {
     console.log(`Awarding trophies for Week ${week}, Season ${season}${specificType ? ` (${specificType})` : ''}...`);

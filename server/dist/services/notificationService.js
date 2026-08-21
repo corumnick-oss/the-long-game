@@ -10,7 +10,7 @@ exports.notifyDeadlineApproaching = notifyDeadlineApproaching;
 exports.notifyPicksLocked = notifyPicksLocked;
 exports.notifyAchievementEarned = notifyAchievementEarned;
 exports.notifyDefaultPicksApplied = notifyDefaultPicksApplied;
-exports.notifyGameFinal = notifyGameFinal;
+exports.notifyWeekSummary = notifyWeekSummary;
 const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
@@ -74,8 +74,7 @@ async function notifyAchievementEarned(userId, achievementName, week) {
 async function notifyDefaultPicksApplied(userId, count, week, seasonType = 'regular') {
     await sendPushToUsers([userId], "Your picks were filled in", `You had ${count} unpicked game${count === 1 ? '' : 's'} for ${weekLabel(week, seasonType)}. We defaulted to the Raiders (or away team).`, { type: 'default_picks', week, seasonType });
 }
-async function notifyGameFinal(userId, homeTeam, awayTeam, homeScore, awayScore, isCorrect) {
-    const result = isCorrect ? 'correct ✓' : 'wrong ✗';
-    await sendPushToUsers([userId], `Final: ${awayTeam} ${awayScore}, ${homeTeam} ${homeScore}`, `Your pick was ${result}.`, { type: 'game_final' });
+async function notifyWeekSummary(userId, week, seasonType, wins, losses) {
+    await sendPushToUsers([userId], weekLabel(week, seasonType) + " wrap-up", `You went ${wins}-${losses} this week! 🏈`, { type: 'week_summary', week, seasonType });
 }
 //# sourceMappingURL=notificationService.js.map
