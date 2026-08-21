@@ -1,8 +1,6 @@
 import { View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { useLeaderboard, type LeaderboardEntry } from '../../src/hooks/useLeaderboard';
-import { getCurrentNFLSeason, getCurrentNFLWeek } from '../../src/lib/nflSeason';
-
-const currentWeek = getCurrentNFLWeek();
+import { useCurrentWeek } from '../../src/hooks/usePicksData';
 
 type Filter = 'gridirons' | 'global';
 type ViewType = 'season' | 'weekly';
@@ -106,7 +104,7 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
   );
 }
 
-function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, setEntryIdx }: {
+function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, setEntryIdx, isCurrentEntry, currentWeek }: {
   filter: Filter;
   setFilter: (f: Filter) => void;
   type: ViewType;
@@ -114,9 +112,10 @@ function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, se
   isGridiron: boolean;
   entryIdx: number;
   setEntryIdx: (i: number) => void;
+  isCurrentEntry: boolean;
+  currentWeek: number;
 }) {
   const entry = SEASON_ENTRIES[entryIdx]!;
-  const isCurrentRegular = entry.year === new Date().getFullYear() && entry.seasonType === 'regular';
   return (
     <View className="px-4 pt-4 pb-2 gap-2">
       {/* Season selector */}
@@ -148,7 +147,7 @@ function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, se
           onChange={setFilter}
         />
       )}
-      {isCurrentRegular && (
+      {isCurrentEntry && (
         <Toggle<ViewType>
           options={[
             { label: 'Season', value: 'season' },
@@ -191,6 +190,13 @@ export default function LeaderboardScreen() {
   useEffect(() => { setType('season'); }, [entryIdx]);
 
   const entry = SEASON_ENTRIES[entryIdx]!;
+
+  const { data: currentWeekData } = useCurrentWeek();
+  const isCurrentEntry =
+    currentWeekData != null &&
+    entry.year === currentWeekData.season &&
+    entry.seasonType === currentWeekData.seasonType;
+  const currentWeek = currentWeekData?.week ?? 1;
 
   const { data, isLoading, isError, refetch, isFetching } = useLeaderboard(
     filter,
@@ -245,6 +251,8 @@ export default function LeaderboardScreen() {
             isGridiron={isGridiron}
             entryIdx={entryIdx}
             setEntryIdx={setEntryIdx}
+            isCurrentEntry={isCurrentEntry}
+            currentWeek={currentWeek}
           />
         }
         ListEmptyComponent={

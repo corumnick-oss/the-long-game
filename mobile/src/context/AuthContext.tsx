@@ -83,9 +83,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     await GoogleSignin.hasPlayServices();
-    await GoogleSignin.signIn();
-    const { accessToken } = await GoogleSignin.getTokens();
-    const credential = GoogleAuthProvider.credential(null, accessToken);
+    const response = await GoogleSignin.signIn();
+    if (response.type !== 'success') {
+      const cancelled: Error & { code?: string } = new Error('Sign in cancelled');
+      cancelled.code = 'SIGN_IN_CANCELLED';
+      throw cancelled;
+    }
+    const { idToken } = response.data;
+    if (!idToken) throw new Error('No ID token from Google');
+    const credential = GoogleAuthProvider.credential(idToken);
     const result = await signInWithCredential(auth, credential);
     await syncUserToBackend(result.user);
   };
