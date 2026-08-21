@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Switch, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { useDeleteAccount, useMyProfile, useUpdateTeamName } from '@/hooks/useProfile';
+import { useDeleteAccount, useMyProfile, useUpdateTeamName, useUpdateNotificationPrefs, type NotificationPrefs } from '@/hooks/useProfile';
 
 const inputStyle = { height: 52, paddingHorizontal: 16 } as const;
+
+function NotificationToggleRow({ label, value, onValueChange, disabled, isLast }: {
+  label: string;
+  value: boolean;
+  onValueChange: (val: boolean) => void;
+  disabled: boolean;
+  isLast?: boolean;
+}) {
+  return (
+    <View className={`flex-row items-center justify-between py-2.5 ${isLast ? '' : 'border-b border-border'}`}>
+      <Text className="text-white text-sm flex-1 mr-3">{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        disabled={disabled}
+        trackColor={{ false: '#374151', true: '#1d4ed8' }}
+        thumbColor={value ? '#3b82f6' : '#9ca3af'}
+      />
+    </View>
+  );
+}
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -12,7 +33,12 @@ export default function SettingsScreen() {
   const deleteAccount = useDeleteAccount();
   const { data: profile } = useMyProfile();
   const updateTeamName = useUpdateTeamName();
+  const updateNotificationPrefs = useUpdateNotificationPrefs();
   const [teamName, setTeamName] = useState('');
+
+  const toggleNotificationPref = (key: keyof NotificationPrefs, val: boolean) => {
+    updateNotificationPrefs.mutate({ [key]: val });
+  };
 
   useEffect(() => {
     if (profile?.teamName) setTeamName(profile.teamName);
@@ -100,6 +126,29 @@ export default function SettingsScreen() {
               {updateTeamName.isPending ? 'Saving…' : 'Save'}
             </Text>
           </TouchableOpacity>
+        </View>
+
+        <Text className="text-muted text-xs font-semibold mb-2 uppercase">Notifications</Text>
+        <View className="bg-surface rounded-xl p-4 mb-6">
+          <NotificationToggleRow
+            label="Picks unlocked"
+            value={profile?.notifyWeekUnlocked ?? true}
+            onValueChange={val => toggleNotificationPref('notifyWeekUnlocked', val)}
+            disabled={updateNotificationPrefs.isPending}
+          />
+          <NotificationToggleRow
+            label="Picks locked"
+            value={profile?.notifyWeekLocked ?? true}
+            onValueChange={val => toggleNotificationPref('notifyWeekLocked', val)}
+            disabled={updateNotificationPrefs.isPending}
+          />
+          <NotificationToggleRow
+            label="Weekly summary"
+            value={profile?.notifyWeekSummary ?? true}
+            onValueChange={val => toggleNotificationPref('notifyWeekSummary', val)}
+            disabled={updateNotificationPrefs.isPending}
+            isLast
+          />
         </View>
 
         <Text className="text-muted text-xs font-semibold mb-2 uppercase">Danger Zone</Text>

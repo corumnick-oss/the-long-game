@@ -26,6 +26,9 @@ export type MyProfile = {
   isGridiron: boolean;
   profileImageUrl: string | null;
   createdAt: string;
+  notifyWeekUnlocked: boolean;
+  notifyWeekLocked: boolean;
+  notifyWeekSummary: boolean;
   seasonRecord: { wins: number; losses: number };
   accuracy: number;
   bestWeek: { week: number; wins: number } | null;
@@ -138,6 +141,22 @@ export function useUpdateTeamName() {
   return useMutation({
     mutationFn: (teamName: string) =>
       apiFetch<MyProfile>('/api/users/me', { method: 'PATCH', body: JSON.stringify({ teamName }) }, user),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', 'me'] }),
+  });
+}
+
+export type NotificationPrefs = {
+  notifyWeekUnlocked: boolean;
+  notifyWeekLocked: boolean;
+  notifyWeekSummary: boolean;
+};
+
+export function useUpdateNotificationPrefs() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (prefs: Partial<NotificationPrefs>) =>
+      apiFetch<MyProfile>('/api/users/me', { method: 'PATCH', body: JSON.stringify(prefs) }, user),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', 'me'] }),
   });
 }

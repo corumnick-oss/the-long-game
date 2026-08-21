@@ -54,12 +54,18 @@ router.get('/me', auth_1.requireAuth, async (req, res) => {
 });
 // PATCH /api/users/me
 router.patch('/me', auth_1.requireAuth, async (req, res) => {
-    const { teamName, profileImageUrl } = req.body;
+    const { teamName, profileImageUrl, notifyWeekUnlocked, notifyWeekLocked, notifyWeekSummary } = req.body;
     const updates = { updatedAt: new Date() };
     if (teamName?.trim())
         updates.teamName = teamName.trim();
     if (profileImageUrl !== undefined)
         updates.profileImageUrl = profileImageUrl || null;
+    if (notifyWeekUnlocked !== undefined)
+        updates.notifyWeekUnlocked = notifyWeekUnlocked;
+    if (notifyWeekLocked !== undefined)
+        updates.notifyWeekLocked = notifyWeekLocked;
+    if (notifyWeekSummary !== undefined)
+        updates.notifyWeekSummary = notifyWeekSummary;
     const [updated] = await db_1.db.update(schema.users).set(updates).where((0, drizzle_orm_1.eq)(schema.users.id, req.currentUser.id)).returning();
     res.json(updated);
 });

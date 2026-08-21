@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { db } from '../db';
 import { pushTokens, users } from '../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -60,20 +60,32 @@ export async function sendPushToAllUsers(title: string, body: string, data?: Rec
   await sendPushToUsers(userIds, title, body, data);
 }
 
+// Broadcasts scoped to users who haven't opted out of the given preference column.
+// Admin broadcasts and test sends deliberately go through sendPushToUsers/sendPushToAllUsers
+// directly instead of this — those must reach everyone regardless of category preferences.
+async function sendPushToOptedInUsers(prefColumn: 'notifyWeekUnlocked' | 'notifyWeekLocked', title: string, body: string, data?: Record<string, unknown>): Promise<void> {
+  const optedIn = await db.query.users.findMany({ where: and(eq(users.nflAccess, true), eq(users[prefColumn], true)) });
+  await sendPushToUsers(optedIn.map(u => u.id), title, body, data);
+}
+
 function weekLabel(week: number, seasonType: 'regular' | 'preseason'): string {
   return seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
 }
 
 export async function notifyWeekUnlocked(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
-  await sendPushToAllUsers(
+  await sendPushToOptedInUsers(
+    'notifyWeekUnlocked',
     weekLabel(week, seasonType) + " is now open!",
     "Make your picks before Wednesday 11:59PM PST.",
     { type: 'week_unlocked', week, seasonType }
   );
 }
 
+// Deadline reminder and picks-locked both ride along with the "notifyWeekLocked" preference —
+// both are lock-related, and splitting them into separate toggles wasn't worth the extra UI.
 export async function notifyDeadlineApproaching(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
-  await sendPushToAllUsers(
+  await sendPushToOptedInUsers(
+    'notifyWeekLocked',
     weekLabel(week, seasonType) + " picks lock tonight at 11:59 PM!",
     "Lock in your picks before they close.",
     { type: 'deadline', week, seasonType }
@@ -81,7 +93,8 @@ export async function notifyDeadlineApproaching(week: number, seasonType: 'regul
 }
 
 export async function notifyPicksLocked(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
-  await sendPushToAllUsers(
+  await sendPushToOptedInUsers(
+    'notifyWeekLocked',
     "Picks locked. Good luck!",
     weekLabel(week, seasonType) + " picks are locked. Games start soon.",
     { type: 'picks_locked', week, seasonType }
@@ -107,6 +120,9 @@ export async function notifyDefaultPicksApplied(userId: string, count: number, w
 }
 
 export async function notifyWeekSummary(userId: string, week: number, seasonType: 'regular' | 'preseason', wins: number, losses: number): Promise<void> {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user?.notifyWeekSummary) return;
+
   await sendPushToUsers(
     [userId],
     weekLabel(week, seasonType) + " wrap-up",

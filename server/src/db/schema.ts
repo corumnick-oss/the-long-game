@@ -18,6 +18,9 @@ export const users = pgTable('users', {
   isPremium: boolean('is_premium').notNull().default(false),
   nflAccess: boolean('nfl_access').notNull().default(true),
   profileImageUrl: text('profile_image_url'),
+  notifyWeekUnlocked: boolean('notify_week_unlocked').notNull().default(true),
+  notifyWeekLocked: boolean('notify_week_locked').notNull().default(true),
+  notifyWeekSummary: boolean('notify_week_summary').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

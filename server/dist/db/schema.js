@@ -11,6 +11,9 @@ exports.users = (0, pg_core_1.pgTable)('users', {
     isPremium: (0, pg_core_1.boolean)('is_premium').notNull().default(false),
     nflAccess: (0, pg_core_1.boolean)('nfl_access').notNull().default(true),
     profileImageUrl: (0, pg_core_1.text)('profile_image_url'),
+    notifyWeekUnlocked: (0, pg_core_1.boolean)('notify_week_unlocked').notNull().default(true),
+    notifyWeekLocked: (0, pg_core_1.boolean)('notify_week_locked').notNull().default(true),
+    notifyWeekSummary: (0, pg_core_1.boolean)('notify_week_summary').notNull().default(true),
     createdAt: (0, pg_core_1.timestamp)('created_at').notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)('updated_at').notNull().defaultNow(),
 });
