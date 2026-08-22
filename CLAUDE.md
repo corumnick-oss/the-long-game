@@ -11,6 +11,15 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
+### ⚠️ UNRESOLVED — iOS App Store rejected for NFL references in metadata, resubmitted Aug 21 2026
+Apple rejected the Aug 16 2026 submission: "metadata appears to contain potentially misleading references to third-party content... resembles NFL teams/leagues without authorization." Confirmed with Nick: no NFL license exists. Root cause found — Promotional Text, Description, and Keywords fields in App Store Connect all referenced "NFL" directly (e.g. "free NFL picks app", keywords `nfl, nfl picks, nfl pick em, nfl games`). No Subtitle field was set (not a factor). Rewrote all three fields to use generic "football"/"pro football" language, and added a disclaimer sentence to the Description ("not affiliated with, endorsed by, or sponsored by the NFL or any professional football league or team"). Nick made the changes in App Store Connect and resubmitted Aug 21 2026 — **outcome not yet known, check first next session.**
+
+**Deliberately NOT changed, per this session's reasoning:**
+- Team names displayed in-app and real game scores — left as-is. These are core app functionality, not marketing metadata, and referencing real teams/scores to describe real games is standard, legally settled practice across the entire fantasy-sports/pick'em category (same reasoning every competitor — ESPN, Yahoo Sports, Sleeper, DraftKings — relies on). Apple's rejection language specifically said "metadata," meaning the marketing text fields, not in-app screens.
+- Screenshots — left untouched this round for the same reason (screenshots are also technically "metadata" in ASC, but nothing in Apple's message pointed at them specifically).
+
+**Real open risk, separate from this rejection — not urgent, Nick's call:** the app renders actual official NFL team logo artwork pulled straight through from ESPN's API (`team.logo` field, used in `mobile/src/components/GameCard.tsx` and `mobile/src/hooks/useTeams.ts`), not placeholder graphics. Official logos are trademarked branding assets — a materially weaker legal position than plain-text team names/scores (which are just facts about public events). This wasn't what got flagged this round, but is a standing decision to revisit later: keep real logos (common industry practice, some risk) vs. replace with generic team-colored badges + name/abbreviation (safer, touches every screen's visual identity, meaningful design work). Don't do this unprompted — ask Nick first if it comes up again.
+
 ### ⚠️ UNRESOLVED — Android Google Sign-In still not confirmed working (as of Aug 20 2026)
 Nick reported two bugs Aug 20 2026: (1) forgot-password emails never arriving, (2) Google Sign-In broken on Android. Investigated both:
 

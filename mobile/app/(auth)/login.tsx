@@ -26,7 +26,7 @@ const FEATURES = [
 ];
 
 const RULES_SUMMARY = [
-  'Pick the winner of every NFL game, every week.',
+  'Pick the winner of every pro football game, every week.',
   "It's a season-long competition — most wins by the end of the season takes the title.",
   'Picks lock Wednesday at 11:59 PM PST — no changes after that.',
   "Miss a pick after your first active week? We'll auto-fill it for you.",
@@ -66,7 +66,7 @@ export default function LoginScreen() {
                 <Text style={ob.footballEmoji}>🏈</Text>
               </View>
               <Text style={ob.appName}>The Long Game</Text>
-              <Text style={ob.tagline}>NFL Picks &amp; Leaderboards</Text>
+              <Text style={ob.tagline}>Football Picks &amp; Leaderboards</Text>
             </View>
             <View style={ob.featuresSection}>
               {FEATURES.map(f => (
@@ -178,7 +178,7 @@ export default function LoginScreen() {
         <View className="items-center mb-12">
           <Text className="text-5xl mb-3">🏈</Text>
           <Text className="text-white text-3xl font-bold tracking-tight">The Long Game</Text>
-          <Text className="text-muted text-sm mt-1">NFL Picks &amp; Leaderboards</Text>
+          <Text className="text-muted text-sm mt-1">Football Picks &amp; Leaderboards</Text>
         </View>
 
         {/* OAuth buttons */}

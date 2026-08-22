@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 const RULES = [
   {
     title: 'Make Your Picks',
-    body: 'Every week, pick the winner of each NFL game. Picks are free to change right up until they lock.',
+    body: 'Every week, pick the winner of each game. Picks are free to change right up until they lock.',
   },
   {
     title: 'How You Win',
