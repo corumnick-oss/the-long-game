@@ -14,6 +14,13 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 ### ⚠️ UNRESOLVED — iOS App Store rejected for NFL references in metadata, resubmitted Aug 21 2026
 Apple rejected the Aug 16 2026 submission: "metadata appears to contain potentially misleading references to third-party content... resembles NFL teams/leagues without authorization." Confirmed with Nick: no NFL license exists. Root cause found — Promotional Text, Description, and Keywords fields in App Store Connect all referenced "NFL" directly (e.g. "free NFL picks app", keywords `nfl, nfl picks, nfl pick em, nfl games`). No Subtitle field was set (not a factor). Rewrote all three fields to use generic "football"/"pro football" language, and added a disclaimer sentence to the Description ("not affiliated with, endorsed by, or sponsored by the NFL or any professional football league or team"). Nick made the changes in App Store Connect and resubmitted Aug 21 2026 — **outcome not yet known, check first next session.**
 
+**Follow-up cleanup, same day (Aug 21 2026):** for consistency (not because Apple required it — these weren't flagged), also scrubbed literal "NFL" text from in-app copy and the public legal pages:
+- `mobile/app/(auth)/login.tsx` — onboarding tagline "NFL Picks & Leaderboards" → "Football Picks & Leaderboards" (2 spots), rotating rules-summary bullet "Pick the winner of every NFL game..." → "...pro football game..."
+- `mobile/app/rules.tsx` — "pick the winner of each NFL game" → "each game"
+- `docs/terms.html` + `docs/privacy.html` — "NFL picks and leaderboard app" → "football picks and leaderboard app", added the same non-affiliation disclaimer sentence, bumped "Last updated" to August 21, 2026
+- Committed as `ed9e68c`, pushed to `main` (GitHub Pages redeploys the two docs pages automatically)
+- Shipped to the app via `eas update --branch preview`, update group `ea89501b-009f-4544-ac7f-95b76b476f3a` — reaches iOS + Android on next cold start, no rebuild needed
+
 **Deliberately NOT changed, per this session's reasoning:**
 - Team names displayed in-app and real game scores — left as-is. These are core app functionality, not marketing metadata, and referencing real teams/scores to describe real games is standard, legally settled practice across the entire fantasy-sports/pick'em category (same reasoning every competitor — ESPN, Yahoo Sports, Sleeper, DraftKings — relies on). Apple's rejection language specifically said "metadata," meaning the marketing text fields, not in-app screens.
 - Screenshots — left untouched this round for the same reason (screenshots are also technically "metadata" in ASC, but nothing in Apple's message pointed at them specifically).
