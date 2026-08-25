@@ -11,8 +11,8 @@ const RULES = [
     body: "This is a season-long competition. Every correct pick counts toward your record, and whoever has the most wins when the season ends takes the title.",
   },
   {
-    title: 'Picks Lock Wednesday at 11:59 PM PST',
-    body: "Once a week locks, no more changes — your picks are final and everyone's picks become visible.",
+    title: 'Picks Lock the Night Before Kickoff',
+    body: "Picks lock at 11:59 PM PST the night before that week's first game — usually Wednesday, but earlier or later for weeks with an unusual schedule. Once a week locks, no more changes — your picks are final and everyone's picks become visible.",
   },
   {
     title: "Missed a Game? We've Got You Covered",

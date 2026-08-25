@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { eq, and, inArray, asc } from 'drizzle-orm';
+import { getWeekLockTime } from '../utils/lockTime';
 
 // Shared sender until a custom domain is verified in Resend -- swap FROM_ADDRESS once one is.
 const FROM_ADDRESS = process.env['EMAIL_FROM'] ?? 'The Long Game <onboarding@resend.dev>';
@@ -29,7 +30,13 @@ function formatGameTime(d: Date | null): string {
   }) + ' PT';
 }
 
-function buildEmailHtml(teamName: string, weekLabel: string, season: number, picks: PickRow[]): string {
+function formatLockTime(d: Date): string {
+  return d.toLocaleString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+  }) + ' PT';
+}
+
+function buildEmailHtml(teamName: string, weekLabel: string, season: number, picks: PickRow[], lockTimeText: string): string {
   const rows = picks.map(p => `
     <tr>
       <td style="padding:14px 16px;border-bottom:1px solid #2a2a2a;">
@@ -69,7 +76,7 @@ function buildEmailHtml(teamName: string, weekLabel: string, season: number, pic
           <tr>
             <td style="padding:18px 20px;text-align:center;">
               <div style="color:#9ca3af;font-size:12px;">
-                This is your official record of picks for ${weekLabel.toLowerCase()}, locked at Wednesday 11:59PM PST.
+                This is your official record of picks for ${weekLabel.toLowerCase()}, locked at ${lockTimeText}.
               </div>
             </td>
           </tr>
@@ -98,7 +105,7 @@ export async function sendPreviewEmail(toEmail: string, teamName = 'Preview'): P
     from: FROM_ADDRESS,
     to: toEmail,
     subject: 'Preview: Your Preseason Week 2 picks — The Long Game',
-    html: buildEmailHtml(teamName, 'Preseason Week 2', 2026, DUMMY_PICKS),
+    html: buildEmailHtml(teamName, 'Preseason Week 2', 2026, DUMMY_PICKS, 'Tuesday, Aug 11 at 11:59 PM PT'),
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
@@ -136,6 +143,8 @@ export async function sendWeeklyPicksEmails(week: number, season: number, season
   }
 
   const weekLabel = seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
+  const lockTime = await getWeekLockTime(week, season, seasonType);
+  const lockTimeText = lockTime ? formatLockTime(lockTime) : '11:59 PM PT';
   let sent = 0;
 
   for (const user of allUsers) {
@@ -163,7 +172,7 @@ export async function sendWeeklyPicksEmails(week: number, season: number, season
         from: FROM_ADDRESS,
         to: user.email,
         subject: `Your ${weekLabel} picks — The Long Game`,
-        html: buildEmailHtml(user.teamName, weekLabel, season, rows),
+        html: buildEmailHtml(user.teamName, weekLabel, season, rows, lockTimeText),
       });
       if (error) {
         console.error(`[Email] Resend rejected send to ${user.email}:`, error);

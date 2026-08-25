@@ -29,15 +29,20 @@ function getPacificDateParts(date: Date): { year: number; month: number; day: nu
   return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day) };
 }
 
-// Wednesday 11:59PM America/Los_Angeles. DST-aware — do not replace with fixed UTC offset math.
+// 11:59PM America/Los_Angeles, the calendar day before the week's earliest game — NOT always
+// a Wednesday. A normal week (first game Thursday) locks Wednesday, but a week whose earliest
+// game is itself on a Wednesday (e.g. a season-opening Wednesday game) locks Tuesday, and a
+// week whose earliest game is Saturday (e.g. a Saturday-only final week) locks Friday. This is
+// one general rule, not a per-week special case — do not reintroduce a "walk back to Wednesday"
+// shortcut here. DST-aware — do not replace with fixed UTC offset math.
 export async function getWeekLockTime(week: number, season: number, seasonType: string = 'regular'): Promise<Date | null> {
   const setting = await db.query.weekSettings.findFirst({
     where: and(eq(weekSettings.week, week), eq(weekSettings.season, season), eq(weekSettings.seasonType, seasonType)),
   });
   if (setting?.lockTime) return setting.lockTime;
 
-  // Derive Wednesday 11:59PM Pacific from the earliest game of the week (same season type only —
-  // preseason and regular season both use week numbers 1-4, so this must not cross-match).
+  // Same season type only — preseason and regular season both use week numbers 1-4, so this
+  // must not cross-match.
   const firstGame = await db.query.games.findFirst({
     where: and(eq(games.week, week), eq(games.season, season), eq(games.sport, 'nfl'), eq(games.seasonType, seasonType)),
     orderBy: [asc(games.gameTime)],
@@ -46,15 +51,14 @@ export async function getWeekLockTime(week: number, season: number, seasonType: 
   if (!firstGame?.gameTime) return null;
 
   // Anchor on the game's Pacific calendar date (noon UTC avoids any DST-boundary day rollover),
-  // then walk back to the most recent Wednesday on/before that date.
+  // then step back exactly one day. Date.UTC normalizes month/year rollover automatically, so
+  // this is safe even when the first game falls on the 1st of a month.
   const gameDate = new Date(firstGame.gameTime);
   const { year, month, day } = getPacificDateParts(gameDate);
-  const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  const weekday = anchor.getUTCDay(); // 0=Sun ... 3=Wed ... 6=Sat, matches Pacific weekday since Y/M/D came from Pacific parts
-  const daysToWed = (weekday - 3 + 7) % 7;
-  const wedAnchor = new Date(anchor.getTime() - daysToWed * 86400000);
+  const gameDayAnchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const lockDayAnchor = new Date(gameDayAnchor.getTime() - 86400000);
 
-  return pacificWallTimeToUtc(wedAnchor.getUTCFullYear(), wedAnchor.getUTCMonth() + 1, wedAnchor.getUTCDate(), 23, 59);
+  return pacificWallTimeToUtc(lockDayAnchor.getUTCFullYear(), lockDayAnchor.getUTCMonth() + 1, lockDayAnchor.getUTCDate(), 23, 59);
 }
 
 export async function isWeekLocked(week: number, season: number, seasonType: string = 'regular'): Promise<boolean> {

@@ -21,7 +21,8 @@
     "sync:games": "tsx --require dotenv/config src/scripts/sync-games-local.ts",
     "reassign:user": "tsx --require dotenv/config src/scripts/reassign-user.ts",
     "backfill:week-lock": "tsx --require dotenv/config src/scripts/backfill-week-lock.ts",
-    "migrate:notification-prefs": "tsx --require dotenv/config src/scripts/migrate-notification-prefs.ts"
+    "migrate:notification-prefs": "tsx --require dotenv/config src/scripts/migrate-notification-prefs.ts",
+    "migrate:week-lock-tracking": "tsx --require dotenv/config src/scripts/migrate-week-lock-tracking.ts"
   },
   "keywords": [],
   "author": "",

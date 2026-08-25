@@ -178,7 +178,7 @@ function PickComparison({
         {weekSelector}
         <View className="bg-surface rounded-xl px-4 py-5 mt-3 items-center">
           <Text className="text-muted text-sm text-center">
-            Pick comparison appears here after Wednesday 11:59 PM lock.
+            Pick comparison appears here after this week's lock.
           </Text>
         </View>
       </View>

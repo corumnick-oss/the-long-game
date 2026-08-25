@@ -15,6 +15,7 @@ const axios_1 = __importDefault(require("axios"));
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+const lockTime_1 = require("../utils/lockTime");
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 async function sendPushToUsers(userIds, title, body, data) {
     const tokens = await db_1.db.query.pushTokens.findMany({
@@ -66,8 +67,17 @@ async function sendPushToOptedInUsers(prefColumn, title, body, data) {
 function weekLabel(week, seasonType) {
     return seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
 }
-async function notifyWeekUnlocked(week, seasonType = 'regular') {
-    await sendPushToOptedInUsers('notifyWeekUnlocked', weekLabel(week, seasonType) + " is now open!", "Make your picks before Wednesday 11:59PM PST.", { type: 'week_unlocked', week, seasonType });
+// Lock day varies by week (see lockTime.ts) — it's the day before that week's earliest game,
+// not always a Wednesday — so this formats the real computed date/time instead of assuming one.
+function formatLockTime(d) {
+    return d.toLocaleString('en-US', {
+        weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+    }) + ' PT';
+}
+async function notifyWeekUnlocked(week, seasonType, season) {
+    const lockTime = await (0, lockTime_1.getWeekLockTime)(week, season, seasonType);
+    const deadlineText = lockTime ? `by ${formatLockTime(lockTime)}` : 'before this week\'s lock';
+    await sendPushToOptedInUsers('notifyWeekUnlocked', weekLabel(week, seasonType) + " is now open!", `Make your picks ${deadlineText}.`, { type: 'week_unlocked', week, seasonType });
 }
 // Deadline reminder and picks-locked both ride along with the "notifyWeekLocked" preference —
 // both are lock-related, and splitting them into separate toggles wasn't worth the extra UI.

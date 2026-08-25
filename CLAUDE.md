@@ -11,6 +11,25 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
+### ⚠️ ACTION REQUIRED before deploying the Aug 24 2026 lock-time fix (see below) — run the migration FIRST
+`npm run migrate:week-lock-tracking` (from `server/`) must be run against prod **before** (or in the same breath as, but not after) pushing this backend change. It adds two nullable columns (`reminder_sent_at`, `lock_processed_at`) to `unlocked_weeks` that the new code queries by name on every request that touches that table — including the existing Tuesday-unlock job and `applyDefaultPicks` — so if the new code deploys first, every one of those queries will fail with a Postgres "column does not exist" error until the migration runs. Same reason as every other schema change: the sandbox's auto-mode classifier blocks direct prod-DB writes from Claude Code, so **Nick has to run this one himself**, same as `migrate-notification-prefs.ts` before it. The script also backfills every already-past week's tracking columns so the new dynamic cron doesn't treat years of history as "pending" on its first tick (see below) — it deliberately leaves the currently-open week unmarked so it still gets a real reminder/lock notification at its actual lock time.
+
+### Reminder — manually unlock Week 1 (regular season) on Sunday, Sept 6 2026, not Tuesday
+Week 1's earliest game is Wednesday Sept 9, 2026, so its real lock time (see below) is Tuesday Sept 8 at 11:59PM PST. Left to the normal Tuesday-6AM auto-unlock, that would open week 1 the same day it locks — about 18 hours' notice for the whole season's opening week. Nick asked to unlock it early instead: **on or after Sunday, Sept 6, go to Admin → NFL Tools → "Unlock Week" → Week 1, Regular Season.** This is safe to do early — `applyDefaultPicks`/achievement-award logic both explicitly skip week 1 regardless of who or what triggers the unlock, and the games are already pre-synced, so nothing else depends on the Tuesday job specifically running first. One thing the manual button does NOT do that the Tuesday auto-unlock normally would: send the "Week 1 is now open!" push. If Nick wants players notified the moment he unlocks it, follow up with Admin → NFL Tools → Broadcast Notification (custom title/body, All Users) right after tapping Unlock Week — no code change needed for either step.
+
+### ✅ Admin Activity tab timestamps weren't forced to PST — DONE (Aug 24 2026)
+Nick flagged that the activity feed didn't look like it was showing PST. Found it: Admin → Activity tab (`ActivityTab` in `mobile/admin.tsx`, the pick-audit-trail used for dispute resolution) formatted `pick_audit_log.created_at` via `toLocaleString()` with no `timeZone` option — so it silently rendered in whatever timezone the viewing phone's OS was set to, not a fixed PST. That matters specifically here because this screen exists to judge picks against the fixed PST lock deadline (see below) — if the admin's device isn't set to Pacific, timestamps would be off from the actual rule boundary with no indication. Fixed by explicitly passing `timeZone: 'America/Los_Angeles'` and appending " PT" to the display, matching the convention already used elsewhere (e.g. `emailService.ts`'s `formatGameTime`). Also fixed the same missing-timezone pattern in the Admin Feedback tab's two timestamp displays (list + detail modal) for consistency, since they're the same bug even though Nick didn't flag those specifically.
+- **Deliberately NOT changed:** game-time displays elsewhere in the app (`GameCard.tsx`, `game/[id].tsx`, `team/[name].tsx`, etc.) also omit `timeZone` and render in the device's local timezone — that's correct as-is, since a kickoff time is naturally most useful shown in whatever timezone the viewer is actually in, unlike the lock-deadline/audit-trail timestamps above, which are a fixed rule boundary that has to mean the same thing regardless of viewer location.
+- **Not yet deployed** — mobile-only change, ships via `eas update --branch preview`, no rebuild needed.
+
+### ✅ Lock time now formula-driven, not always Wednesday — DONE (Aug 24 2026)
+Nick flagged that Week 1's earliest game is on a Wednesday (Sept 9, 2026) and the last regular-season week is Saturday-only — both broke the old lock-time logic. Root cause: `getWeekLockTime()` in `server/src/utils/lockTime.ts` didn't compute "the day before the first game" — it walked backward from the first game's date to **the most recent Wednesday**, which only coincidentally matched a normal week (first game Thursday → lock Wednesday). For a week whose first game IS Wednesday, that walked back zero days, locking hours *after* that game already kicked off; for a Saturday-only week, it walked back three days, locking Wednesday instead of the intended Friday.
+- **Fixed the formula itself** (not a special case for these two weeks): lock = 11:59PM Pacific the calendar day before the week's earliest game, full stop. This produces the correct day for every week automatically — normal week → Wednesday (unchanged), Wednesday-opener week → Tuesday, Saturday-only week → Friday — with no per-week admin overrides needed (the existing `week_settings.lockTime` override still exists for genuine one-offs, just isn't needed for this).
+- Every pick-visibility check in the app (`GET /api/games`, `/api/picks/week`, Game Detail's pick list, tiebreakers, public-profile H2H) already reads off `isWeekLocked()`/`getWeekLockTime()` — confirmed by grep, no other code path duplicates the old Wednesday assumption — so fixing this one function fixes visibility everywhere with no route changes needed.
+- **The actual lock actions (not just the visibility check) also had to become dynamic.** They used to fire on fixed `Wed 8PM` (reminder) / `Wed 11:59PM` (locked push + default picks + proof-of-picks email) crons in `server/src/services/scheduler.ts` — which would've fired a day late for a Tuesday-lock week and up to two days early for a Friday-lock week. Replaced both with a single cron that runs every 5 minutes and checks every unlocked-but-not-yet-processed week against its own real computed lock time, guarded by two new nullable columns on `unlocked_weeks` (`reminderSentAt`, `lockProcessedAt`) so each fires exactly once. This also makes the whole thing self-healing — if the server is ever down when a week's lock time passes, the next tick after it comes back still catches it and fires the actions once, instead of silently skipping that week forever. Requires the migration above.
+- Fixed every user-facing and internal reference that hardcoded "Wednesday": `mobile/app/rules.tsx`, `mobile/app/(auth)/login.tsx` (onboarding), `mobile/app/game/[id].tsx`, `mobile/app/(tabs)/week-picks.tsx`, `mobile/app/user/[id].tsx` (all now say "this week's lock" generically instead of naming a day), `server/src/services/notificationService.ts`'s week-unlocked push (now fetches and formats that week's real lock date/time instead of a hardcoded string), and `server/src/services/emailService.ts`'s proof-of-picks email (same — now shows the real lock date/time it was actually locked at). Comments in `server/src/utils/season.ts` and `server/src/routes/admin.ts` updated for accuracy; `server/src/scripts/backfill-week-lock.ts`'s comment describing the historical Aug 5 2026 DST bug was deliberately left as-is (it's describing what actually happened at the time, not current behavior).
+- **Not yet deployed** — needs `npm run build` + commit `dist` + push (backend) and `eas update --branch preview` (mobile copy changes), plus the migration step above run first. Do this next session unless already done.
+
 ### ⚠️ UNRESOLVED — iOS App Store rejected for NFL references in metadata, resubmitted Aug 21 2026
 Apple rejected the Aug 16 2026 submission: "metadata appears to contain potentially misleading references to third-party content... resembles NFL teams/leagues without authorization." Confirmed with Nick: no NFL license exists. Root cause found — Promotional Text, Description, and Keywords fields in App Store Connect all referenced "NFL" directly (e.g. "free NFL picks app", keywords `nfl, nfl picks, nfl pick em, nfl games`). No Subtitle field was set (not a factor). Rewrote all three fields to use generic "football"/"pro football" language, and added a disclaimer sentence to the Description ("not affiliated with, endorsed by, or sponsored by the NFL or any professional football league or team"). Nick made the changes in App Store Connect and resubmitted Aug 21 2026 — **outcome not yet known, check first next session.**
 
@@ -38,6 +57,7 @@ Nick reported two bugs Aug 20 2026: (1) forgot-password emails never arriving, (
    - **Published via OTA** Aug 20 2026 (`eas update --branch preview`, update group `67e6c856-aa45-4aca-b2d1-b705466ac9b6`) — JS-only change, no rebuild needed.
    - **Nick's dad retested and reported "same thing"** (still nothing happens after tapping an email) — but this was NOT yet properly diagnosed before the session ended: didn't confirm (a) whether the phone was fully force-closed (swiped from recent apps) before retesting, since OTA updates only apply on a true cold start, not a background/foreground cycle, or (b) whether the account picker dialog actually closes when tapped, or (c) whether any spinner/loading state appears — all of which would help tell a stale-bundle problem apart from a hang that happens even earlier, inside the native account picker itself before the JS fix would ever run.
    - **Next session: start by getting those three answers from Nick's dad**, then re-diagnose from there. If the OTA genuinely was applied and it still hangs identically, the `getTokens()` theory is likely wrong and the hang is happening in native code before `signIn()` ever resolves — at that point, get `adb logcat` output from the phone (connect via USB to Nick's PC) while attempting sign-in, since there is no way to see JS-level errors on a non-dev-client sideloaded APK otherwise.
+   - **Aug 24 2026: Nick reports `DEVELOPER_ERROR` again** — not the silent-hang symptom from the bullet above, the *original* error code, which was supposedly fully resolved Aug 18 by registering both the Play Store App Signing cert and the EAS preview-keystore cert in Firebase. `DEVELOPER_ERROR` on Android Google Sign-In is essentially always an unregistered SHA-1 cert (or a webClientId/package-name mismatch — checked `mobile/.env`'s `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` against what's documented above, matches, so not that). Ruled out re-checking anything server-side without more info from Nick — **did not yet get an answer on**: (a) is this the same dad's-phone sideloaded internal/preview APK as before, or a different device/build (e.g. the Aug 16-built production AAB, which is signed with a THIRD, never-yet-registered keystore, sideloaded directly rather than through Play Store's re-signing — very plausible if this is what's now being tested), and (b) whether a new `eas build` for Android happened since Aug 18 that could have touched credentials. **Next session: get those answers first**, then if a new build/device is confirmed, have Nick run `eas credentials -p android` (interactive terminal only, same limitation as before) to find that build's SHA-1 and add it as a third fingerprint in Firebase Console alongside the other two — never replace, only add.
 
 ### 🚀 App Store submission push (Aug 16 2026) — iOS submitted, Android in progress
 
@@ -257,6 +277,18 @@ Apple requires any app with account creation to also offer in-app self-service d
 3. **Onboarding polish** — Nick wants a fuller visual redesign before launch (the Aug 16 2026 rules addition covers the *content* requirement only, not a redesign)
 4. **TestFlight for remaining Gridirons** — after UID reassignments are done, invite via App Store Connect → TestFlight → External Testing → add by email.
 5. **ascAppId for non-interactive TestFlight submits** — add to `eas.json` submit.preview profile so `eas submit --non-interactive` works without Nick's Apple ID/2FA each time. Find in App Store Connect → My Apps → The Long Game → General → App Information → Apple ID (10-digit number).
+6. **NOT YET BUILT — Weekly bonus pool opt-in marker (requested Aug 23 2026, discuss further Aug 24 2026)** — alongside the season-long pool, Nick is running an optional side pool: $5 buy-in per week (due same time picks lock that week), winner-take-all to whoever gets the most correct picks that week. Buy-in itself is handled outside the app (cash/Venmo, same as the season pool). Scope confirmed with Nick: **just a simple marker showing who opted in** — no need to compute/display the weekly winner in-app (that's determined manually; existing data like `getWeeklyRecords()` in `trophyService.ts` or the `most_wins` Achievement could support it later if he changes his mind, but not now). Marker should show **only on the Week Picks tab, only in the Gridirons-filtered view** (Nick confirmed this Aug 23 2026) — conveniently this needs no new permission logic, since Week Picks' existing Gridirons/Global toggle already restricts the Gridirons view to Gridiron users only (non-Gridirons are always forced to Global server-side).
+   - Draft plan (not yet approved — confirm with Nick before writing code):
+     - `server/src/db/schema.ts` — new `weekly_bonus_optins` table (userId, week, season, seasonType, sport)
+     - `server/src/scripts/migrate-weekly-bonus-optins.ts` — one-off migration to create the table (Nick runs it himself against prod, same pattern as `migrate-notification-prefs.ts`)
+     - `server/src/routes/admin.ts` — admin-only endpoints to list a week's opt-ins and toggle a player on/off
+     - `server/src/routes/picks.ts` — `GET /api/picks/week` includes which userIds are opted in for that week
+     - `mobile/app/admin.tsx` — new section (proposed: under NFL Tools, where other week-scoped admin actions live) with a week picker + list of Gridiron players + toggle per player
+     - `mobile/src/hooks/useAdminData.ts` / `useWeekPicks.ts` — hooks for the toggle and for reading opt-in status
+     - `mobile/app/(tabs)/week-picks.tsx` — small badge (e.g. "💰" or "$5") next to opted-in players' names, Gridirons view only
+   - **Open questions for Nick, pick up next session:**
+     1. Is the NFL Tools tab the right home for the admin toggle, or somewhere else?
+     2. Is a simple "$5" text badge fine for the marker, or did he have something specific in mind?
 
 ### Win Probability — weekly workflow
 ⚠️ **Currently broken from Railway** — see "UNRESOLVED, IN PROGRESS — ESPN live score sync blocked from Railway" at the top of this doc. The Aug 10 2026 UA fix below did NOT durably resolve it; ESPN/Akamai is blocking all Railway (and Cloudflare Worker) traffic again as of Aug 12-13 2026. Until the Raspberry Pi relay is live, run locally instead: `npm run sync:winprobs <week> 2026` from `server/`, e.g. `npm run sync:winprobs 1 2026`, ideally Wednesday afternoon before the 11:59PM lock.
@@ -594,8 +626,7 @@ All 5 achievement images done, in `mobile/assets/achievements/{most_wins,loser,u
 | Tuesday 9PM PST | Win probability refresh |
 | Wednesday 6AM PST | Win probability refresh |
 | Wednesday 5PM PST | Win probability refresh |
-| Wednesday 8PM PST | Push: "[Week] picks lock tonight at 11:59 PM!" |
-| Wednesday 11:59PM PST | Picks lock + push notification |
+| Every 5 min | Dynamic lock check: fires "[Week] picks lock tonight!" ~4h before that week's real lock time, and picks-locked push + default picks + proof-of-picks email exactly at it |
 
 Push functions wired: `notifyWeekUnlocked` + `notifyDeadlineApproaching` + `notifyPicksLocked` + `notifyWeekSummary` in `scheduler.ts`; `notifyAchievementEarned` in `trophyService.ts`. (Per-game `notifyGameFinal` was removed Aug 20 2026 in favor of `notifyWeekSummary` — see "remaining notification overhaul" section above.)
 
@@ -623,7 +654,7 @@ change again, but as of this fix the local-script requirement should no longer a
 If any of these start failing with 403s again, re-run the diagnostic: `curl -A "axios/1.7.9" -H "Accept: application/json" "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&seasontype=1&season=2026&limit=50"` — a plain/no-UA request succeeding while the app's requests fail would point back at a header/fingerprint issue, not an IP block.
 
 ### Lock Times
-- Default: Wednesday 11:59PM PST
+- Default: 11:59PM PST the calendar day before that week's earliest game (usually Wednesday, since games usually start Thursday — but a week whose earliest game is itself a Wednesday locks Tuesday, and a Saturday-only week locks Friday). See "Lock time now formula-driven, not always Wednesday" below.
 - Admin-configurable per week via `week_settings` table
 
 ### Preseason — FUNCTIONAL, NOT ISOLATED
@@ -645,7 +676,7 @@ The 2026 preseason (Aug 7–Sept 3) is a REAL picks period:
 
 ## CRITICAL: Pick Visibility Rules
 
-> NO ONE's picks visible ANYWHERE until Wednesday 11:59PM PST lock passes.
+> NO ONE's picks visible ANYWHERE until that week's lock time passes (11:59PM PST the day before the week's earliest game — see "Lock time now formula-driven, not always Wednesday").
 
 - Week Picks tab: hidden before lock
 - Game Detail pick list: hidden before lock
@@ -731,7 +762,7 @@ No API key required. Win probability range: ~20%–80%. All ESPN logic is isolat
 1. No CBB ever. Future = brackets only.
 2. Dark mode only. Never light mode.
 3. No ads ever.
-4. Never show anyone's picks before Wednesday 11:59PM PST lock.
+4. Never show anyone's picks before that week's lock time (11:59PM PST the day before the week's earliest game — not always Wednesday).
 5. Full team names always. Never abbreviations.
 6. Top/bottom game card layout. Never left/right.
 7. Friend group = "Gridirons". isGridiron boolean.

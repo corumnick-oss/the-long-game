@@ -22,8 +22,9 @@ async function firstGameTime(season: number, seasonType: 'preseason' | 'regular'
 }
 
 // The current week for a season type is the first one whose picks aren't locked yet (still
-// open, or about to open) -- naturally advances 1, 2, 3... as each week's Wednesday 11:59PM lock
-// passes. If every known week is already locked, stay on the last one rather than erroring.
+// open, or about to open) -- naturally advances 1, 2, 3... as each week's lock time (see
+// lockTime.ts -- the day before that week's earliest game, not always a Wednesday) passes.
+// If every known week is already locked, stay on the last one rather than erroring.
 async function firstUnlockedOrLastWeek(season: number, seasonType: 'preseason' | 'regular'): Promise<number | null> {
   const { games } = await import('../db/schema');
   const { and, eq: eqOp } = await import('drizzle-orm');
@@ -40,12 +41,12 @@ async function firstUnlockedOrLastWeek(season: number, seasonType: 'preseason' |
   return weeks[weeks.length - 1]!;
 }
 
-// The week the scheduler's Tuesday 6AM job has most recently unlocked for a season type --
-// this is the single source of truth for "current week" below. Using it (instead of raw
-// lock-time math against whatever weeks' games happen to already be synced) is what keeps
-// the current week from jumping to next week the instant the current one's Wednesday 11:59PM
-// lock passes -- since the full season schedule is pre-synced ahead of time, next week's
-// games already exist with a computable (future) lock time well before Tuesday actually
+// The week the scheduler's Tuesday 6AM job (or a manual admin unlock) has most recently
+// unlocked for a season type -- this is the single source of truth for "current week" below.
+// Using it (instead of raw lock-time math against whatever weeks' games happen to already be
+// synced) is what keeps the current week from jumping to next week the instant the current
+// one's lock time passes -- since the full season schedule is pre-synced ahead of time, next
+// week's games already exist with a computable (future) lock time well before Tuesday actually
 // opens it, and lock-time math alone can't tell "not locked yet" apart from "not open yet".
 async function maxUnlockedWeek(season: number, seasonType: 'preseason' | 'regular'): Promise<number | null> {
   const rows = await db.query.unlockedWeeks.findMany({
@@ -91,9 +92,9 @@ function determineSeasonType(season: number, now: Date): Promise<'preseason' | '
 // of Fame Game a full week before the real 16-game slate) -- so this reads whatever's actually
 // synced into the DB instead of assuming a schedule shape.
 //
-// "Current week" only advances when the scheduler's Tuesday 6AM job formally unlocks the next
-// one (see maxUnlockedWeek above) -- never merely because the previous week's Wednesday 11:59PM
-// lock passed.
+// "Current week" only advances when the scheduler's Tuesday 6AM job (or a manual admin unlock)
+// formally unlocks the next one (see maxUnlockedWeek above) -- never merely because the
+// previous week's lock time passed.
 export async function getCurrentWeekAndType(): Promise<{ week: number; seasonType: 'preseason' | 'regular' }> {
   // Manual admin override (Admin -> app settings) always wins.
   const override = await db.query.appSettings.findFirst({ where: eq(appSettings.key, 'currentWeek') });

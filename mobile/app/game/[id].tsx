@@ -579,7 +579,7 @@ export default function GameDetailScreen() {
         {!game.isLocked && (
           <View className="mx-4 mb-4 bg-surface rounded-xl px-4 py-6 items-center">
             <Text className="text-muted text-sm text-center">
-              Player picks will appear here after Wednesday 11:59 PM lock.
+              Player picks will appear here after this week's lock.
             </Text>
           </View>
         )}

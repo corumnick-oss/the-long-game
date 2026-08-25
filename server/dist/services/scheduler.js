@@ -43,6 +43,7 @@ const trophyService_1 = require("./trophyService");
 const notificationService_1 = require("./notificationService");
 const emailService_1 = require("./emailService");
 const season_1 = require("../utils/season");
+const lockTime_1 = require("../utils/lockTime");
 const db_1 = require("../db");
 const schema_1 = require("../db/schema");
 const schema = __importStar(require("../db/schema"));
@@ -89,7 +90,7 @@ node_cron_1.default.schedule('0 6 * * 2', async () => {
             .values({ week, season, seasonType, unlockedBy: 'scheduler' })
             .onConflictDoNothing();
         // Notify users week is open
-        await (0, notificationService_1.notifyWeekUnlocked)(week, seasonType);
+        await (0, notificationService_1.notifyWeekUnlocked)(week, seasonType, season);
         await (0, activity_1.logActivity)('week_opened', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are now open!`, 'global', { metadata: { week, season, seasonType } });
     }
     catch (err) {
@@ -133,29 +134,61 @@ node_cron_1.default.schedule('0 17 * * 3', async () => {
         console.error('[Scheduler] Wednesday 5PM prob sync failed:', err);
     }
 }, PT);
-// Wednesday 8PM PT — deadline reminder (lock is 11:59PM same night)
-node_cron_1.default.schedule('0 20 * * 3', async () => {
+// Every 5 minutes — dynamic lock reminder + lock actions. Each week's real lock time is
+// computed per-week (see lockTime.ts: 11:59PM Pacific the day before that week's earliest
+// game), so this replaces what used to be a fixed Wednesday-only cron — a week whose earliest
+// game is itself a Wednesday locks Tuesday night, and a Saturday-only week locks Friday night,
+// and this check fires the right actions on whichever day that turns out to be.
+//
+// Checks every week that's been unlocked but not yet marked locked-processed (unlocked_weeks.
+// lockProcessedAt), so it also self-heals: if the server was down when a week's lock time
+// passed, the next tick still catches it and fires the actions exactly once (guarded by the
+// reminderSentAt/lockProcessedAt columns), instead of silently skipping that week forever.
+//
+// unlocked_weeks has no unique constraint on (week, season, seasonType) -- onConflictDoNothing
+// on the insert elsewhere in this file has never actually enforced one-row-per-week (confirmed:
+// prod already has duplicate rows for the same week from repeated manual "Unlock Week" taps
+// during testing). Deduping by that triple here is what keeps a duplicate row from causing the
+// lock push / email to fire twice for the same real week.
+node_cron_1.default.schedule('*/5 * * * *', async () => {
     try {
-        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
-        await (0, notificationService_1.notifyDeadlineApproaching)(week, seasonType);
+        const pending = await db_1.db.query.unlockedWeeks.findMany({
+            where: (0, drizzle_orm_1.isNull)(schema.unlockedWeeks.lockProcessedAt),
+        });
+        const seenKeys = new Set();
+        for (const row of pending) {
+            const seasonType = row.seasonType;
+            const key = `${row.week}|${row.season}|${seasonType}`;
+            if (seenKeys.has(key))
+                continue;
+            seenKeys.add(key);
+            const lockTime = await (0, lockTime_1.getWeekLockTime)(row.week, row.season, seasonType);
+            if (!lockTime)
+                continue;
+            const now = new Date();
+            const alreadyLocked = now >= lockTime;
+            const reminderThreshold = new Date(lockTime.getTime() - 4 * 60 * 60 * 1000);
+            const rowMatch = (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.week, row.week), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, row.season), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.seasonType, seasonType));
+            // Skip the "lock tonight" reminder entirely if we're already past lock time (e.g. after
+            // extended downtime) — no point warning about a deadline that's already passed.
+            if (!row.reminderSentAt && !alreadyLocked && now >= reminderThreshold) {
+                await (0, notificationService_1.notifyDeadlineApproaching)(row.week, seasonType);
+                await db_1.db.update(schema.unlockedWeeks).set({ reminderSentAt: new Date() }).where(rowMatch);
+            }
+            if (alreadyLocked) {
+                await (0, notificationService_1.notifyPicksLocked)(row.week, seasonType);
+                await (0, activity_1.logActivity)('picks_locked', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${row.week} picks are locked. Good luck!`, 'global', { metadata: { week: row.week, season: row.season, seasonType } });
+                await applyDefaultPicks(row.week, row.season, seasonType);
+                // Proof-of-picks email, sent after default picks so it reflects each user's final state.
+                (0, emailService_1.sendWeeklyPicksEmails)(row.week, row.season, seasonType).catch(err => console.error('[Scheduler] sendWeeklyPicksEmails failed:', err));
+                // Marks every row sharing this (week, season, seasonType), not just this one — see note
+                // above about duplicate rows.
+                await db_1.db.update(schema.unlockedWeeks).set({ lockProcessedAt: new Date() }).where(rowMatch);
+            }
+        }
     }
     catch (err) {
-        console.error('[Scheduler] Wednesday 8PM warning failed:', err);
-    }
-}, PT);
-// Wednesday 11:59PM PT — picks lock notification + apply default picks
-node_cron_1.default.schedule('59 23 * * 3', async () => {
-    try {
-        const season = (0, season_1.getCurrentNFLSeason)();
-        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
-        await (0, notificationService_1.notifyPicksLocked)(week, seasonType);
-        await (0, activity_1.logActivity)('picks_locked', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are locked. Good luck!`, 'global', { metadata: { week, season, seasonType } });
-        await applyDefaultPicks(week, season, seasonType);
-        // Proof-of-picks email, sent after default picks so it reflects each user's final state.
-        (0, emailService_1.sendWeeklyPicksEmails)(week, season, seasonType).catch(err => console.error('[Scheduler] sendWeeklyPicksEmails failed:', err));
-    }
-    catch (err) {
-        console.error('[Scheduler] Wednesday 11:59PM lock notification failed:', err);
+        console.error('[Scheduler] Lock check failed:', err);
     }
 }, PT);
 // Apply default picks for users who didn't pick all games.

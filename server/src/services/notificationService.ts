@@ -2,6 +2,7 @@ import axios from 'axios';
 import { db } from '../db';
 import { pushTokens, users } from '../db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
+import { getWeekLockTime } from '../utils/lockTime';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -72,11 +73,22 @@ function weekLabel(week: number, seasonType: 'regular' | 'preseason'): string {
   return seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
 }
 
-export async function notifyWeekUnlocked(week: number, seasonType: 'regular' | 'preseason' = 'regular'): Promise<void> {
+// Lock day varies by week (see lockTime.ts) — it's the day before that week's earliest game,
+// not always a Wednesday — so this formats the real computed date/time instead of assuming one.
+function formatLockTime(d: Date): string {
+  return d.toLocaleString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+  }) + ' PT';
+}
+
+export async function notifyWeekUnlocked(week: number, seasonType: 'regular' | 'preseason', season: number): Promise<void> {
+  const lockTime = await getWeekLockTime(week, season, seasonType);
+  const deadlineText = lockTime ? `by ${formatLockTime(lockTime)}` : 'before this week\'s lock';
+
   await sendPushToOptedInUsers(
     'notifyWeekUnlocked',
     weekLabel(week, seasonType) + " is now open!",
-    "Make your picks before Wednesday 11:59PM PST.",
+    `Make your picks ${deadlineText}.`,
     { type: 'week_unlocked', week, seasonType }
   );
 }

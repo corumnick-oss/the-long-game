@@ -207,4 +207,9 @@ export const unlockedWeeks = pgTable('unlocked_weeks', {
   seasonType: text('season_type').notNull().default('regular'),
   unlockedAt: timestamp('unlocked_at').notNull().defaultNow(),
   unlockedBy: text('unlocked_by').notNull(),
+  // Set once the dynamic lock-check cron has fired this week's "picks lock tonight" reminder /
+  // lock actions, so it only ever fires once per week regardless of how many times the cron
+  // ticks past that week's (variable, non-Wednesday-guaranteed) lock time.
+  reminderSentAt: timestamp('reminder_sent_at'),
+  lockProcessedAt: timestamp('lock_processed_at'),
 });

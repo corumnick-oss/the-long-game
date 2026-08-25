@@ -186,5 +186,10 @@ exports.unlockedWeeks = (0, pg_core_1.pgTable)('unlocked_weeks', {
     seasonType: (0, pg_core_1.text)('season_type').notNull().default('regular'),
     unlockedAt: (0, pg_core_1.timestamp)('unlocked_at').notNull().defaultNow(),
     unlockedBy: (0, pg_core_1.text)('unlocked_by').notNull(),
+    // Set once the dynamic lock-check cron has fired this week's "picks lock tonight" reminder /
+    // lock actions, so it only ever fires once per week regardless of how many times the cron
+    // ticks past that week's (variable, non-Wednesday-guaranteed) lock time.
+    reminderSentAt: (0, pg_core_1.timestamp)('reminder_sent_at'),
+    lockProcessedAt: (0, pg_core_1.timestamp)('lock_processed_at'),
 });
 //# sourceMappingURL=schema.js.map

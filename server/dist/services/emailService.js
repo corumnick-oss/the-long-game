@@ -39,6 +39,7 @@ const resend_1 = require("resend");
 const db_1 = require("../db");
 const schema = __importStar(require("../db/schema"));
 const drizzle_orm_1 = require("drizzle-orm");
+const lockTime_1 = require("../utils/lockTime");
 // Shared sender until a custom domain is verified in Resend -- swap FROM_ADDRESS once one is.
 const FROM_ADDRESS = process.env['EMAIL_FROM'] ?? 'The Long Game <onboarding@resend.dev>';
 function getClient() {
@@ -54,7 +55,12 @@ function formatGameTime(d) {
         weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
     }) + ' PT';
 }
-function buildEmailHtml(teamName, weekLabel, season, picks) {
+function formatLockTime(d) {
+    return d.toLocaleString('en-US', {
+        weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+    }) + ' PT';
+}
+function buildEmailHtml(teamName, weekLabel, season, picks, lockTimeText) {
     const rows = picks.map(p => `
     <tr>
       <td style="padding:14px 16px;border-bottom:1px solid #2a2a2a;">
@@ -93,7 +99,7 @@ function buildEmailHtml(teamName, weekLabel, season, picks) {
           <tr>
             <td style="padding:18px 20px;text-align:center;">
               <div style="color:#9ca3af;font-size:12px;">
-                This is your official record of picks for ${weekLabel.toLowerCase()}, locked at Wednesday 11:59PM PST.
+                This is your official record of picks for ${weekLabel.toLowerCase()}, locked at ${lockTimeText}.
               </div>
             </td>
           </tr>
@@ -120,7 +126,7 @@ async function sendPreviewEmail(toEmail, teamName = 'Preview') {
         from: FROM_ADDRESS,
         to: toEmail,
         subject: 'Preview: Your Preseason Week 2 picks — The Long Game',
-        html: buildEmailHtml(teamName, 'Preseason Week 2', 2026, DUMMY_PICKS),
+        html: buildEmailHtml(teamName, 'Preseason Week 2', 2026, DUMMY_PICKS, 'Tuesday, Aug 11 at 11:59 PM PT'),
     });
     if (error)
         return { ok: false, error: error.message };
@@ -155,6 +161,8 @@ async function sendWeeklyPicksEmails(week, season, seasonType, onlyUserId) {
         picksByUser.get(p.userId).push(p);
     }
     const weekLabel = seasonType === 'preseason' ? `Preseason Week ${week}` : `Week ${week}`;
+    const lockTime = await (0, lockTime_1.getWeekLockTime)(week, season, seasonType);
+    const lockTimeText = lockTime ? formatLockTime(lockTime) : '11:59 PM PT';
     let sent = 0;
     for (const user of allUsers) {
         const userPicks = picksByUser.get(user.id) ?? [];
@@ -180,7 +188,7 @@ async function sendWeeklyPicksEmails(week, season, seasonType, onlyUserId) {
                 from: FROM_ADDRESS,
                 to: user.email,
                 subject: `Your ${weekLabel} picks — The Long Game`,
-                html: buildEmailHtml(user.teamName, weekLabel, season, rows),
+                html: buildEmailHtml(user.teamName, weekLabel, season, rows, lockTimeText),
             });
             if (error) {
                 console.error(`[Email] Resend rejected send to ${user.email}:`, error);

@@ -813,8 +813,8 @@ function FeedbackDetailModal({ item, onClose }: { item: FeedbackItem | null; onC
         <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
           <Text className="text-muted text-xs mt-5 mb-3">
             {new Date(item.createdAt).toLocaleDateString('en-US', {
-              weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
-            })}
+              weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+            })} PT
           </Text>
           {item.metadata?.subject ? (
             <Text className="text-primary text-lg font-bold mb-4">{item.metadata.subject}</Text>
@@ -857,7 +857,7 @@ function FeedbackTab() {
               <Text className="text-white font-semibold">{item.metadata?.teamName ?? 'Unknown'}</Text>
               <Text className="text-muted text-xs">
                 {new Date(item.createdAt).toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric',
+                  month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
                 })}
               </Text>
             </View>
@@ -942,8 +942,8 @@ function ActivityTab({ season }: { season: number }) {
                 <Text className="text-white font-semibold text-sm">{e.player_name}</Text>
                 <Text className="text-muted text-xs">
                   {new Date(e.created_at).toLocaleString('en-US', {
-                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                  })}
+                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+                  })} PT
                 </Text>
               </View>
               <Text className="text-muted text-xs mb-1">{e.away_team} @ {e.home_team}</Text>
