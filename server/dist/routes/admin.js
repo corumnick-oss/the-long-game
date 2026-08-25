@@ -306,7 +306,9 @@ router.get('/pick-audit-log', async (req, res) => {
     const whereClause = conditions.reduce((acc, c) => (0, drizzle_orm_1.sql) `${acc} AND ${c}`);
     const result = await db_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
-      pal.id, pal.created_at, pal.action,
+      pal.id,
+      to_char(pal.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS."000Z"') AS created_at,
+      pal.action,
       u.team_name AS player_name,
       admin_u.team_name AS admin_name,
       g.away_team, g.home_team, g.week, g.season_type,
