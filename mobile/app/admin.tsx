@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
+import { formatPacific, formatPacificDateOnly } from '@/lib/pacificTime';
 import { useGames } from '@/hooks/usePicksData';
 import {
   useAdminUsers, useUpdateUser,
@@ -812,9 +813,7 @@ function FeedbackDetailModal({ item, onClose }: { item: FeedbackItem | null; onC
 
         <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
           <Text className="text-muted text-xs mt-5 mb-3">
-            {new Date(item.createdAt).toLocaleDateString('en-US', {
-              weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
-            })} PT
+            {formatPacific(new Date(item.createdAt), { weekday: 'long' })} PT
           </Text>
           {item.metadata?.subject ? (
             <Text className="text-primary text-lg font-bold mb-4">{item.metadata.subject}</Text>
@@ -856,9 +855,7 @@ function FeedbackTab() {
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-white font-semibold">{item.metadata?.teamName ?? 'Unknown'}</Text>
               <Text className="text-muted text-xs">
-                {new Date(item.createdAt).toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
-                })}
+                {formatPacificDateOnly(new Date(item.createdAt))}
               </Text>
             </View>
             {item.metadata?.subject ? (
@@ -941,9 +938,7 @@ function ActivityTab({ season }: { season: number }) {
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-white font-semibold text-sm">{e.player_name}</Text>
                 <Text className="text-muted text-xs">
-                  {new Date(e.created_at).toLocaleString('en-US', {
-                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
-                  })} PT
+                  {formatPacific(new Date(e.created_at))} PT
                 </Text>
               </View>
               <Text className="text-muted text-xs mb-1">{e.away_team} @ {e.home_team}</Text>
