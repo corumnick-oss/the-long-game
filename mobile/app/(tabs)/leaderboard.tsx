@@ -153,6 +153,8 @@ function ListHeader({
   seasonType: 'regular' | 'preseason';
 }) {
   const entry = SEASON_ENTRIES[entryIdx]!;
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   return (
     <View className="px-4 pt-4 pb-2 gap-2">
       {/* Season selector */}
@@ -188,22 +190,36 @@ function ListHeader({
         <Toggle<ViewType>
           options={[
             { label: 'Season', value: 'season' },
-            { label: selectedWeek === currentWeek ? `Week ${currentWeek}` : `Week ${selectedWeek} ▾`, value: 'weekly' },
+            { label: 'Weekly', value: 'weekly' },
           ]}
           value={type}
-          onChange={setType}
+          onChange={(t) => { setType(t); if (t !== 'weekly') setPickerOpen(false); }}
         />
       )}
 
       {isCurrentEntry && type === 'weekly' && (
-        <View className="-mx-4">
-          <WeekSelector
-            currentWeek={currentWeek}
-            selectedWeek={selectedWeek}
-            onSelect={setSelectedWeek}
-            totalWeeks={currentWeek}
-            seasonType={seasonType}
-          />
+        <View>
+          <TouchableOpacity
+            onPress={() => setPickerOpen(o => !o)}
+            className="flex-row items-center justify-center bg-surface rounded-xl py-2"
+          >
+            <Text className="text-white text-sm font-semibold mr-1">
+              Week {selectedWeek}
+            </Text>
+            <Text className="text-muted text-xs">{pickerOpen ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+
+          {pickerOpen && (
+            <View className="mt-2 bg-surface rounded-xl overflow-hidden">
+              <WeekSelector
+                currentWeek={currentWeek}
+                selectedWeek={selectedWeek}
+                onSelect={(w) => { setSelectedWeek(w); setPickerOpen(false); }}
+                totalWeeks={currentWeek}
+                seasonType={seasonType}
+              />
+            </View>
+          )}
         </View>
       )}
 
