@@ -27,6 +27,7 @@ router.get('/picks.csv', async (req, res) => {
       g.away_team, g.home_team,
       CASE WHEN p.pick = 'home' THEN g.home_team WHEN p.pick = 'away' THEN g.away_team END AS picked_team,
       p.is_correct,
+      g.status,
       to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS."000Z"') AS picked_at
     FROM picks p
     JOIN users u ON u.id = p.user_id
@@ -40,7 +41,9 @@ router.get('/picks.csv', async (req, res) => {
   const header = ['Player', 'Away Team', 'Home Team', 'Picked', 'Result', 'Picked At (UTC)'];
   const lines = [header.map(csvField).join(',')];
   for (const r of rows) {
-    const outcome = r.is_correct === true ? 'Correct' : r.is_correct === false ? 'Incorrect' : 'Tie/Pending';
+    // is_correct stays null both for an ungraded (not-yet-final) game and for a genuine tie —
+    // game status is what actually distinguishes "hasn't happened yet" from "ended tied".
+    const outcome = r.is_correct === true ? 'Correct' : r.is_correct === false ? 'Incorrect' : r.status === 'post' ? 'Tie' : 'Pending';
     lines.push([r.player, r.away_team, r.home_team, r.picked_team, outcome, r.picked_at].map(csvField).join(','));
   }
   const csv = lines.join('\r\n');
