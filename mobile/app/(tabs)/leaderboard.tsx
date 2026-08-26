@@ -214,7 +214,7 @@ function ListHeader({
               <WeekSelector
                 currentWeek={currentWeek}
                 selectedWeek={selectedWeek}
-                onSelect={(w) => { setSelectedWeek(w); setPickerOpen(false); }}
+                onSelect={setSelectedWeek}
                 totalWeeks={currentWeek}
                 seasonType={seasonType}
               />
