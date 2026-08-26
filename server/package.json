@@ -22,7 +22,8 @@
     "reassign:user": "tsx --require dotenv/config src/scripts/reassign-user.ts",
     "backfill:week-lock": "tsx --require dotenv/config src/scripts/backfill-week-lock.ts",
     "migrate:notification-prefs": "tsx --require dotenv/config src/scripts/migrate-notification-prefs.ts",
-    "migrate:week-lock-tracking": "tsx --require dotenv/config src/scripts/migrate-week-lock-tracking.ts"
+    "migrate:week-lock-tracking": "tsx --require dotenv/config src/scripts/migrate-week-lock-tracking.ts",
+    "migrate:weekly-bonus-optins": "tsx --require dotenv/config src/scripts/migrate-weekly-bonus-optins.ts"
   },
   "keywords": [],
   "author": "",

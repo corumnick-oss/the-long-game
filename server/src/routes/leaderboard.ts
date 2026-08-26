@@ -52,6 +52,19 @@ router.get('/', optionalAuth, async (req, res) => {
   const rows = (result as any).rows ?? result;
   const viewerId = req.currentUser?.id;
 
+  // Weekly bonus opt-ins only matter (and are only shown) on the Gridirons-filtered weekly view
+  let bonusUserIds = new Set<string>();
+  if (isWeekly && gridironsOnly) {
+    const optins = await db.query.weeklyBonusOptins.findMany({
+      where: and(
+        eq(schema.weeklyBonusOptins.week, week!),
+        eq(schema.weeklyBonusOptins.season, season),
+        eq(schema.weeklyBonusOptins.seasonType, seasonType),
+      ),
+    });
+    bonusUserIds = new Set(optins.map(o => o.userId));
+  }
+
   // Add rank + picks different from viewer
   const entries = (rows as any[]).map((row: any, idx: number) => {
     const wins = Number(row.wins);
@@ -68,6 +81,7 @@ router.get('/', optionalAuth, async (req, res) => {
       accuracy: wins + losses > 0 ? Math.round((wins / (wins + losses)) * 1000) / 10 : 0,
       trophyCount: Number(row.trophy_count),
       isCurrentUser: row.user_id === viewerId,
+      weeklyBonusOptIn: bonusUserIds.has(row.user_id as string),
     };
   });
 

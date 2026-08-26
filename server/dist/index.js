@@ -51,6 +51,7 @@ const pushTokens_1 = __importDefault(require("./routes/pushTokens"));
 const admin_1 = __importDefault(require("./routes/admin"));
 const teams_1 = __importDefault(require("./routes/teams"));
 const feedback_1 = __importDefault(require("./routes/feedback"));
+const exports_1 = __importDefault(require("./routes/exports"));
 // ── Firebase Admin ────────────────────────────────────────────────────────────
 firebase_admin_1.default.initializeApp({
     credential: firebase_admin_1.default.credential.cert({
@@ -75,6 +76,7 @@ app.use('/api/push-tokens', pushTokens_1.default);
 app.use('/api/admin', admin_1.default);
 app.use('/api/teams', teams_1.default);
 app.use('/api/feedback', feedback_1.default);
+app.use('/api/exports', exports_1.default);
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
     console.error('[Error]', err.message);

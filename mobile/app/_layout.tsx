@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { NotificationPrompt } from '@/components/NotificationPrompt';
+import { TeamNamePrompt } from '@/components/TeamNamePrompt';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -26,10 +27,12 @@ Notifications.setNotificationHandler({
 });
 
 function AuthGate() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, needsTeamName, clearNeedsTeamName } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const { showPrompt, handleAllow, handleMaybeLater } = useNotificationPermission(!!user);
+  // Hold off on the notification prompt until a required team name (if any) is set first,
+  // so the two modals never stack.
+  const { showPrompt, handleAllow, handleMaybeLater } = useNotificationPermission(!!user && !needsTeamName);
 
   useEffect(() => {
     if (isLoading) return;
@@ -65,6 +68,7 @@ function AuthGate() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false }} />
+      <TeamNamePrompt visible={needsTeamName} onDone={clearNeedsTeamName} />
       <NotificationPrompt
         visible={showPrompt}
         onAllow={handleAllow}

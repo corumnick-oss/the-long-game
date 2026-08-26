@@ -1,6 +1,8 @@
 import { View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { useLeaderboard, type LeaderboardEntry } from '../../src/hooks/useLeaderboard';
 import { useCurrentWeek } from '../../src/hooks/usePicksData';
+import { useToggleWeeklyBonus } from '../../src/hooks/useAdminData';
+import { WeekSelector } from '../../src/components/WeekSelector';
 
 type Filter = 'gridirons' | 'global';
 type ViewType = 'season' | 'weekly';
@@ -74,7 +76,19 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
-function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: () => void }) {
+function LeaderboardRow({
+  entry,
+  onPress,
+  showBonus,
+  canToggleBonus,
+  onToggleBonus,
+}: {
+  entry: LeaderboardEntry;
+  onPress: () => void;
+  showBonus: boolean;
+  canToggleBonus: boolean;
+  onToggleBonus: () => void;
+}) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -89,9 +103,26 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
         <Avatar name={entry.teamName} imageUrl={entry.profileImageUrl} />
       </View>
 
-      <Text className="flex-1 text-white font-semibold text-sm" numberOfLines={1}>
-        {entry.teamName}
-      </Text>
+      <View className="flex-1 mr-2">
+        <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+          {entry.teamName}
+        </Text>
+        {showBonus && (entry.weeklyBonusOptIn || canToggleBonus) && (
+          <TouchableOpacity
+            disabled={!canToggleBonus}
+            onPress={(e) => { e.stopPropagation(); onToggleBonus(); }}
+            className="self-start mt-1"
+          >
+            <Text
+              className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full overflow-hidden ${
+                entry.weeklyBonusOptIn ? 'bg-amber-500/20 text-amber-400' : 'bg-surface-2 text-muted'
+              }`}
+            >
+              Bonus
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <Text className="text-white text-sm font-bold mr-4">
         {entry.wins}-{entry.losses}
@@ -104,7 +135,10 @@ function LeaderboardRow({ entry, onPress }: { entry: LeaderboardEntry; onPress: 
   );
 }
 
-function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, setEntryIdx, isCurrentEntry, currentWeek }: {
+function ListHeader({
+  filter, setFilter, type, setType, isGridiron, entryIdx, setEntryIdx, isCurrentEntry, currentWeek,
+  selectedWeek, setSelectedWeek, seasonType,
+}: {
   filter: Filter;
   setFilter: (f: Filter) => void;
   type: ViewType;
@@ -114,6 +148,9 @@ function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, se
   setEntryIdx: (i: number) => void;
   isCurrentEntry: boolean;
   currentWeek: number;
+  selectedWeek: number;
+  setSelectedWeek: (w: number) => void;
+  seasonType: 'regular' | 'preseason';
 }) {
   const entry = SEASON_ENTRIES[entryIdx]!;
   return (
@@ -151,11 +188,23 @@ function ListHeader({ filter, setFilter, type, setType, isGridiron, entryIdx, se
         <Toggle<ViewType>
           options={[
             { label: 'Season', value: 'season' },
-            { label: `Week ${currentWeek}`, value: 'weekly' },
+            { label: selectedWeek === currentWeek ? `Week ${currentWeek}` : `Week ${selectedWeek} ▾`, value: 'weekly' },
           ]}
           value={type}
           onChange={setType}
         />
+      )}
+
+      {isCurrentEntry && type === 'weekly' && (
+        <View className="-mx-4">
+          <WeekSelector
+            currentWeek={currentWeek}
+            selectedWeek={selectedWeek}
+            onSelect={setSelectedWeek}
+            totalWeeks={currentWeek}
+            seasonType={seasonType}
+          />
+        </View>
       )}
 
       {/* Column headers */}
@@ -178,9 +227,12 @@ export default function LeaderboardScreen() {
   const router = useRouter();
   const { data: profile } = useMyProfile();
   const isGridiron = profile?.isGridiron ?? false;
+  const isAdmin = profile?.isAdmin ?? false;
   const [filter, setFilter] = useState<Filter>('global');
   const [type, setType] = useState<ViewType>('season');
   const [entryIdx, setEntryIdx] = useState(DEFAULT_IDX);
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const toggleBonus = useToggleWeeklyBonus();
 
   useEffect(() => {
     if (profile?.isGridiron) setFilter('gridirons');
@@ -198,10 +250,16 @@ export default function LeaderboardScreen() {
     entry.seasonType === currentWeekData.seasonType;
   const currentWeek = currentWeekData?.week ?? 1;
 
+  // Default the week selector to the current week whenever it becomes known / changes
+  useEffect(() => { setSelectedWeek(currentWeek); }, [currentWeek]);
+
+  const viewedWeek = type === 'weekly' ? selectedWeek : currentWeek;
+  const showBonus = type === 'weekly' && filter === 'gridirons';
+
   const { data, isLoading, isError, refetch, isFetching } = useLeaderboard(
     filter,
     type,
-    currentWeek,
+    viewedWeek,
     entry.year,
     entry.seasonType,
   );
@@ -233,6 +291,11 @@ export default function LeaderboardScreen() {
         renderItem={({ item }) => (
           <LeaderboardRow
             entry={item}
+            showBonus={showBonus}
+            canToggleBonus={showBonus && isAdmin}
+            onToggleBonus={() =>
+              toggleBonus.mutate({ userId: item.userId, week: viewedWeek, season: entry.year, seasonType: entry.seasonType })
+            }
             onPress={() => {
               if (item.isCurrentUser) {
                 router.push('/(tabs)/profile');
@@ -253,6 +316,9 @@ export default function LeaderboardScreen() {
             setEntryIdx={setEntryIdx}
             isCurrentEntry={isCurrentEntry}
             currentWeek={currentWeek}
+            selectedWeek={selectedWeek}
+            setSelectedWeek={setSelectedWeek}
+            seasonType={entry.seasonType}
           />
         }
         ListEmptyComponent={

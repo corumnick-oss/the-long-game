@@ -26,6 +26,8 @@ GoogleSignin.configure({
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
+  needsTeamName: boolean;
+  clearNeedsTeamName: () => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, teamName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -36,10 +38,10 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function syncUserToBackend(user: User, teamName?: string) {
+async function syncUserToBackend(user: User, teamName?: string): Promise<{ isNewUser: boolean }> {
   try {
     const idToken = await user.getIdToken();
-    await fetch(`${API_BASE}/api/users`, {
+    const res = await fetch(`${API_BASE}/api/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,14 +53,17 @@ async function syncUserToBackend(user: User, teamName?: string) {
         profileImageUrl: user.photoURL,
       }),
     });
+    return { isNewUser: res.status === 201 };
   } catch (err) {
     console.error('Failed to sync user to backend:', err);
+    return { isNewUser: false };
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsTeamName, setNeedsTeamName] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -93,7 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!idToken) throw new Error('No ID token from Google');
     const credential = GoogleAuthProvider.credential(idToken);
     const result = await signInWithCredential(auth, credential);
-    await syncUserToBackend(result.user);
+    const { isNewUser } = await syncUserToBackend(result.user);
+    // Google never provides a usable display name to us, so every new account needs one
+    if (isNewUser) setNeedsTeamName(true);
   };
 
   const signInWithApple = async () => {
@@ -121,7 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const teamName = fullName?.givenName
       ? `${fullName.givenName}${fullName.familyName ? ' ' + fullName.familyName : ''}`
       : undefined;
-    await syncUserToBackend(result.user, teamName);
+    const { isNewUser } = await syncUserToBackend(result.user, teamName);
+    // Apple only shares the real name on the very first authorization (or not at all with
+    // Hide My Email) — if we didn't get one and this is a new account, we need to ask.
+    if (isNewUser && !teamName) setNeedsTeamName(true);
   };
 
   const signOut = async () => {
@@ -137,6 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isLoading,
+        needsTeamName,
+        clearNeedsTeamName: () => setNeedsTeamName(false),
         signInWithEmail,
         signUpWithEmail,
         signInWithGoogle,

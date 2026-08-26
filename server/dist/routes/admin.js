@@ -44,6 +44,7 @@ const season_1 = require("../utils/season");
 const lockTime_1 = require("../utils/lockTime");
 const activity_1 = require("./activity");
 const notificationService_1 = require("../services/notificationService");
+const exportTokens_1 = require("../services/exportTokens");
 const router = (0, express_1.Router)();
 router.use(auth_1.requireAuth, auth_1.requireAdmin);
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -346,6 +347,51 @@ router.post('/unlock-week', async (req, res) => {
     await db_1.db.insert(schema.unlockedWeeks).values({ week, season, seasonType, unlockedBy: req.currentUser.id }).onConflictDoNothing();
     await (0, activity_1.logActivity)('week_unlocked', `Week ${week} picks are now open!`, 'global', { metadata: { week, season, seasonType } });
     res.json({ ok: true, week, season, seasonType });
+});
+// ── Weekly Bonus Opt-ins ──────────────────────────────────────────────────────
+// Simple opt-in marker for Nick's optional $5/week side pool. No winner computation here —
+// just tracks who paid in for a given week, shown as a "Bonus" badge on the Leaderboard's
+// Gridirons-filtered weekly view. Toggle is idempotent (insert-if-absent / delete-if-present).
+router.post('/weekly-bonus/toggle', async (req, res) => {
+    const userId = req.body.userId;
+    const week = parseInt(req.body.week, 10);
+    const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.body.seasonType ?? 'regular';
+    if (!userId || !week) {
+        res.status(400).json({ error: 'userId and week required' });
+        return;
+    }
+    const existing = await db_1.db.query.weeklyBonusOptins.findFirst({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.weeklyBonusOptins.userId, userId), (0, drizzle_orm_1.eq)(schema.weeklyBonusOptins.week, week), (0, drizzle_orm_1.eq)(schema.weeklyBonusOptins.season, season), (0, drizzle_orm_1.eq)(schema.weeklyBonusOptins.seasonType, seasonType)),
+    });
+    if (existing) {
+        await db_1.db.delete(schema.weeklyBonusOptins).where((0, drizzle_orm_1.eq)(schema.weeklyBonusOptins.id, existing.id));
+        res.json({ optedIn: false });
+    }
+    else {
+        await db_1.db.insert(schema.weeklyBonusOptins).values({ userId, week, season, seasonType });
+        res.json({ optedIn: true });
+    }
+});
+// ── CSV Export ────────────────────────────────────────────────────────────────
+// Mints a short-lived (5 min), single-use token for a Gridirons-only weekly picks CSV,
+// opened outside the app (system browser can't carry a Bearer header). Gated to locked
+// weeks only -- same reasoning as pick-audit-log: admin is a player too, no pre-lock peeking.
+router.post('/export-week-picks-token', async (req, res) => {
+    const week = parseInt(req.body.week, 10);
+    const season = req.body.season ?? (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.body.seasonType ?? 'regular';
+    if (!week) {
+        res.status(400).json({ error: 'week required' });
+        return;
+    }
+    const locked = await (0, lockTime_1.isWeekLocked)(week, season, seasonType);
+    if (!locked) {
+        res.status(400).json({ error: 'This week has not locked yet' });
+        return;
+    }
+    const token = (0, exportTokens_1.createExportToken)({ week, season, seasonType });
+    res.json({ token });
 });
 // ── Week Settings ─────────────────────────────────────────────────────────────
 router.get('/week-settings', async (req, res) => {

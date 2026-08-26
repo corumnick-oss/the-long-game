@@ -15,6 +15,7 @@ import pushTokensRouter from './routes/pushTokens';
 import adminRouter from './routes/admin';
 import teamsRouter from './routes/teams';
 import feedbackRouter from './routes/feedback';
+import exportsRouter from './routes/exports';
 
 // ── Firebase Admin ────────────────────────────────────────────────────────────
 admin.initializeApp({
@@ -44,6 +45,7 @@ app.use('/api/push-tokens', pushTokensRouter);
 app.use('/api/admin',       adminRouter);
 app.use('/api/teams',       teamsRouter);
 app.use('/api/feedback',    feedbackRouter);
+app.use('/api/exports',     exportsRouter);
 
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

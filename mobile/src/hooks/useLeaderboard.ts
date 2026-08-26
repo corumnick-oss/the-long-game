@@ -13,6 +13,7 @@ export type LeaderboardEntry = {
   accuracy: number;
   trophyCount: number;
   isCurrentUser: boolean;
+  weeklyBonusOptIn: boolean;
 };
 
 export type LeaderboardResponse = {

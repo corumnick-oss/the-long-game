@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../lib/queryClient';
+import { apiFetch, API_BASE } from '../lib/queryClient';
 
 export type AdminUser = {
   id: string;
@@ -215,14 +215,6 @@ export function useCorrectScore() {
   });
 }
 
-export function useExportWeekPicks() {
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: ({ week, season }: { week: number; season: number }) =>
-      apiFetch<unknown[]>(`/api/admin/picks?week=${week}&season=${season}`, undefined, user),
-  });
-}
-
 export function useTokenStatus() {
   const { user } = useAuth();
   return useQuery({
@@ -349,5 +341,32 @@ export function useExportData() {
         undefined,
         user,
       ),
+  });
+}
+
+export function useToggleWeeklyBonus() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { userId: string; week: number; season: number; seasonType: string }) =>
+      apiFetch<{ optedIn: boolean }>('/api/admin/weekly-bonus/toggle', { method: 'POST', body: JSON.stringify(params) }, user),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leaderboard'] }),
+  });
+}
+
+// Mints a short-lived export link for a locked week's Gridirons-only picks CSV, then hands
+// the caller a full URL to open in the system browser (Linking.openURL) — the browser can't
+// carry a Bearer header, so auth for this one request is a single-use token in the query string.
+export function useCreateWeekPicksExportLink() {
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (params: { week: number; season: number; seasonType: string }) => {
+      const { token } = await apiFetch<{ token: string }>(
+        '/api/admin/export-week-picks-token',
+        { method: 'POST', body: JSON.stringify(params) },
+        user,
+      );
+      return `${API_BASE}/api/exports/picks.csv?token=${token}`;
+    },
   });
 }

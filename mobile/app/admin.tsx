@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal,
+  Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -13,7 +13,7 @@ import {
   useSyncGames, useSyncScores, useSyncProbs, useSyncFullSeason,
   useSyncGamesForFutureSeason, useSyncFullSeasonForFutureSeason,
   useAwardTrophies, useUnlockWeek,
-  useCorrectScore, useExportWeekPicks, useExportData,
+  useCorrectScore, useExportData, useCreateWeekPicksExportLink,
   useSendTestNotification, useSendTestEmail, useScheduleTestNotification, useCancelScheduledTest, useTokenStatus,
   useSyncTeamStats, useBroadcastNotification, useFeedbackList, type FeedbackItem,
   useSeasonStandingsPreview, useAwardSeasonTrophies,
@@ -723,9 +723,11 @@ function ToolsTab({ season }: { season: number }) {
 // ── Data Tab ──────────────────────────────────────────────────────────────────
 
 function DataTab({ season }: { season: number }) {
+  const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
   const [week, setWeek] = useState(getCurrentNFLWeek());
+  const maxWeek = seasonType === 'preseason' ? 4 : 22;
   const exportData = useExportData();
-  const exportWeekPicks = useExportWeekPicks();
+  const createExportLink = useCreateWeekPicksExportLink();
   const [seasonSummary, setSeasonSummary] = useState<string | undefined>();
   const [weekSummary, setWeekSummary] = useState<string | undefined>();
 
@@ -748,7 +750,22 @@ function DataTab({ season }: { season: number }) {
         }
       />
 
-      <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-4 mt-2">Weekly Export</Text>
+      <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-4 mt-2">Weekly Picks CSV (Gridirons only)</Text>
+
+      {/* Season type toggle */}
+      <View className="flex-row bg-surface rounded-xl p-1 mb-3">
+        {(['regular', 'preseason'] as const).map(st => (
+          <TouchableOpacity
+            key={st}
+            onPress={() => { setSeasonType(st); setWeek(1); }}
+            className={`flex-1 py-2 rounded-lg items-center ${seasonType === st ? 'bg-primary' : ''}`}
+          >
+            <Text className={`text-sm font-semibold ${seasonType === st ? 'text-white' : 'text-muted'}`}>
+              {st === 'regular' ? 'Regular Season' : 'Preseason'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Week picker for weekly export */}
       <View className="flex-row items-center mb-4" style={{ gap: 12 }}>
@@ -758,11 +775,11 @@ function DataTab({ season }: { season: number }) {
         >
           <Text className="text-white text-xl leading-6">−</Text>
         </TouchableOpacity>
-        <Text className="text-white font-semibold" style={{ minWidth: 60, textAlign: 'center' }}>
-          Week {week}
+        <Text className="text-white font-semibold" style={{ minWidth: 90, textAlign: 'center' }}>
+          {seasonType === 'preseason' ? `Pre ${week}` : `Week ${week}`}
         </Text>
         <TouchableOpacity
-          onPress={() => setWeek(w => Math.min(22, w + 1))}
+          onPress={() => setWeek(w => Math.min(maxWeek, w + 1))}
           className="w-9 h-9 bg-surface rounded-full items-center justify-center"
         >
           <Text className="text-white text-xl leading-6">+</Text>
@@ -770,20 +787,27 @@ function DataTab({ season }: { season: number }) {
       </View>
 
       <ActionBtn
-        label={`Export Week ${week} Picks`}
-        loading={exportWeekPicks.isPending}
+        label={`Download Week ${week} Picks CSV`}
+        loading={createExportLink.isPending}
         result={weekSummary}
         onPress={() =>
-          exportWeekPicks.mutate({ week, season }, {
-            onSuccess: (picks) =>
-              setWeekSummary(`✓ ${Array.isArray(picks) ? picks.length : 0} picks verified for Week ${week}`),
-            onError: () => setWeekSummary('✗ Export failed'),
+          createExportLink.mutate({ week, season, seasonType }, {
+            onSuccess: (url) => {
+              setWeekSummary(undefined);
+              Linking.openURL(url);
+            },
+            onError: (err: any) =>
+              setWeekSummary(
+                err?.message?.includes('not locked')
+                  ? '✗ This week hasn\'t locked yet'
+                  : '✗ Export failed',
+              ),
           })
         }
       />
 
       <Text className="text-muted text-xs leading-5 mt-2">
-        Export verifies record counts in the Railway database. Full CSV is available via the backend API directly.
+        Opens a real CSV download in your browser (Gridirons only, once the week has locked) — save it, email it, or drop it anywhere you want a backup.
       </Text>
 
       <View className="h-8" />

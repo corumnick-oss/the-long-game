@@ -200,6 +200,16 @@ export const pickAuditLog = pgTable('pick_audit_log', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+export const weeklyBonusOptins = pgTable('weekly_bonus_optins', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull().references(() => users.id),
+  week: integer('week').notNull(),
+  season: integer('season').notNull(),
+  seasonType: text('season_type').notNull().default('regular'),
+  sport: text('sport').notNull().default('nfl'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 export const unlockedWeeks = pgTable('unlocked_weeks', {
   id: uuid('id').primaryKey().defaultRandom(),
   week: integer('week').notNull(),

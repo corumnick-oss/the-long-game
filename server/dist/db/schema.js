@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlockedWeeks = exports.pickAuditLog = exports.appSettings = exports.weekSettings = exports.tiebreakerPicks = exports.tiebreakerGames = exports.pushTokens = exports.activityLog = exports.playerStats = exports.teamGameStats = exports.seasonTrophies = exports.trophies = exports.picks = exports.games = exports.users = void 0;
+exports.unlockedWeeks = exports.weeklyBonusOptins = exports.pickAuditLog = exports.appSettings = exports.weekSettings = exports.tiebreakerPicks = exports.tiebreakerGames = exports.pushTokens = exports.activityLog = exports.playerStats = exports.teamGameStats = exports.seasonTrophies = exports.trophies = exports.picks = exports.games = exports.users = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 exports.users = (0, pg_core_1.pgTable)('users', {
     id: (0, pg_core_1.text)('id').primaryKey(),
@@ -177,6 +177,15 @@ exports.pickAuditLog = (0, pg_core_1.pgTable)('pick_audit_log', {
     previousPick: (0, pg_core_1.text)('previous_pick'),
     newPick: (0, pg_core_1.text)('new_pick'),
     adminId: (0, pg_core_1.text)('admin_id'),
+    createdAt: (0, pg_core_1.timestamp)('created_at').notNull().defaultNow(),
+});
+exports.weeklyBonusOptins = (0, pg_core_1.pgTable)('weekly_bonus_optins', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    userId: (0, pg_core_1.text)('user_id').notNull().references(() => exports.users.id),
+    week: (0, pg_core_1.integer)('week').notNull(),
+    season: (0, pg_core_1.integer)('season').notNull(),
+    seasonType: (0, pg_core_1.text)('season_type').notNull().default('regular'),
+    sport: (0, pg_core_1.text)('sport').notNull().default('nfl'),
     createdAt: (0, pg_core_1.timestamp)('created_at').notNull().defaultNow(),
 });
 exports.unlockedWeeks = (0, pg_core_1.pgTable)('unlocked_weeks', {
