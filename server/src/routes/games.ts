@@ -101,20 +101,29 @@ async function fetchTeamStatsMap(
     });
   };
 
-  let rows = await getRows(season, seasonType, teamNames);
-  let seasonUsed: number | null = rows.length > 0 ? season : null;
+  const currentRows = await getRows(season, seasonType, teamNames);
 
-  if (rows.length === 0 && season > 2025) {
-    // 2025 stats were stored with ESPN abbreviations; translate full names before querying.
-    const abbrevNames = teamNames.map(n => NFL_FULL_TO_ABBREV[n] ?? n);
-    rows = await getRows(2025, 'regular', abbrevNames);
-    if (rows.length > 0) seasonUsed = 2025;
-  }
+  // Fall back to last season PER TEAM (not all-or-nothing): a team that hasn't played a
+  // completed game this season yet keeps showing 2025 averages until it has, so early in a
+  // new season some cards show 2026 numbers and others still show 2025 rather than going blank.
+  // 2025 stats were stored under ESPN abbreviations, so query with those.
+  const abbrevNames = teamNames.map(n => NFL_FULL_TO_ABBREV[n] ?? n);
+  const covered = new Set(currentRows.map(r => r.teamName));
+  const anyMissingCurrent = teamNames.some(n => !covered.has(n) && !covered.has(NFL_FULL_TO_ABBREV[n] ?? n));
+  const priorRows = (season > 2025 && anyMissingCurrent) ? await getRows(2025, 'regular', abbrevNames) : [];
 
   const map: Record<string, TeamStats> = {};
+  let usedCurrent = false;
+  let usedPrior = false;
   for (const name of teamNames) {
     const abbrev = NFL_FULL_TO_ABBREV[name] ?? name;
-    const tr = rows.filter(r => r.teamName === name || r.teamName === abbrev);
+    let tr = currentRows.filter(r => r.teamName === name || r.teamName === abbrev);
+    if (tr.length > 0) {
+      usedCurrent = true;
+    } else {
+      tr = priorRows.filter(r => r.teamName === name || r.teamName === abbrev);
+      if (tr.length > 0) usedPrior = true;
+    }
     map[name] = {
       ppg:          avgOf(tr.map(r => r.pointsPerGame)),
       ppga:         avgOf(tr.map(r => r.pointsAllowedPerGame)),
@@ -128,6 +137,9 @@ async function fetchTeamStatsMap(
       turnoversPG:  avgOf(tr.map(r => (r.additionalStats as any)?.turnovers)),
     };
   }
+  // Report the oldest season actually shown, so the "using older averages" note stays visible
+  // while any team on screen is still on last year's numbers.
+  const seasonUsed: number | null = usedPrior ? 2025 : (usedCurrent ? season : null);
   return { map, seasonUsed };
 }
 
