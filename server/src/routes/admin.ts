@@ -403,7 +403,7 @@ router.get('/app-settings', async (req, res) => {
 
 router.patch('/app-settings', async (req, res) => {
   const updates = req.body as Record<string, string>;
-  const allowed = ['seasonStartDate', 'currentSeason', 'preseasonMode', 'currentWeek'];
+  const allowed = ['seasonStartDate', 'currentSeason', 'preseasonMode', 'currentWeek', 'forceRegularSeason'];
 
   for (const [key, value] of Object.entries(updates)) {
     if (!allowed.includes(key)) continue;

@@ -41,12 +41,11 @@ const SEASON_ENTRIES: SeasonEntry[] = [
   { year: 2026, seasonType: 'preseason', label: '2026 Preseason' },
   { year: 2026, seasonType: 'regular', label: '2026 Season' },
 ];
+// Preseason is over — default to the current regular season. The server's useCurrentWeek()
+// still corrects the week number on load; preseason stays reachable via the season selector.
 function getDefaultEntryIdx(): number {
-  const now = new Date();
-  const yr = now.getFullYear();
-  const afterPreseason = now >= new Date(yr, 8, 7);
-  if (afterPreseason) return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
-  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'preseason');
+  const yr = new Date().getFullYear();
+  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
 }
 const DEFAULT_IDX = Math.max(0, getDefaultEntryIdx());
 

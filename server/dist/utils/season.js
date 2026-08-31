@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCurrentNFLSeason = getCurrentNFLSeason;
 exports.getCurrentWeekAndType = getCurrentWeekAndType;
+exports.isForceRegularSeason = isForceRegularSeason;
 exports.getNextWeekToUnlock = getNextWeekToUnlock;
 exports.getCurrentNFLWeek = getCurrentNFLWeek;
 exports.isPreseasonMode = isPreseasonMode;
@@ -112,16 +113,31 @@ async function nextWeekToUnlock(season, seasonType) {
         columns: { week: true },
     });
     const unlockedSet = new Set(unlockedRows.map(r => r.week));
+    // Never advance to the next week while the latest already-unlocked week is still open.
+    // Without this, an early manual unlock of week N (e.g. opening Week 1 a few days ahead of
+    // its lock) would let the next Tuesday 6AM job unlock week N+1 prematurely.
+    if (unlockedSet.size > 0) {
+        const maxUnlocked = Math.max(...unlockedSet);
+        if (!(await (0, lockTime_1.isWeekLocked)(maxUnlocked, season, seasonType)))
+            return maxUnlocked;
+    }
     for (const w of weeks)
         if (!unlockedSet.has(w))
             return w;
     return weeks[weeks.length - 1];
 }
-function determineSeasonType(season, now) {
-    return firstGameTime(season, 'regular').then(regularStart => {
-        const regularHasBegun = !!regularStart && regularStart.getTime() <= now.getTime();
-        return regularHasBegun ? 'regular' : 'preseason';
+async function determineSeasonType(season, now) {
+    const regularStart = await firstGameTime(season, 'regular');
+    if (regularStart && regularStart.getTime() <= now.getTime())
+        return 'regular';
+    // Also treat the regular season as active once an admin has actually unlocked a
+    // regular-season week -- the "Unlock Week -> Week 1, Regular Season" tap is the deliberate
+    // switchover, so notifications/scheduler follow it immediately instead of waiting for the
+    // first kickoff.
+    const regularUnlocked = await db_1.db.query.unlockedWeeks.findFirst({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.unlockedWeeks.season, season), (0, drizzle_orm_1.eq)(schema_1.unlockedWeeks.seasonType, 'regular')),
     });
+    return regularUnlocked ? 'regular' : 'preseason';
 }
 // Data-driven, not calendar-guessed: preseason week numbering doesn't line up with a fixed
 // "first Thursday of August" rule (e.g. 2026's preseason "week 1" was a lone standalone Hall
@@ -137,9 +153,21 @@ async function getCurrentWeekAndType() {
     if (override)
         return { week: parseInt(override.value, 10), seasonType: 'regular' };
     const season = getCurrentNFLSeason();
-    const seasonType = await determineSeasonType(season, new Date());
+    let seasonType = await determineSeasonType(season, new Date());
+    // "Preseason is over" switch -- set via `npm run season:regular` (app_settings.forceRegularSeason).
+    // Makes the app present the regular season even before Week 1 is unlocked or the first game
+    // kicks off. The week is still computed normally below, so it auto-advances as weeks unlock
+    // and this flag can be left on permanently (it's a no-op once the season truly starts).
+    if (seasonType === 'preseason' && await isForceRegularSeason())
+        seasonType = 'regular';
     const week = (await maxUnlockedWeek(season, seasonType)) ?? (await firstUnlockedOrLastWeek(season, seasonType)) ?? 1;
     return { week, seasonType };
+}
+async function isForceRegularSeason() {
+    const setting = await db_1.db.query.appSettings.findFirst({
+        where: (0, drizzle_orm_1.eq)(schema_1.appSettings.key, 'forceRegularSeason'),
+    });
+    return setting?.value === 'true';
 }
 // Used only by the Tuesday 6AM scheduler job to determine which week to sync + unlock next --
 // distinct from getCurrentWeekAndType() above, which reports whatever week is already open.

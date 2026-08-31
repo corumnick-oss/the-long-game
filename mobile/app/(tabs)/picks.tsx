@@ -14,10 +14,10 @@ const CURRENT_WEEK = getCurrentNFLWeek();
 const MIN_SEASON = 2025;
 const MAX_SEASON = new Date().getFullYear();
 
-// Default to preseason; switch to regular season on Sept 7 (after last preseason game)
+// Preseason is over — default to the regular season. The server's useCurrentWeek() still
+// corrects week/type on load; preseason stays reachable via the season-type toggle.
 function getDefaultSeasonType(): 'regular' | 'preseason' {
-  const now = new Date();
-  return now >= new Date(now.getFullYear(), 8, 7) ? 'regular' : 'preseason';
+  return 'regular';
 }
 
 export default function PicksScreen() {
@@ -146,7 +146,7 @@ export default function PicksScreen() {
         <View className="flex-row items-center mx-4 mb-2 px-4 py-2.5 bg-surface rounded-xl border border-border">
           <Text className="text-base mr-2">🔒</Text>
           <Text className="flex-1 text-muted text-sm">
-            Week picks locked. They'll unlock at 6:00 AM PST on Tuesday.
+            This week's picks aren't open yet. Check back soon.
           </Text>
         </View>
       )}

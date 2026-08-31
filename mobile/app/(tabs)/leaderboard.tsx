@@ -14,13 +14,11 @@ const SEASON_ENTRIES: SeasonEntry[] = [
   { year: 2026, seasonType: 'preseason', label: '2026 Preseason' },
   { year: 2026, seasonType: 'regular', label: '2026 Season' },
 ];
-// Default to 2026 Preseason; switch to 2026 Regular Season on Sept 7 (day after last preseason game)
+// Preseason is over — default to the current regular season. The server's useCurrentWeek()
+// corrects this on load; past seasons / preseason stay reachable via the season selector.
 function getDefaultEntryIdx(): number {
-  const now = new Date();
-  const yr = now.getFullYear();
-  const afterPreseason = now >= new Date(yr, 8, 7); // Sept 7
-  if (afterPreseason) return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
-  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'preseason');
+  const yr = new Date().getFullYear();
+  return SEASON_ENTRIES.findIndex(e => e.year === yr && e.seasonType === 'regular');
 }
 const DEFAULT_IDX = Math.max(0, getDefaultEntryIdx());
 
@@ -235,7 +233,7 @@ function ListHeader({
   );
 }
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useMyProfile } from '../../src/hooks/useProfile';
 
@@ -260,6 +258,19 @@ export default function LeaderboardScreen() {
   const entry = SEASON_ENTRIES[entryIdx]!;
 
   const { data: currentWeekData } = useCurrentWeek();
+
+  // Move the season selector to whatever the server reports as current (once), so it isn't
+  // pinned to a calendar guess and follows the preseason→regular switchover.
+  const appliedServerEntry = useRef(false);
+  useEffect(() => {
+    if (!currentWeekData || appliedServerEntry.current) return;
+    appliedServerEntry.current = true;
+    const idx = SEASON_ENTRIES.findIndex(
+      e => e.year === currentWeekData.season && e.seasonType === currentWeekData.seasonType,
+    );
+    if (idx >= 0) setEntryIdx(idx);
+  }, [currentWeekData]);
+
   const isCurrentEntry =
     currentWeekData != null &&
     entry.year === currentWeekData.season &&

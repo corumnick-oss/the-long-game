@@ -70,6 +70,15 @@ node_cron_1.default.schedule('0 6 * * 2', async () => {
         const season = (0, season_1.getCurrentNFLSeason)();
         const { week, seasonType } = await (0, season_1.getNextWeekToUnlock)();
         console.log(`[Scheduler] Tuesday 6AM: weekly transition for ${seasonType} Week ${week}`);
+        // Nothing to do if this week is already unlocked -- every synced week is done, or an admin
+        // unlocked it manually ahead of the cron. Bail before re-syncing / re-sending "week open".
+        const alreadyUnlocked = await db_1.db.query.unlockedWeeks.findFirst({
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.unlockedWeeks.week, week), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.season, season), (0, drizzle_orm_1.eq)(schema.unlockedWeeks.seasonType, seasonType)),
+        });
+        if (alreadyUnlocked) {
+            console.log(`[Scheduler] Tuesday 6AM: ${seasonType} Week ${week} already unlocked — nothing to do`);
+            return;
+        }
         // Weekly Achievements ("trophies") are regular-season only for now.
         if (seasonType === 'regular' && week > 1)
             await (0, trophyService_1.awardWeeklyTrophies)(week - 1, season);
@@ -91,38 +100,22 @@ node_cron_1.default.schedule('0 6 * * 2', async () => {
             .onConflictDoNothing();
         // Notify users week is open
         await (0, notificationService_1.notifyWeekUnlocked)(week, seasonType, season);
+        // Refresh win probabilities for the newly-opened week (regular season only — ESPN publishes
+        // no predictor data for preseason). Goes through the Pi relay like every other ESPN call.
+        if (seasonType === 'regular') {
+            await (0, espnService_1.syncWinProbabilities)(week, season).catch(err => console.error('[Scheduler] Tuesday 6AM win-prob sync failed:', err));
+        }
         await (0, activity_1.logActivity)('week_opened', `${seasonType === 'preseason' ? 'Preseason ' : ''}Week ${week} picks are now open!`, 'global', { metadata: { week, season, seasonType } });
     }
     catch (err) {
         console.error('[Scheduler] Tuesday 6AM job failed:', err);
     }
 }, PT);
-// Tuesday 9PM PT — win probability refresh (regular season only; ESPN doesn't publish
-// predictor data for preseason games at all, confirmed directly against their API)
-node_cron_1.default.schedule('0 21 * * 2', async () => {
-    try {
-        const season = (0, season_1.getCurrentNFLSeason)();
-        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
-        if (seasonType === 'regular')
-            await (0, espnService_1.syncWinProbabilities)(week, season);
-    }
-    catch (err) {
-        console.error('[Scheduler] Tuesday 9PM prob sync failed:', err);
-    }
-}, PT);
-// Wednesday 6AM PT — win probability refresh
-node_cron_1.default.schedule('0 6 * * 3', async () => {
-    try {
-        const season = (0, season_1.getCurrentNFLSeason)();
-        const { week, seasonType } = await (0, season_1.getCurrentWeekAndType)();
-        if (seasonType === 'regular')
-            await (0, espnService_1.syncWinProbabilities)(week, season);
-    }
-    catch (err) {
-        console.error('[Scheduler] Wednesday 6AM prob sync failed:', err);
-    }
-}, PT);
-// Wednesday 5PM PT — win probability refresh
+// Win probability refresh runs twice a week: once at the Tuesday 6AM weekly transition (folded
+// into that job above, right after the new week opens) and once more Wednesday 5PM PT to pick
+// up any line/projection movement before the lock. Regular season only — ESPN publishes no
+// predictor data for preseason games (confirmed directly against their API). Admins can also
+// trigger a sync any time via Admin -> NFL Tools -> "Sync Win Probabilities".
 node_cron_1.default.schedule('0 17 * * 3', async () => {
     try {
         const season = (0, season_1.getCurrentNFLSeason)();
@@ -218,15 +211,16 @@ async function applyDefaultPicks(week, season, seasonType) {
                 pickMap.set(pick.userId, new Set());
             pickMap.get(pick.userId).add(pick.gameId);
         }
-        // Only default-pick users who already completed at least one OTHER week this season --
-        // a brand-new player's very first active week never gets auto-filled, even for games they
-        // forgot, so someone who never picks anything doesn't get carried along all year on
-        // Raiders/away-team defaults alone.
-        const seasonPicks = await db_1.db.select({ userId: schema.picks.userId, week: schema_1.games.week, seasonType: schema_1.games.seasonType })
+        // Only default-pick users who already completed at least one OTHER week of THIS season
+        // type -- a player's very first active regular-season week is never auto-filled, even for
+        // games they forgot, and preseason picks do NOT count (preseason is its own thing; the
+        // regular season starts everyone fresh). So someone who never really plays doesn't get
+        // carried all year on Raiders/away-team defaults alone.
+        const seasonPicks = await db_1.db.select({ userId: schema.picks.userId, week: schema_1.games.week })
             .from(schema.picks)
             .innerJoin(schema_1.games, (0, drizzle_orm_1.eq)(schema_1.games.id, schema.picks.gameId))
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.games.season, season), (0, drizzle_orm_1.eq)(schema_1.games.sport, 'nfl')));
-        const priorWeekPickUserIds = new Set(seasonPicks.filter(p => !(p.week === week && p.seasonType === seasonType)).map(p => p.userId));
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.games.season, season), (0, drizzle_orm_1.eq)(schema_1.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema_1.games.seasonType, seasonType)));
+        const priorWeekPickUserIds = new Set(seasonPicks.filter(p => p.week !== week).map(p => p.userId));
         for (const user of allUsers) {
             if (!priorWeekPickUserIds.has(user.id))
                 continue;
