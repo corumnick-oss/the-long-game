@@ -211,11 +211,14 @@ router.get('/picks', async (req, res) => {
   const userId = req.query['userId'] as string | undefined;
   const week = req.query['week'] ? parseInt(req.query['week'] as string, 10) : undefined;
   const season = req.query['season'] ? parseInt(req.query['season'] as string, 10) : getCurrentNFLSeason();
+  const seasonType = (req.query['seasonType'] as string) ?? 'regular';
 
   let gameIds: string[] | undefined;
   if (week) {
+    // Filtered by seasonType too -- preseason and regular season share week numbers, so an
+    // unfiltered lookup here would silently blend both weeks' games together.
     const weekGames = await db.query.games.findMany({
-      where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl')),
+      where: and(eq(schema.games.week, week), eq(schema.games.season, season), eq(schema.games.sport, 'nfl'), eq(schema.games.seasonType, seasonType)),
     });
     gameIds = weekGames.map(g => g.id);
   }
@@ -230,6 +233,48 @@ router.get('/picks', async (req, res) => {
     orderBy: [desc(schema.picks.createdAt)],
   });
   res.json(picks);
+});
+
+// POST /api/admin/picks — set (create or overwrite) a single pick for any user, bypassing the
+// normal week-lock check (that's the whole point: fixing a missed pick after the week has
+// already locked). Safety rail: only allowed while the game itself hasn't kicked off yet
+// (status === 'pre') -- this must never be usable to retroactively set a pick once the outcome
+// is knowable or partially knowable (live). Always logged to pick_audit_log like every other
+// pick action, so it shows up in the existing Activity/dispute audit trail.
+router.post('/picks', async (req, res) => {
+  const { userId, gameId, pick } = req.body as { userId: string; gameId: string; pick: 'home' | 'away' };
+  if (!userId || !gameId || !pick || !['home', 'away'].includes(pick)) {
+    res.status(400).json({ error: 'userId, gameId, and pick (home|away) are required' });
+    return;
+  }
+
+  const game = await db.query.games.findFirst({ where: eq(schema.games.id, gameId) });
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return; }
+  if (game.status !== 'pre') {
+    res.status(400).json({ error: 'This game has already started — admin picks can only be set for games that have not kicked off yet' });
+    return;
+  }
+
+  const existing = await db.query.picks.findFirst({
+    where: and(eq(schema.picks.userId, userId), eq(schema.picks.gameId, gameId)),
+  });
+
+  await db.insert(schema.pickAuditLog).values({
+    userId, gameId, action: 'admin_edit',
+    previousPick: existing?.pick ?? null, newPick: pick,
+    adminId: req.currentUser!.id,
+  });
+
+  if (existing) {
+    const [updated] = await db.update(schema.picks).set({ pick }).where(eq(schema.picks.id, existing.id)).returning();
+    res.json(updated);
+  } else {
+    const [created] = await db.insert(schema.picks).values({
+      userId, gameId, pick,
+      pickWinProbability: pick === 'home' ? game.homeTeamFPI : game.awayTeamFPI,
+    }).returning();
+    res.status(201).json(created);
+  }
 });
 
 // Admin edit pick — requires confirm; always logs to pick_audit_log

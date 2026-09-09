@@ -344,6 +344,39 @@ export function useExportData() {
   });
 }
 
+export type AdminPick = {
+  id: string;
+  userId: string;
+  gameId: string;
+  pick: 'home' | 'away';
+  isCorrect: boolean | null;
+};
+
+// A specific user's picks for one week -- used by the "Set Missing Pick" admin tool to know
+// which of that week's games they've already picked. Only fetches once a userId is chosen.
+export function useAdminUserWeekPicks(userId: string | null, week: number, season: number, seasonType: string) {
+  const { user } = useAuth();
+  const qs = new URLSearchParams({ userId: userId ?? '', week: String(week), season: String(season), seasonType });
+  return useQuery({
+    queryKey: ['admin', 'picks', userId, week, season, seasonType, user?.uid ?? null],
+    queryFn: () => apiFetch<AdminPick[]>(`/api/admin/picks?${qs}`, undefined, user),
+    enabled: !!user && !!userId,
+    staleTime: 5_000,
+  });
+}
+
+// Sets (creates or overwrites) a single pick for any user. Server-side rejects it once the
+// game has kicked off -- this is only for fixing a missed pick on a game that hasn't started.
+export function useAdminSetPick() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { userId: string; gameId: string; pick: 'home' | 'away' }) =>
+      apiFetch<AdminPick>('/api/admin/picks', { method: 'POST', body: JSON.stringify(params) }, user),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'picks'] }),
+  });
+}
+
 export function useToggleWeeklyBonus() {
   const { user } = useAuth();
   const qc = useQueryClient();

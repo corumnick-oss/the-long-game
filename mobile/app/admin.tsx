@@ -18,6 +18,7 @@ import {
   useSyncTeamStats, useBroadcastNotification, useFeedbackList, type FeedbackItem,
   useSeasonStandingsPreview, useAwardSeasonTrophies,
   usePickAuditLog, type PickAuditLogEntry,
+  useAdminUserWeekPicks, useAdminSetPick,
 } from '@/hooks/useAdminData';
 import type { Game } from '@/hooks/usePicksData';
 
@@ -239,6 +240,99 @@ function ScoreEditor({
 
 // ── NFL Tools Tab ──────────────────────────────────────────────────────────────
 
+// Lets an admin set a specific player's pick on a specific game, after the week has already
+// locked -- for fixing a missed pick without unlocking the week for everyone (which would
+// re-hide everyone's picks and reopen editing on every game, including ones already live).
+// Only works on games that haven't kicked off yet; the server enforces that too.
+function SetPickTool({
+  week, season, seasonType, games,
+}: {
+  week: number; season: number; seasonType: 'regular' | 'preseason'; games: Game[];
+}) {
+  const { data: users = [] } = useAdminUsers();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const { data: userPicks = [] } = useAdminUserWeekPicks(selectedUserId, week, season, seasonType);
+  const setPick = useAdminSetPick();
+  const [pending, setPending] = useState<Record<string, string>>({});
+
+  const selectedUser = users.find(u => u.id === selectedUserId);
+
+  return (
+    <View className="mb-4">
+      <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">
+        Set Missing Pick (one player, one game)
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+        <View className="flex-row" style={{ gap: 8 }}>
+          {users.map(u => (
+            <TouchableOpacity
+              key={u.id}
+              onPress={() => { setSelectedUserId(u.id === selectedUserId ? null : u.id); setPending({}); }}
+              activeOpacity={0.7}
+              className={`px-3 py-2 rounded-lg ${u.id === selectedUserId ? 'bg-primary' : 'bg-surface'}`}
+            >
+              <Text className={`text-sm font-semibold ${u.id === selectedUserId ? 'text-white' : 'text-muted'}`}>
+                {u.teamName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      {selectedUser && (
+        games.length === 0 ? (
+          <View className="bg-surface rounded-xl px-4 py-5 items-center">
+            <Text className="text-muted text-sm">No games loaded for this week</Text>
+          </View>
+        ) : (
+          <View className="bg-surface rounded-xl overflow-hidden">
+            {games.map((game, idx) => {
+              const existingPick = userPicks.find(p => p.gameId === game.id)?.pick;
+              const started = game.status !== 'pre';
+              const result = pending[game.id];
+              return (
+                <View key={game.id} className={`px-4 py-3 ${idx < games.length - 1 ? 'border-b border-border' : ''}`}>
+                  <Text className="text-muted text-xs mb-2">
+                    {game.awayTeam} @ {game.homeTeam}
+                    {started ? ' · already started — locked out' : ''}
+                  </Text>
+                  <View className="flex-row" style={{ gap: 8 }}>
+                    {(['away', 'home'] as const).map(side => {
+                      const teamName = side === 'away' ? game.awayTeam : game.homeTeam;
+                      const isPicked = existingPick === side;
+                      return (
+                        <TouchableOpacity
+                          key={side}
+                          disabled={started || setPick.isPending}
+                          activeOpacity={0.7}
+                          onPress={() =>
+                            setPick.mutate({ userId: selectedUser.id, gameId: game.id, pick: side }, {
+                              onSuccess: () => setPending(p => ({ ...p, [game.id]: `✓ Set to ${teamName}` })),
+                              onError: (e: any) => setPending(p => ({ ...p, [game.id]: `✗ ${e?.message ?? 'Failed'}` })),
+                            })
+                          }
+                          className={`flex-1 py-2 rounded-lg items-center ${isPicked ? 'bg-success' : 'bg-surface-2'} ${started ? 'opacity-40' : ''}`}
+                        >
+                          <Text className={`text-xs font-semibold ${isPicked ? 'text-white' : 'text-muted'}`} numberOfLines={1}>
+                            {teamName}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {result ? (
+                    <Text className={`text-xs mt-1 ${result.startsWith('✓') ? 'text-success' : 'text-danger'}`}>{result}</Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )
+      )}
+    </View>
+  );
+}
+
 function ToolsTab({ season }: { season: number }) {
   const currentSeason = getCurrentNFLSeason();
   const [week, setWeek] = useState(() => season > currentSeason ? 1 : getCurrentNFLWeek());
@@ -275,7 +369,7 @@ function ToolsTab({ season }: { season: number }) {
   const [broadcastBody, setBroadcastBody] = useState('');
   const [broadcastGridironsOnly, setBroadcastGridironsOnly] = useState(false);
 
-  const { data: games = [] } = useGames(week, season);
+  const { data: games = [] } = useGames(week, season, seasonType);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
@@ -477,6 +571,8 @@ function ToolsTab({ season }: { season: number }) {
             ])
           }
         />
+
+        <SetPickTool week={week} season={season} seasonType={seasonType} games={games} />
 
         {/* Notifications */}
         <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-2">Notifications</Text>

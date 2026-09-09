@@ -244,10 +244,13 @@ router.get('/picks', async (req, res) => {
     const userId = req.query['userId'];
     const week = req.query['week'] ? parseInt(req.query['week'], 10) : undefined;
     const season = req.query['season'] ? parseInt(req.query['season'], 10) : (0, season_1.getCurrentNFLSeason)();
+    const seasonType = req.query['seasonType'] ?? 'regular';
     let gameIds;
     if (week) {
+        // Filtered by seasonType too -- preseason and regular season share week numbers, so an
+        // unfiltered lookup here would silently blend both weeks' games together.
         const weekGames = await db_1.db.query.games.findMany({
-            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl')),
+            where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.games.week, week), (0, drizzle_orm_1.eq)(schema.games.season, season), (0, drizzle_orm_1.eq)(schema.games.sport, 'nfl'), (0, drizzle_orm_1.eq)(schema.games.seasonType, seasonType)),
         });
         gameIds = weekGames.map(g => g.id);
     }
@@ -262,6 +265,47 @@ router.get('/picks', async (req, res) => {
         orderBy: [(0, drizzle_orm_1.desc)(schema.picks.createdAt)],
     });
     res.json(picks);
+});
+// POST /api/admin/picks — set (create or overwrite) a single pick for any user, bypassing the
+// normal week-lock check (that's the whole point: fixing a missed pick after the week has
+// already locked). Safety rail: only allowed while the game itself hasn't kicked off yet
+// (status === 'pre') -- this must never be usable to retroactively set a pick once the outcome
+// is knowable or partially knowable (live). Always logged to pick_audit_log like every other
+// pick action, so it shows up in the existing Activity/dispute audit trail.
+router.post('/picks', async (req, res) => {
+    const { userId, gameId, pick } = req.body;
+    if (!userId || !gameId || !pick || !['home', 'away'].includes(pick)) {
+        res.status(400).json({ error: 'userId, gameId, and pick (home|away) are required' });
+        return;
+    }
+    const game = await db_1.db.query.games.findFirst({ where: (0, drizzle_orm_1.eq)(schema.games.id, gameId) });
+    if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+    }
+    if (game.status !== 'pre') {
+        res.status(400).json({ error: 'This game has already started — admin picks can only be set for games that have not kicked off yet' });
+        return;
+    }
+    const existing = await db_1.db.query.picks.findFirst({
+        where: (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema.picks.userId, userId), (0, drizzle_orm_1.eq)(schema.picks.gameId, gameId)),
+    });
+    await db_1.db.insert(schema.pickAuditLog).values({
+        userId, gameId, action: 'admin_edit',
+        previousPick: existing?.pick ?? null, newPick: pick,
+        adminId: req.currentUser.id,
+    });
+    if (existing) {
+        const [updated] = await db_1.db.update(schema.picks).set({ pick }).where((0, drizzle_orm_1.eq)(schema.picks.id, existing.id)).returning();
+        res.json(updated);
+    }
+    else {
+        const [created] = await db_1.db.insert(schema.picks).values({
+            userId, gameId, pick,
+            pickWinProbability: pick === 'home' ? game.homeTeamFPI : game.awayTeamFPI,
+        }).returning();
+        res.status(201).json(created);
+    }
 });
 // Admin edit pick — requires confirm; always logs to pick_audit_log
 router.patch('/picks/:id', async (req, res) => {
