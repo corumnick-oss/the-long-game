@@ -176,6 +176,13 @@ export default function WeekPicksScreen() {
     }
   }, [currentWeekData, entry]);
 
+  // The WeekSelector's "current week" outline should use the same server-corrected value
+  // rather than the stale calendar-math currentWeek guess (which drove the outline landing
+  // on the wrong week — see the comment on getCurrentNFLWeek()).
+  const displayCurrentWeek = (currentWeekData && currentWeekData.season === entry.year && currentWeekData.seasonType === entry.seasonType)
+    ? currentWeekData.week
+    : currentWeek;
+
   // Synchronized horizontal scroll across header + all user rows.
   // isSyncing blocks echo events: scrollTo fires onScroll on the target view,
   // which would re-trigger syncScroll without the lock. rAF resets the lock
@@ -248,7 +255,7 @@ export default function WeekPicksScreen() {
       </View>
 
       <WeekSelector
-        currentWeek={entry.year === new Date().getFullYear() ? currentWeek : 0}
+        currentWeek={entry.year === new Date().getFullYear() ? displayCurrentWeek : 0}
         selectedWeek={selectedWeek}
         onSelect={setSelectedWeek}
         seasonType={entry.seasonType}

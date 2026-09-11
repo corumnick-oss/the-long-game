@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Linking,
@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
 import { formatPacific, formatPacificDateOnly } from '@/lib/pacificTime';
-import { useGames } from '@/hooks/usePicksData';
+import { useGames, useCurrentWeek } from '@/hooks/usePicksData';
 import {
   useAdminUsers, useUpdateUser,
   useSyncGames, useSyncScores, useSyncProbs, useSyncFullSeason,
@@ -344,6 +344,19 @@ function ToolsTab({ season }: { season: number }) {
   const maxWeek = seasonType === 'preseason' ? 4 : 22;
 
   const isFutureSeason = season > currentSeason;
+
+  // week/seasonType above are a fast calendar-math guess (getCurrentNFLWeek() doesn't
+  // reliably track ESPN's actual week numbering — e.g. Week 1 2026 kicked off a Wednesday
+  // instead of the assumed Thursday). Correct once with the server's data-driven answer.
+  const { data: currentWeekData } = useCurrentWeek();
+  const appliedServerDefault = useRef(false);
+  useEffect(() => {
+    if (!currentWeekData || appliedServerDefault.current || isFutureSeason) return;
+    appliedServerDefault.current = true;
+    setSeasonType(currentWeekData.seasonType);
+    setWeek(currentWeekData.week);
+  }, [currentWeekData, isFutureSeason]);
+
   const syncGames = useSyncGames();
   const syncGamesFuture = useSyncGamesForFutureSeason();
   const syncScores = useSyncScores();
@@ -819,9 +832,22 @@ function ToolsTab({ season }: { season: number }) {
 // ── Data Tab ──────────────────────────────────────────────────────────────────
 
 function DataTab({ season }: { season: number }) {
+  const currentSeason = getCurrentNFLSeason();
   const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
   const [week, setWeek] = useState(getCurrentNFLWeek());
   const maxWeek = seasonType === 'preseason' ? 4 : 22;
+
+  // week/seasonType above are a fast calendar-math guess — correct once with the server's
+  // data-driven answer, same reasoning as ToolsTab above.
+  const { data: currentWeekData } = useCurrentWeek();
+  const appliedServerDefault = useRef(false);
+  useEffect(() => {
+    if (!currentWeekData || appliedServerDefault.current || season !== currentSeason) return;
+    appliedServerDefault.current = true;
+    setSeasonType(currentWeekData.seasonType);
+    setWeek(currentWeekData.week);
+  }, [currentWeekData, season, currentSeason]);
+
   const exportData = useExportData();
   const createExportLink = useCreateWeekPicksExportLink();
   const [seasonSummary, setSeasonSummary] = useState<string | undefined>();
@@ -1004,9 +1030,22 @@ function actionLabel(e: PickAuditLogEntry): string {
 }
 
 function ActivityTab({ season }: { season: number }) {
+  const currentSeason = getCurrentNFLSeason();
   const [seasonType, setSeasonType] = useState<'regular' | 'preseason'>('regular');
   const [week, setWeek] = useState(getCurrentNFLWeek());
   const maxWeek = seasonType === 'preseason' ? 4 : 22;
+
+  // week/seasonType above are a fast calendar-math guess — correct once with the server's
+  // data-driven answer, same reasoning as ToolsTab above.
+  const { data: currentWeekData } = useCurrentWeek();
+  const appliedServerDefault = useRef(false);
+  useEffect(() => {
+    if (!currentWeekData || appliedServerDefault.current || season !== currentSeason) return;
+    appliedServerDefault.current = true;
+    setSeasonType(currentWeekData.seasonType);
+    setWeek(currentWeekData.week);
+  }, [currentWeekData, season, currentSeason]);
+
   const { data: entries = [], isLoading } = usePickAuditLog({ season, seasonType, week });
 
   return (

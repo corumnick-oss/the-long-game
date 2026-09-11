@@ -40,6 +40,13 @@ export default function PicksScreen() {
     }
   }, [currentWeekData, season]);
 
+  // The WeekSelector's "current week" outline should use the same server-corrected value
+  // rather than the stale calendar-math CURRENT_WEEK constant (which drove the outline
+  // landing on the wrong week — see the comment on getCurrentNFLWeek()).
+  const displayCurrentWeek = (currentWeekData && currentWeekData.seasonType === seasonType)
+    ? currentWeekData.week
+    : CURRENT_WEEK;
+
   // Batch season/type + week changes in one call so React renders
   // the new season and week=1 together — prevents a brief flash of
   // week-18 data (from the old season) before the week resets.
@@ -123,7 +130,7 @@ export default function PicksScreen() {
       </View>
 
       <WeekSelector
-        currentWeek={season === MAX_SEASON ? CURRENT_WEEK : 18}
+        currentWeek={season === MAX_SEASON ? displayCurrentWeek : 18}
         selectedWeek={selectedWeek}
         onSelect={setSelectedWeek}
         seasonType={seasonType}

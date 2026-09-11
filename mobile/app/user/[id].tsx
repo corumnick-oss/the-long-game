@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
 import { useWeekPicks } from '@/hooks/useWeekPicks';
 import { getCurrentNFLSeason, getCurrentNFLWeek } from '@/lib/nflSeason';
+import { useCurrentWeek } from '@/hooks/usePicksData';
 import { useAuth } from '@/context/AuthContext';
 import { WeekSelector } from '@/components/WeekSelector';
 import { useSeasonTrophies, usePublicAchievements, type WeekRecord, type SeasonTrophy, type Achievement } from '@/hooks/useProfile';
@@ -126,15 +127,22 @@ function PickComparison({
   isCurrentSeason: boolean;
 }) {
   const { user } = useAuth();
-  const currentWeek = getCurrentNFLWeek();
+
+  // getCurrentNFLWeek() is a fast calendar-math guess that can't reliably track ESPN's
+  // actual week numbering (e.g. Week 1 2026 kicked off a Wednesday instead of the assumed
+  // Thursday) — prefer the server's data-driven regular-season week once it loads.
+  const { data: currentWeekData } = useCurrentWeek();
+  const currentWeek = isCurrentSeason && currentWeekData?.seasonType === 'regular'
+    ? currentWeekData.week
+    : getCurrentNFLWeek();
 
   const maxWeek = isCurrentSeason ? currentWeek : 18;
   const [comparisonWeek, setComparisonWeek] = useState(maxWeek);
 
-  // Reset to latest week when season changes
+  // Reset to latest week when season changes, or once the server's real current week loads
   useEffect(() => {
-    setComparisonWeek(isCurrentSeason ? getCurrentNFLWeek() : 18);
-  }, [season]);
+    setComparisonWeek(maxWeek);
+  }, [season, maxWeek]);
 
   const { data: weekPicksData } = useWeekPicks(comparisonWeek, season, 'regular');
 
