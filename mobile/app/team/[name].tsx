@@ -1,6 +1,7 @@
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { getCurrentNFLSeason } from '@/lib/nflSeason';
 import { useTeamDetail, type RecentGame } from '@/hooks/useTeams';
 
@@ -57,6 +58,36 @@ function GameRow({ game }: { game: RecentGame }) {
       <Text className="text-muted text-xs ml-3 w-8 text-right">Wk {game.week}</Text>
     </View>
   );
+}
+
+// The Pick Insight callout only fires when a gap is actually notable — a couple points
+// either way is noise, not insight. Two independent gaps can qualify; show the larger one.
+const INSIGHT_THRESHOLD = 12;
+
+type PickInsight = { message: string; color: string; bg: string; icon: 'trending-up' | 'trending-down' };
+
+function getPickInsight(pickShare: number | null, avgWinProb: number | null, pickAccuracy: number | null): PickInsight | null {
+  if (pickShare === null || avgWinProb === null) return null;
+
+  const candidates: (PickInsight & { magnitude: number })[] = [];
+  const popularityGap = pickShare - avgWinProb;
+  if (Math.abs(popularityGap) >= INSIGHT_THRESHOLD) {
+    candidates.push(popularityGap > 0
+      ? { magnitude: popularityGap, icon: 'trending-up', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', message: `Fan favorite — picked ${Math.round(popularityGap)} pts more often than the model's win probability alone would suggest.` }
+      : { magnitude: -popularityGap, icon: 'trending-down', color: '#eab308', bg: 'rgba(234,179,8,0.12)', message: `Slept on — the model likes them more than the Gridirons do.` });
+  }
+
+  const performanceGap = pickAccuracy !== null ? pickAccuracy - avgWinProb : null;
+  if (performanceGap !== null && Math.abs(performanceGap) >= INSIGHT_THRESHOLD) {
+    candidates.push(performanceGap > 0
+      ? { magnitude: performanceGap, icon: 'trending-up', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', message: `Beats the odds — wins more often than the model gives them credit for.` }
+      : { magnitude: -performanceGap, icon: 'trending-down', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', message: `Overrated by the model — loses more often than expected.` });
+  }
+
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.magnitude - a.magnitude);
+  const { magnitude: _drop, ...top } = candidates[0]!;
+  return top;
 }
 
 export default function TeamDetailScreen() {
@@ -187,38 +218,68 @@ export default function TeamDetailScreen() {
           </View>
         )}
 
-        {/* Community picks */}
+        {/* Pick Insight */}
         {team.pickTotal > 0 && (
           <View className="mx-4 mb-5">
-            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Community Picks</Text>
+            <Text className="text-muted text-xs font-semibold uppercase tracking-widest mb-3">Pick Insight</Text>
             <View className="bg-surface rounded-xl px-4 py-4">
-              <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-start justify-between mb-4">
                 <View className="items-center">
-                  <Text className="text-white text-xl font-bold">{team.pickTotal}</Text>
-                  <Text className="text-muted text-xs">Total Picks</Text>
+                  <Text style={{ color: '#3b82f6', fontSize: 20, fontWeight: 'bold' }}>
+                    {team.pickShare !== null ? `${team.pickShare}%` : '—'}
+                  </Text>
+                  <Text className="text-muted text-xs">Pick %</Text>
                 </View>
                 <View className="items-center">
-                  <Text className="text-success text-xl font-bold">{team.pickWins}</Text>
-                  <Text className="text-muted text-xs">Correct</Text>
-                </View>
-                <View className="items-center">
-                  <Text className="text-danger text-xl font-bold">{team.pickLosses}</Text>
-                  <Text className="text-muted text-xs">Wrong</Text>
+                  <Text style={{ color: '#eab308', fontSize: 20, fontWeight: 'bold' }}>
+                    {team.avgWinProb !== null ? `${team.avgWinProb}%` : '—'}
+                  </Text>
+                  <Text className="text-muted text-xs">Avg Win Prob</Text>
                 </View>
                 <View className="items-center">
                   <Text style={{ color: pickColor, fontSize: 20, fontWeight: 'bold' }}>
                     {team.pickAccuracy}%
                   </Text>
                   <Text className="text-muted text-xs">Accuracy</Text>
+                  <Text className="text-gray-500 mt-0.5" style={{ fontSize: 11 }}>{team.pickWins}-{team.pickLosses}</Text>
                 </View>
               </View>
-              {/* Accuracy bar */}
-              <View className="h-2 bg-surface-2 rounded-full overflow-hidden">
-                <View
-                  className="h-full rounded-full"
-                  style={{ width: `${team.pickAccuracy ?? 0}%`, backgroundColor: pickColor }}
-                />
-              </View>
+
+              {/* Comparison bars */}
+              {team.pickShare !== null && team.avgWinProb !== null && (
+                <>
+                  <View className="mb-2">
+                    <View className="flex-row justify-between mb-1">
+                      <Text className="text-muted" style={{ fontSize: 12 }}>Picked by Gridirons</Text>
+                      <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: '600' }}>{team.pickShare}%</Text>
+                    </View>
+                    <View className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                      <View className="h-full rounded-full" style={{ width: `${team.pickShare}%`, backgroundColor: '#3b82f6' }} />
+                    </View>
+                  </View>
+                  <View className="mb-3.5">
+                    <View className="flex-row justify-between mb-1">
+                      <Text className="text-muted" style={{ fontSize: 12 }}>Model's Win Probability</Text>
+                      <Text style={{ color: '#eab308', fontSize: 12, fontWeight: '600' }}>{team.avgWinProb}%</Text>
+                    </View>
+                    <View className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                      <View className="h-full rounded-full" style={{ width: `${team.avgWinProb}%`, backgroundColor: '#eab308' }} />
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* Insight callout — only shown when a gap is actually notable */}
+              {(() => {
+                const insight = getPickInsight(team.pickShare, team.avgWinProb, team.pickAccuracy);
+                if (!insight) return null;
+                return (
+                  <View className="flex-row items-center rounded-lg px-3 py-2.5" style={{ backgroundColor: insight.bg, gap: 8 }}>
+                    <Ionicons name={insight.icon} size={16} color={insight.color} />
+                    <Text className="text-white flex-1" style={{ fontSize: 12, lineHeight: 16 }}>{insight.message}</Text>
+                  </View>
+                );
+              })()}
             </View>
           </View>
         )}

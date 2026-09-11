@@ -58,8 +58,11 @@ export default function PicksScreen() {
   const { data: tiebreaker } = useTiebreaker(selectedWeek, season);
   const submitPick = useSubmitPick();
 
-  // When any live game goes final, invalidate team + picks-by-team caches
-  // so Team Central and Picks by Team reflect updated W-L without manual refresh.
+  // When any live game goes final, invalidate team + picks-by-team caches so Team Central,
+  // Team Detail (Pick Insight included), and Picks by Team reflect updated stats without
+  // manual refresh. 'team' (singular, useTeamDetail) was missing here — only the team LIST
+  // was covered, so a Team Detail screen open at the moment a game finished sat on stale
+  // pick-share/win-prob/accuracy numbers until its 5-minute staleTime happened to expire.
   const prevGamesRef = useRef<Game[] | undefined>(undefined);
   useEffect(() => {
     if (games && prevGamesRef.current) {
@@ -69,6 +72,7 @@ export default function PicksScreen() {
       );
       if (anyWentFinal) {
         queryClient.invalidateQueries({ queryKey: ['teams'] });
+        queryClient.invalidateQueries({ queryKey: ['team'] });
         queryClient.invalidateQueries({ queryKey: ['picks-by-team'] });
       }
     }

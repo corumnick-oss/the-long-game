@@ -69,7 +69,7 @@ async function buildTeamStats(season, seasonType = 'regular') {
     const teams = {};
     const ensure = (name, logo) => {
         if (!teams[name]) {
-            teams[name] = { name, logo: logo ?? null, wins: 0, losses: 0, pointsScored: [], pointsAllowed: [], pickWins: 0, pickLosses: 0 };
+            teams[name] = { name, logo: logo ?? null, wins: 0, losses: 0, pointsScored: [], pointsAllowed: [], pickWins: 0, pickLosses: 0, pickPoolTotal: 0, winProbs: [] };
         }
     };
     for (const game of allGames) {
@@ -100,6 +100,10 @@ async function buildTeamStats(season, seasonType = 'regular') {
             const game = gameMap[pick.gameId];
             if (!game)
                 continue;
+            if (teams[game.homeTeam])
+                teams[game.homeTeam].pickPoolTotal++;
+            if (teams[game.awayTeam])
+                teams[game.awayTeam].pickPoolTotal++;
             const teamName = pick.pick === 'home' ? game.homeTeam : game.awayTeam;
             if (!teams[teamName])
                 continue;
@@ -107,6 +111,8 @@ async function buildTeamStats(season, seasonType = 'regular') {
                 teams[teamName].pickWins++;
             else
                 teams[teamName].pickLosses++;
+            if (pick.pickWinProbability != null)
+                teams[teamName].winProbs.push(pick.pickWinProbability);
         }
     }
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
@@ -122,6 +128,12 @@ async function buildTeamStats(season, seasonType = 'regular') {
         pickTotal: t.pickWins + t.pickLosses,
         pickAccuracy: t.pickWins + t.pickLosses > 0
             ? Math.round((t.pickWins / (t.pickWins + t.pickLosses)) * 100)
+            : null,
+        pickShare: t.pickPoolTotal > 0
+            ? Math.round(((t.pickWins + t.pickLosses) / t.pickPoolTotal) * 100)
+            : null,
+        avgWinProb: t.winProbs.length
+            ? Math.round(t.winProbs.reduce((a, b) => a + b, 0) / t.winProbs.length)
             : null,
     }));
 }
@@ -204,7 +216,8 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
     }
     // Pick W-L for this team across all users
     const gameIds = teamGames.map(g => g.id);
-    let pickWins = 0, pickLosses = 0;
+    let pickWins = 0, pickLosses = 0, pickPoolTotal = 0;
+    const winProbs = [];
     if (gameIds.length > 0) {
         const gamePicks = await db_1.db.query.picks.findMany({
             where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds),
@@ -216,6 +229,7 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
             const game = gameMap[pick.gameId];
             if (!game)
                 continue;
+            pickPoolTotal++; // every graded pick in one of this team's games, either side
             const pickedTeam = pick.pick === 'home' ? game.homeTeam : game.awayTeam;
             if (pickedTeam !== resolvedName)
                 continue;
@@ -223,6 +237,8 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
                 pickWins++;
             else
                 pickLosses++;
+            if (pick.pickWinProbability != null)
+                winProbs.push(pick.pickWinProbability);
         }
     }
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
@@ -293,6 +309,8 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
         pickLosses,
         pickTotal: pickWins + pickLosses,
         pickAccuracy: pickWins + pickLosses > 0 ? Math.round((pickWins / (pickWins + pickLosses)) * 100) : null,
+        pickShare: pickPoolTotal > 0 ? Math.round(((pickWins + pickLosses) / pickPoolTotal) * 100) : null,
+        avgWinProb: winProbs.length ? Math.round(winProbs.reduce((a, b) => a + b, 0) / winProbs.length) : null,
         recentGames,
     });
 });

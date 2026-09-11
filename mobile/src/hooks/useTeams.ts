@@ -13,6 +13,8 @@ export type TeamSummary = {
   pickLosses: number;
   pickTotal: number;
   pickAccuracy: number | null;
+  pickShare: number | null;
+  avgWinProb: number | null;
 };
 
 export type RecentGame = {
