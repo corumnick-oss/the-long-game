@@ -47,7 +47,7 @@ async function buildTeamStats(season: number, seasonType: string = 'regular') {
     pickWins: number;
     pickLosses: number;
     pickPoolTotal: number; // graded picks made in any of this team's games (both sides)
-    winProbs: number[]; // model win prob at pick time, for picks that went to this team
+    winProbs: number[]; // model's final win prob for this team, one entry per decided game
   };
 
   const teams: Record<string, TeamData> = {};
@@ -71,6 +71,17 @@ async function buildTeamStats(season: number, seasonType: string = 'regular') {
     teams[game.awayTeam].losses += homeWon ? 1 : 0;
     teams[game.awayTeam].pointsScored.push(game.awayScore);
     teams[game.awayTeam].pointsAllowed.push(game.homeScore);
+
+    // Model's win prob for this game, once per team — not once per pick. winningTeamWinProb/
+    // losingTeamWinProb are frozen at game-final (see espnService.ts), so this reflects the
+    // model's actual final line rather than whatever snapshot different pickers happened to
+    // see over the days leading up to kickoff.
+    if (game.winningTeamWinProb != null && game.losingTeamWinProb != null) {
+      const winnerName = homeWon ? game.homeTeam : game.awayTeam;
+      const loserName = homeWon ? game.awayTeam : game.homeTeam;
+      teams[winnerName].winProbs.push(game.winningTeamWinProb);
+      teams[loserName].winProbs.push(game.losingTeamWinProb);
+    }
   }
 
   // Aggregate pick W-L across all users
@@ -90,7 +101,6 @@ async function buildTeamStats(season: number, seasonType: string = 'regular') {
       if (!teams[teamName]) continue;
       if (pick.isCorrect) teams[teamName].pickWins++;
       else teams[teamName].pickLosses++;
-      if (pick.pickWinProbability != null) teams[teamName].winProbs.push(pick.pickWinProbability);
     }
   }
 
@@ -190,6 +200,8 @@ router.get('/:name', optionalAuth, async (req, res) => {
     };
   });
 
+  // Model's win prob for this team, once per decided game (not once per pick — see buildTeamStats).
+  const winProbs: number[] = [];
   for (const game of teamGames) {
     if (game.status !== 'post' || game.homeScore === null || game.awayScore === null) continue;
     const isHome = game.homeTeam === resolvedName;
@@ -198,12 +210,15 @@ router.get('/:name', optionalAuth, async (req, res) => {
     if (myScore > theirScore) wins++; else losses++;
     pointsScored.push(myScore);
     pointsAllowed.push(theirScore);
+
+    if (game.winningTeamWinProb != null && game.losingTeamWinProb != null) {
+      winProbs.push(myScore > theirScore ? game.winningTeamWinProb : game.losingTeamWinProb);
+    }
   }
 
   // Pick W-L for this team across all users
   const gameIds = teamGames.map(g => g.id);
   let pickWins = 0, pickLosses = 0, pickPoolTotal = 0;
-  const winProbs: number[] = [];
   if (gameIds.length > 0) {
     const gamePicks = await db.query.picks.findMany({
       where: inArray(schema.picks.gameId, gameIds),
@@ -217,7 +232,6 @@ router.get('/:name', optionalAuth, async (req, res) => {
       const pickedTeam = pick.pick === 'home' ? game.homeTeam : game.awayTeam;
       if (pickedTeam !== resolvedName) continue;
       if (pick.isCorrect) pickWins++; else pickLosses++;
-      if (pick.pickWinProbability != null) winProbs.push(pick.pickWinProbability);
     }
   }
 

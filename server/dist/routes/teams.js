@@ -86,6 +86,16 @@ async function buildTeamStats(season, seasonType = 'regular') {
         teams[game.awayTeam].losses += homeWon ? 1 : 0;
         teams[game.awayTeam].pointsScored.push(game.awayScore);
         teams[game.awayTeam].pointsAllowed.push(game.homeScore);
+        // Model's win prob for this game, once per team — not once per pick. winningTeamWinProb/
+        // losingTeamWinProb are frozen at game-final (see espnService.ts), so this reflects the
+        // model's actual final line rather than whatever snapshot different pickers happened to
+        // see over the days leading up to kickoff.
+        if (game.winningTeamWinProb != null && game.losingTeamWinProb != null) {
+            const winnerName = homeWon ? game.homeTeam : game.awayTeam;
+            const loserName = homeWon ? game.awayTeam : game.homeTeam;
+            teams[winnerName].winProbs.push(game.winningTeamWinProb);
+            teams[loserName].winProbs.push(game.losingTeamWinProb);
+        }
     }
     // Aggregate pick W-L across all users
     const finishedGameIds = allGames.filter(g => g.status === 'post').map(g => g.id);
@@ -111,8 +121,6 @@ async function buildTeamStats(season, seasonType = 'regular') {
                 teams[teamName].pickWins++;
             else
                 teams[teamName].pickLosses++;
-            if (pick.pickWinProbability != null)
-                teams[teamName].winProbs.push(pick.pickWinProbability);
         }
     }
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
@@ -201,6 +209,8 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
             result,
         };
     });
+    // Model's win prob for this team, once per decided game (not once per pick — see buildTeamStats).
+    const winProbs = [];
     for (const game of teamGames) {
         if (game.status !== 'post' || game.homeScore === null || game.awayScore === null)
             continue;
@@ -213,11 +223,13 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
             losses++;
         pointsScored.push(myScore);
         pointsAllowed.push(theirScore);
+        if (game.winningTeamWinProb != null && game.losingTeamWinProb != null) {
+            winProbs.push(myScore > theirScore ? game.winningTeamWinProb : game.losingTeamWinProb);
+        }
     }
     // Pick W-L for this team across all users
     const gameIds = teamGames.map(g => g.id);
     let pickWins = 0, pickLosses = 0, pickPoolTotal = 0;
-    const winProbs = [];
     if (gameIds.length > 0) {
         const gamePicks = await db_1.db.query.picks.findMany({
             where: (0, drizzle_orm_1.inArray)(schema.picks.gameId, gameIds),
@@ -237,8 +249,6 @@ router.get('/:name', auth_1.optionalAuth, async (req, res) => {
                 pickWins++;
             else
                 pickLosses++;
-            if (pick.pickWinProbability != null)
-                winProbs.push(pick.pickWinProbability);
         }
     }
     const avg = (arr) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
