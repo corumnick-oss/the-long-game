@@ -11,6 +11,12 @@ When starting a session say: "I've read CLAUDE.md and I'm ready to continue."
 
 ## ⚠️ DO THIS FIRST NEXT SESSION
 
+### ✅ Public profile: Pick Comparison moved above Achievements/Trophy Case + achievement descriptions shown — DONE (Sept 22 2026)
+Nick's read: public profiles showed Achievements first, so if someone had a lot of them, the Pick Comparison section got pushed far enough down that people didn't realize it existed. Two small fixes, both mobile-only:
+- `mobile/app/user/[id].tsx` — reordered sections so **Pick Comparison renders first**, then Trophy Case, then Achievements (was Trophy Case → Achievements → Pick Comparison). Own Profile (`profile.tsx`) already had H2H above Achievements, so it didn't need this change.
+- **Achievement cards now show why they were earned**, not just an image + "Week N". Each `trophies` row already had a `description` field being generated server-side (`trophyService.ts`, e.g. "Got 12 picks correct this week" for Most Wins, "Picked Chiefs to beat Ravens with only 22% win probability" for Upset Pick) — it just wasn't being rendered anywhere. `AchievementCard` in both `profile.tsx` (own profile) and `user/[id].tsx` (public profile) now displays that description under the "Week N" label. No backend change needed — the data already existed, this was purely a mobile display gap.
+- Deployed Sept 22 2026: mobile-only (JS, no backend change), commit `f44ec83` pushed to `main`, via `eas update --branch preview` (update group `cbf29615-f8e1-44ab-b93e-babcec3bec86`).
+
 ### ✅ Team Detail's "Community Picks" redesigned into "Pick Insight" + avgWinProb averaging bug fixed — DONE (Sept 10 2026)
 Nick's read on the old Community Picks card (Total Picks / Correct / Wrong / Accuracy): raw Total Picks mostly just tracked how many games the team had played (not popularity), and Accuracy was nearly redundant with the team's own record shown above it. Mocked up a redesign with the `design` skill first (published as an Artifact for Nick to review before any code changed), then built it once he signed off:
 - **New fields, both `server/src/routes/teams.ts` endpoints** (`GET /api/teams` list + `GET /api/teams/:name` detail): `pickShare` (% of graded picks in that team's games that went to them — normalizes for games-played, unlike raw `pickTotal`) and `avgWinProb` (the model's win probability for this team, averaged across its decided games). `pickWins`/`pickLosses`/`pickTotal`/`pickAccuracy` are unchanged and still returned.
