@@ -42,7 +42,7 @@ function AchievementCard({ trophy }: { trophy: Achievement }) {
         <Text className="text-muted text-xs font-semibold text-center">
           Week {trophy.week}
         </Text>
-        <Text className="text-muted text-[11px] text-center mt-0.5" numberOfLines={2}>
+        <Text className="text-muted text-[11px] text-center mt-0.5">
           {trophy.description}
         </Text>
       </View>
